@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  agentos-server:
+    build: .
+    image: nexus-agentos:1.14.5
+    ports:
+      - "8000:8000"
+      - "9090:9090"
+    environment:
+      - AGENTOS_MODEL=gpt-4o
+      - AGENTOS_LOG_LEVEL=info
+    volumes:
+      - agentos_data:/home/agentos/.agentos
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  agentos-worker:
+    image: nexus-agentos:1.14.5
+    command: ray start --address=agentos-server:6379
+    depends_on:
+      - agentos-server
+    deploy:
+      replicas: 2
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=agentos
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  agentos_data:
+  prometheus_data:
+  grafana_data:
