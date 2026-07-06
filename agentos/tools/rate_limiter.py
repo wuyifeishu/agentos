@@ -17,12 +17,12 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
-
+from typing import Any
 
 # ============================================================================
 # Rate Limit Exceeded
 # ============================================================================
+
 
 class RateLimitExceeded(Exception):
     def __init__(self, key: str, limit: float, window: float):
@@ -35,6 +35,7 @@ class RateLimitExceeded(Exception):
 # ============================================================================
 # TokenBucket
 # ============================================================================
+
 
 @dataclass
 class _BucketState:
@@ -51,12 +52,12 @@ class TokenBucket:
         limiter.try_acquire("api:user:42", tokens=5)  # consume 5 tokens
     """
 
-    def __init__(self, rate: float, burst: Optional[float] = None):
+    def __init__(self, rate: float, burst: float | None = None):
         if rate <= 0:
             raise ValueError("rate must be positive")
         self._rate = rate
         self._burst = burst if burst is not None else rate
-        self._buckets: Dict[str, _BucketState] = {}
+        self._buckets: dict[str, _BucketState] = {}
         self._lock = threading.RLock()
         self._total_acquired: int = 0
         self._total_rejected: int = 0
@@ -83,7 +84,7 @@ class TokenBucket:
                 self._total_rejected += 1
                 return False
 
-    def acquire_or_wait(self, key: str, timeout: Optional[float] = None, tokens: float = 1.0) -> bool:
+    def acquire_or_wait(self, key: str, timeout: float | None = None, tokens: float = 1.0) -> bool:
         """Block until tokens available or timeout."""
         deadline = time.monotonic() + timeout if timeout else None
         while True:
@@ -101,7 +102,7 @@ class TokenBucket:
         with self._lock:
             self._buckets.clear()
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "rate": self._rate,
@@ -120,6 +121,7 @@ class TokenBucket:
 # SlidingWindow
 # ============================================================================
 
+
 class SlidingWindow:
     """Sliding window rate limiter — strict per-window limit, no burst.
 
@@ -133,7 +135,7 @@ class SlidingWindow:
             raise ValueError("limit must be positive")
         self._limit = limit
         self._window = window
-        self._windows: Dict[str, List[float]] = {}
+        self._windows: dict[str, list[float]] = {}
         self._lock = threading.RLock()
         self._total_acquired: int = 0
         self._total_rejected: int = 0
@@ -160,7 +162,7 @@ class SlidingWindow:
                 self._total_rejected += 1
                 return False
 
-    def acquire_or_wait(self, key: str, timeout: Optional[float] = None) -> bool:
+    def acquire_or_wait(self, key: str, timeout: float | None = None) -> bool:
         deadline = time.monotonic() + timeout if timeout else None
         while True:
             if self.try_acquire(key):
@@ -177,7 +179,7 @@ class SlidingWindow:
         with self._lock:
             self._windows.clear()
 
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "limit": self._limit,

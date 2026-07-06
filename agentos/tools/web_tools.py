@@ -10,7 +10,6 @@ from agentos.tools.base import BaseTool, PermissionLevel, ToolResult
 
 
 class WebFetchTool(BaseTool):
-
     """网页抓取工具。"""
 
     name = "web_fetch"

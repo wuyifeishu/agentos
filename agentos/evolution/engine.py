@@ -11,18 +11,20 @@ from __future__ import annotations
 import os
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class EvolutionStatus(str, Enum):
+class EvolutionStatus(StrEnum):
     """Status of an evolution proposal."""
-    PENDING = "pending"       # Waiting for approval
-    APPROVED = "approved"     # Approved, ready to apply
-    REJECTED = "rejected"     # Rejected by human
-    APPLIED = "applied"       # Successfully applied
-    FAILED = "failed"         # Failed to apply
+
+    PENDING = "pending"  # Waiting for approval
+    APPROVED = "approved"  # Approved, ready to apply
+    REJECTED = "rejected"  # Rejected by human
+    APPLIED = "applied"  # Successfully applied
+    FAILED = "failed"  # Failed to apply
 
 
 @dataclass
@@ -44,6 +46,7 @@ class EvolutionProposal:
         applied_at: Application timestamp
         metadata: Additional metadata
     """
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     agent_name: str = ""
     change_type: str = "prompt"  # prompt, tools, params, behavior
@@ -55,9 +58,9 @@ class EvolutionProposal:
     target_files: list[str] = field(default_factory=list)
     status: EvolutionStatus = EvolutionStatus.PENDING
     created_at: float = field(default_factory=time.time)
-    approved_at: Optional[float] = None
-    approved_by: Optional[str] = None
-    applied_at: Optional[float] = None
+    approved_at: float | None = None
+    approved_by: str | None = None
+    applied_at: float | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -120,8 +123,8 @@ class EvolutionEngine:
         new_value: Any = None,
         confidence: float = 0.0,
         risk_level: str = "low",
-        target_files: Optional[list[str]] = None,
-        **metadata
+        target_files: list[str] | None = None,
+        **metadata,
     ) -> EvolutionProposal:
         """
         Create a new evolution proposal.
@@ -156,7 +159,7 @@ class EvolutionEngine:
 
         return proposal
 
-    def get_proposal(self, proposal_id: str) -> Optional[EvolutionProposal]:
+    def get_proposal(self, proposal_id: str) -> EvolutionProposal | None:
         """
         Get a proposal by ID.
 
@@ -170,8 +173,8 @@ class EvolutionEngine:
 
     def list_proposals(
         self,
-        status: Optional[EvolutionStatus] = None,
-        agent_name: Optional[str] = None,
+        status: EvolutionStatus | None = None,
+        agent_name: str | None = None,
     ) -> list[EvolutionProposal]:
         """
         List proposals.
@@ -274,7 +277,7 @@ class EvolutionEngine:
                 for fpath in target_files:
                     if not os.path.exists(fpath):
                         continue
-                    with open(fpath, "r") as f:
+                    with open(fpath) as f:
                         content = f.read()
                     old_str = str(old_val)
                     new_str = str(new_val)

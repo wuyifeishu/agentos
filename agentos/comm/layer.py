@@ -12,8 +12,9 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 @dataclass
@@ -29,9 +30,10 @@ class Message:
         metadata: Additional metadata
         timestamp: Message timestamp
     """
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     sender: str = ""
-    receiver: Optional[str] = None
+    receiver: str | None = None
     content: Any = None
     metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
@@ -86,12 +88,14 @@ class Blackboard:
         self._data[agent_name][key] = value
 
         # Record in history
-        self._history.append({
-            "agent": agent_name,
-            "key": key,
-            "value": value,
-            "timestamp": time.time(),
-        })
+        self._history.append(
+            {
+                "agent": agent_name,
+                "key": key,
+                "value": value,
+                "timestamp": time.time(),
+            }
+        )
 
     def read(
         self,
@@ -125,11 +129,7 @@ class Blackboard:
         Returns:
             Dict of agent_name -> value
         """
-        return {
-            agent: data.get(key)
-            for agent, data in self._data.items()
-            if key in data
-        }
+        return {agent: data.get(key) for agent, data in self._data.items() if key in data}
 
     def get_agent_data(self, agent_name: str) -> dict[str, Any]:
         """
@@ -145,7 +145,7 @@ class Blackboard:
 
     def get_history(
         self,
-        agent_name: Optional[str] = None,
+        agent_name: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """
@@ -165,7 +165,7 @@ class Blackboard:
 
         return history[-limit:]
 
-    def clear(self, agent_name: Optional[str] = None) -> None:
+    def clear(self, agent_name: str | None = None) -> None:
         """
         Clear blackboard.
 
@@ -259,12 +259,14 @@ class EventBus:
             Number of subscribers notified
         """
         # Record in history
-        self._history.append({
-            "event_type": event_type,
-            "data": data,
-            "sender": sender,
-            "timestamp": time.time(),
-        })
+        self._history.append(
+            {
+                "event_type": event_type,
+                "data": data,
+                "sender": sender,
+                "timestamp": time.time(),
+            }
+        )
 
         # Notify subscribers
         subscribers = self._subscribers.get(event_type, [])
@@ -294,12 +296,14 @@ class EventBus:
             Number of subscribers notified
         """
         # Record in history
-        self._history.append({
-            "event_type": event_type,
-            "data": data,
-            "sender": sender,
-            "timestamp": time.time(),
-        })
+        self._history.append(
+            {
+                "event_type": event_type,
+                "data": data,
+                "sender": sender,
+                "timestamp": time.time(),
+            }
+        )
 
         # Notify subscribers
         subscribers = self._subscribers.get(event_type, [])
@@ -317,7 +321,7 @@ class EventBus:
 
     def get_history(
         self,
-        event_type: Optional[str] = None,
+        event_type: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
         """
@@ -361,13 +365,7 @@ class Mailbox:
         self._mailboxes: dict[str, list[Message]] = {}
         self._sent: list[Message] = []
 
-    def send(
-        self,
-        sender: str,
-        receiver: str,
-        content: Any,
-        **metadata
-    ) -> Message:
+    def send(self, sender: str, receiver: str, content: Any, **metadata) -> Message:
         """
         Send a message.
 
@@ -435,7 +433,7 @@ class Mailbox:
 
     def get_sent(
         self,
-        sender: Optional[str] = None,
+        sender: str | None = None,
         limit: int = 100,
     ) -> list[Message]:
         """
@@ -455,7 +453,7 @@ class Mailbox:
 
         return sent[-limit:]
 
-    def clear(self, receiver: Optional[str] = None) -> None:
+    def clear(self, receiver: str | None = None) -> None:
         """
         Clear mailboxes.
 

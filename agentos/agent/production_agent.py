@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from agentos.agent.agent_builder import build_agent
 from agentos.llm.base import LLMProvider
@@ -29,9 +28,10 @@ logger = logging.getLogger("agentos.production")
 @dataclass
 class AgentResult:
     """Agent 执行完整结果。"""
+
     success: bool
     output: str = ""
-    error: Optional[str] = None
+    error: str | None = None
     total_steps: int = 0
     total_tokens: int = 0
     total_cost_usd: float = 0.0
@@ -50,9 +50,9 @@ class ProductionAgent:
 
     def __init__(
         self,
-        provider: Optional[LLMProvider] = None,
+        provider: LLMProvider | None = None,
         max_steps: int = 20,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         include_skills: bool = True,
         verbose: bool = False,
     ):
@@ -73,9 +73,7 @@ class ProductionAgent:
         try:
             raw = self._agent.run(task)
 
-            tool_calls = sum(
-                len(s.tool_calls) for s in raw.steps
-            )
+            tool_calls = sum(len(s.tool_calls) for s in raw.steps)
 
             logger.info(
                 f"Done: {raw.total_steps} steps, "

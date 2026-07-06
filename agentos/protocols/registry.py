@@ -12,10 +12,10 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Union
-
+from enum import StrEnum
+from typing import Any
 
 # ── Agent Info ───────────────────────────────
 
@@ -23,9 +23,10 @@ from typing import Any, Callable, Dict, List, Optional, Set, Union
 @dataclass
 class AgentInfo:
     """Lightweight agent info for registration and discovery."""
+
     agent_id: str
     endpoint: str = ""
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
     version: str = "1.0.0"
     transport: str = "grpc"
     status: str = "active"
@@ -42,11 +43,12 @@ class DiscoveryCapability:
     不同于 protocols.contracts.AgentCapability（面向合约），
     本类面向注册中心发现和匹配。
     """
-    name: str                       # 能力名称 (e.g. "code_review", "pdf_parsing")
+
+    name: str  # 能力名称 (e.g. "code_review", "pdf_parsing")
     description: str = ""
     version: str = "1.0.0"
-    input_schema: Optional[Dict[str, Any]] = None
-    performance: Dict[str, Any] = field(default_factory=dict)  # 性能指标
+    input_schema: dict[str, Any] | None = None
+    performance: dict[str, Any] = field(default_factory=dict)  # 性能指标
 
     def to_dict(self) -> dict:
         return {
@@ -58,7 +60,7 @@ class DiscoveryCapability:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "DiscoveryCapability":
+    def from_dict(cls, d: dict) -> DiscoveryCapability:
         return cls(
             name=d.get("name", ""),
             description=d.get("description", ""),
@@ -80,19 +82,19 @@ class DiscoveryCard:
     agent_id: str
     name: str
     description: str = ""
-    url: str = ""                      # Agent 的服务端点
+    url: str = ""  # Agent 的服务端点
     version: str = "1.0.0"
-    capabilities: List[DiscoveryCapability] = field(default_factory=list)
-    provider: Dict[str, Any] = field(default_factory=dict)  # 组织/团队信息
-    default_input_modes: List[str] = field(default_factory=lambda: ["text"])
-    default_output_modes: List[str] = field(default_factory=lambda: ["text"])
-    skills: List[Dict[str, Any]] = field(default_factory=list)
+    capabilities: list[DiscoveryCapability] = field(default_factory=list)
+    provider: dict[str, Any] = field(default_factory=dict)  # 组织/团队信息
+    default_input_modes: list[str] = field(default_factory=lambda: ["text"])
+    default_output_modes: list[str] = field(default_factory=lambda: ["text"])
+    skills: list[dict[str, Any]] = field(default_factory=list)
     supports_streaming: bool = False
     supports_handoff: bool = True
     max_context_length: int = 128000
     preferred_model: str = ""
-    service_tier: str = "standard"      # standard | premium | enterprise
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    service_tier: str = "standard"  # standard | premium | enterprise
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -115,17 +117,14 @@ class DiscoveryCard:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "DiscoveryCard":
+    def from_dict(cls, d: dict) -> DiscoveryCard:
         return cls(
             agent_id=d.get("agent_id", ""),
             name=d.get("name", ""),
             description=d.get("description", ""),
             url=d.get("url", ""),
             version=d.get("version", "1.0.0"),
-            capabilities=[
-                DiscoveryCapability.from_dict(c)
-                for c in d.get("capabilities", [])
-            ],
+            capabilities=[DiscoveryCapability.from_dict(c) for c in d.get("capabilities", [])],
             provider=d.get("provider", {}),
             default_input_modes=d.get("defaultInputModes", ["text"]),
             default_output_modes=d.get("defaultOutputModes", ["text"]),
@@ -146,8 +145,9 @@ class DiscoveryCard:
 # ── Registry Entry ──────────────────────────
 
 
-class AgentStatus(str, Enum):
+class AgentStatus(StrEnum):
     """Agent 运行状态。"""
+
     ONLINE = "online"
     BUSY = "busy"
     DEGRADED = "degraded"
@@ -162,12 +162,12 @@ class RegistryEntry:
     status: AgentStatus = AgentStatus.ONLINE
     registered_at: float = field(default_factory=time.time)
     last_heartbeat: float = field(default_factory=time.time)
-    load: float = 0.0              # 0.0~1.0 负载
-    task_count: int = 0            # 已完成任务数
+    load: float = 0.0  # 0.0~1.0 负载
+    task_count: int = 0  # 已完成任务数
     error_count: int = 0
     avg_response_ms: float = 0.0
-    tags: List[str] = field(default_factory=list)
-    endpoint_health: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    endpoint_health: dict[str, Any] = field(default_factory=dict)
 
     def is_healthy(self, heartbeat_timeout: float = 30.0) -> bool:
         """心跳是否正常。"""
@@ -213,16 +213,16 @@ class AgentRegistry:
         health_check_interval: float = 10.0,
         auto_cleanup: bool = True,
     ):
-        self._entries: Dict[str, RegistryEntry] = {}
-        self._capability_index: Dict[str, Set[str]] = {}
-        self._tag_index: Dict[str, Set[str]] = {}
-        self._role_index: Dict[str, Set[str]] = {}
+        self._entries: dict[str, RegistryEntry] = {}
+        self._capability_index: dict[str, set[str]] = {}
+        self._tag_index: dict[str, set[str]] = {}
+        self._role_index: dict[str, set[str]] = {}
         self.heartbeat_timeout = heartbeat_timeout
         self.health_check_interval = health_check_interval
         self.auto_cleanup = auto_cleanup
 
         # Event subscribers
-        self._subscribers: Dict[str, List[Callable]] = {
+        self._subscribers: dict[str, list[Callable]] = {
             "register": [],
             "deregister": [],
             "status_change": [],
@@ -230,7 +230,7 @@ class AgentRegistry:
         }
 
         # Health check task
-        self._health_check_task: Optional[asyncio.Task] = None
+        self._health_check_task: asyncio.Task | None = None
         self._running = False
 
     # ── Lifecycle ─────────────────────────────
@@ -267,9 +267,7 @@ class AgentRegistry:
         """健康检查：摘除失联 Agent。"""
         to_remove = []
         for agent_id, entry in list(self._entries.items()):
-            if entry.status != AgentStatus.OFFLINE and not entry.is_healthy(
-                self.heartbeat_timeout
-            ):
+            if entry.status != AgentStatus.OFFLINE and not entry.is_healthy(self.heartbeat_timeout):
                 self._update_status(agent_id, AgentStatus.OFFLINE)
                 to_remove.append(agent_id)
 
@@ -280,8 +278,8 @@ class AgentRegistry:
 
     def register(
         self,
-        card_or_info: Union[DiscoveryCard, "AgentInfo"],
-        tags: Optional[List[str]] = None,
+        card_or_info: DiscoveryCard | AgentInfo,
+        tags: list[str] | None = None,
     ) -> str:
         """注册一个 Agent。
 
@@ -300,9 +298,7 @@ class AgentRegistry:
                 name=info.agent_id,
                 description=f"Agent {info.agent_id} v{info.version}",
                 version=info.version,
-                capabilities=[
-                    DiscoveryCapability(name=c) for c in info.capabilities
-                ],
+                capabilities=[DiscoveryCapability(name=c) for c in info.capabilities],
                 url=info.endpoint,
             )
         else:
@@ -343,7 +339,7 @@ class AgentRegistry:
         self._emit("deregister", {"agent_id": agent_id, "card": entry.card.to_dict()})
         return True
 
-    def heartbeat(self, agent_id: str, load: Optional[float] = None) -> bool:
+    def heartbeat(self, agent_id: str, load: float | None = None) -> bool:
         """Agent 心跳上报。
 
         Args:
@@ -367,9 +363,9 @@ class AgentRegistry:
     def update_stats(
         self,
         agent_id: str,
-        task_count: Optional[int] = None,
-        error_count: Optional[int] = None,
-        avg_response_ms: Optional[float] = None,
+        task_count: int | None = None,
+        error_count: int | None = None,
+        avg_response_ms: float | None = None,
     ) -> bool:
         """更新 Agent 统计信息。"""
         if agent_id not in self._entries:
@@ -387,15 +383,15 @@ class AgentRegistry:
 
     def discover(
         self,
-        capability: Optional[str] = None,
-        tags: Optional[List[str]] = None,
-        role: Optional[str] = None,
-        status: Optional[AgentStatus] = None,
-        service_tier: Optional[str] = None,
-        supports_streaming: Optional[bool] = None,
+        capability: str | None = None,
+        tags: list[str] | None = None,
+        role: str | None = None,
+        status: AgentStatus | None = None,
+        service_tier: str | None = None,
+        supports_streaming: bool | None = None,
         min_health: bool = True,
         limit: int = 50,
-    ) -> List[RegistryEntry]:
+    ) -> list[RegistryEntry]:
         """服务发现：按条件筛选 Agent。
 
         Args:
@@ -411,7 +407,7 @@ class AgentRegistry:
         Returns:
             匹配的 RegistryEntry 列表
         """
-        candidates: Set[str] = set(self._entries.keys())
+        candidates: set[str] = set(self._entries.keys())
 
         # Capability filter
         if capability:
@@ -447,8 +443,10 @@ class AgentRegistry:
                 continue
 
             # Streaming filter
-            if supports_streaming is not None and \
-               entry.card.supports_streaming != supports_streaming:
+            if (
+                supports_streaming is not None
+                and entry.card.supports_streaming != supports_streaming
+            ):
                 continue
 
             results.append(entry)
@@ -466,10 +464,10 @@ class AgentRegistry:
 
     def discover_one(
         self,
-        capability: Optional[str] = None,
+        capability: str | None = None,
         load_balanced: bool = True,
         **kwargs,
-    ) -> Optional[RegistryEntry]:
+    ) -> RegistryEntry | None:
         """发现单个最优 Agent。
 
         Args:
@@ -490,18 +488,18 @@ class AgentRegistry:
             return results[0]
         return results[0]
 
-    def get_agent(self, agent_id: str) -> Optional[RegistryEntry]:
+    def get_agent(self, agent_id: str) -> RegistryEntry | None:
         """按 ID 获取 Agent。"""
         return self._entries.get(agent_id)
 
-    def list_all(self, include_offline: bool = False) -> List[RegistryEntry]:
+    def list_all(self, include_offline: bool = False) -> list[RegistryEntry]:
         """列出所有 Agent。"""
         entries = list(self._entries.values())
         if not include_offline:
             entries = [
-                e for e in entries
-                if e.status != AgentStatus.OFFLINE
-                or e.is_healthy(self.heartbeat_timeout)
+                e
+                for e in entries
+                if e.status != AgentStatus.OFFLINE or e.is_healthy(self.heartbeat_timeout)
             ]
         return entries
 
@@ -516,11 +514,12 @@ class AgentRegistry:
     def online_count(self) -> int:
         """在线 Agent 数。"""
         return sum(
-            1 for e in self._entries.values()
+            1
+            for e in self._entries.values()
             if e.status == AgentStatus.ONLINE and e.is_healthy(self.heartbeat_timeout)
         )
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """获取注册中心统计。"""
         online = 0
         busy = 0
@@ -552,7 +551,7 @@ class AgentRegistry:
     def subscribe(
         self,
         event: str,
-        callback: Callable[[Dict[str, Any]], Any],
+        callback: Callable[[dict[str, Any]], Any],
     ) -> None:
         """订阅注册事件。
 
@@ -563,7 +562,7 @@ class AgentRegistry:
         if event in self._subscribers:
             self._subscribers[event].append(callback)
 
-    def _emit(self, event: str, data: Dict[str, Any]) -> None:
+    def _emit(self, event: str, data: dict[str, Any]) -> None:
         """触发事件。"""
         for cb in self._subscribers.get(event, []):
             try:
@@ -579,17 +578,20 @@ class AgentRegistry:
             old_status = self._entries[agent_id].status
             self._entries[agent_id].status = new_status
             if old_status != new_status:
-                self._emit("status_change", {
-                    "agent_id": agent_id,
-                    "old_status": old_status.value,
-                    "new_status": new_status.value,
-                })
+                self._emit(
+                    "status_change",
+                    {
+                        "agent_id": agent_id,
+                        "old_status": old_status.value,
+                        "new_status": new_status.value,
+                    },
+                )
 
     def _build_indices(
         self,
         agent_id: str,
         card: DiscoveryCard,
-        tags: List[str],
+        tags: list[str],
     ) -> None:
         """构建反向索引。"""
         # Capability index
@@ -637,12 +639,12 @@ class A2ARegistryBridge:
 
     def __init__(self, registry: AgentRegistry):
         self._registry = registry
-        self._clients: Dict[str, Any] = {}  # agent_id -> A2AClient
+        self._clients: dict[str, Any] = {}  # agent_id -> A2AClient
 
     async def get_client(
         self,
-        capability: Optional[str] = None,
-        agent_id: Optional[str] = None,
+        capability: str | None = None,
+        agent_id: str | None = None,
         **kwargs,
     ) -> Any:
         """获取已发现的 Agent 的 A2A Client。
@@ -663,9 +665,7 @@ class A2ARegistryBridge:
             entry = self._registry.discover_one(capability=capability, **kwargs)
 
         if not entry:
-            raise RuntimeError(
-                f"No available agent found for capability={capability}"
-            )
+            raise RuntimeError(f"No available agent found for capability={capability}")
 
         client = A2AClient(
             base_url=entry.card.url,
@@ -693,8 +693,9 @@ class A2ARegistryBridge:
 default_registry = AgentRegistry()
 
 # ── AgentRecord (test compatibility) ──
-from dataclasses import dataclass, field
 import time
+from dataclasses import dataclass, field
+
 
 @dataclass
 class AgentRecord:
@@ -707,6 +708,7 @@ class AgentRecord:
     version: str = "1.0"
     registered_at: float = field(default_factory=time.time)
 
+
 # ==========================================================================
 # Compat: AgentRecord + lightweight compat API for test_core.py
 # ==========================================================================
@@ -716,8 +718,8 @@ class AgentRecord:
 try:
     from agentos.protocols.a2a import AgentRecord
 except ImportError:
-    from dataclasses import dataclass, field
     import time as _time
+    from dataclasses import dataclass, field
 
     @dataclass
     class AgentRecord:
@@ -738,7 +740,8 @@ def _patch_agent_registry():
 
     def compat_register(self, record):
         from agentos.protocols.a2a import AgentRecord as AR
-        if not hasattr(self, '_compat_records'):
+
+        if not hasattr(self, "_compat_records"):
             self._compat_records = {}
         if isinstance(record, AR):
             record._last_heartbeat = _time.time()
@@ -747,17 +750,17 @@ def _patch_agent_registry():
             self._orig_register(record)
 
     def compat_get(self, agent_id):
-        if not hasattr(self, '_compat_records'):
+        if not hasattr(self, "_compat_records"):
             self._compat_records = {}
         return self._compat_records.get(agent_id)
 
     def compat_find_by_capability(self, capability):
-        if not hasattr(self, '_compat_records'):
+        if not hasattr(self, "_compat_records"):
             self._compat_records = {}
         return [r for r in self._compat_records.values() if capability in r.capabilities]
 
     def compat_heartbeat(self, agent_id):
-        if not hasattr(self, '_compat_records'):
+        if not hasattr(self, "_compat_records"):
             self._compat_records = {}
         r = self._compat_records.get(agent_id)
         if r:
@@ -769,7 +772,7 @@ def _patch_agent_registry():
             return None
         return min(candidates, key=lambda r: r.load)
 
-    if not hasattr(AgentRegistry, '_orig_register'):
+    if not hasattr(AgentRegistry, "_orig_register"):
         AgentRegistry._orig_register = AgentRegistry.register
         AgentRegistry.register = compat_register
         AgentRegistry.get = compat_get

@@ -5,10 +5,18 @@ Category: utility
 """
 
 
-def run(action: str, directory: str = "", pattern: str = "*",
-       organize_by: str = "type", recursive: bool = False) -> str:
+def run(
+    action: str,
+    directory: str = "",
+    pattern: str = "*",
+    organize_by: str = "type",
+    recursive: bool = False,
+) -> str:
     """文件整理工具。action: organize/dedupe/stats/recent。organize_by: type/date/size。"""
-    import os, shutil, hashlib, time
+    import hashlib
+    import os
+    import shutil
+    import time
 
     if not directory or not os.path.isdir(directory):
         return f"[file-organizer] 目录不存在: {directory}"
@@ -21,7 +29,8 @@ def run(action: str, directory: str = "", pattern: str = "*",
         else:
             for f in os.listdir(directory):
                 fp = os.path.join(directory, f)
-                if os.path.isfile(fp): yield fp
+                if os.path.isfile(fp):
+                    yield fp
 
     try:
         if action == "stats":
@@ -32,11 +41,18 @@ def run(action: str, directory: str = "", pattern: str = "*",
                 total += 1
                 ext = os.path.splitext(fp)[1].lower() or "(无后缀)"
                 exts[ext] = exts.get(ext, 0) + 1
-                try: sizes.append(os.path.getsize(fp))
-                except: pass
+                try:
+                    sizes.append(os.path.getsize(fp))
+                except:
+                    pass
             total_size = sum(sizes)
-            lines = [f"目录: {directory}", f"文件总数: {total}", f"总大小: {_fmt_size(total_size)}", "",
-                     "按类型分布:"]
+            lines = [
+                f"目录: {directory}",
+                f"文件总数: {total}",
+                f"总大小: {_fmt_size(total_size)}",
+                "",
+                "按类型分布:",
+            ]
             for ext, cnt in sorted(exts.items(), key=lambda x: -x[1]):
                 lines.append(f"  {ext}: {cnt} 个")
             return "\n".join(lines)
@@ -56,10 +72,14 @@ def run(action: str, directory: str = "", pattern: str = "*",
                     subdir = os.path.join(directory, ts)
                 elif organize_by == "size":
                     sz = os.path.getsize(fp)
-                    if sz < 1024*1024: tier = "small"
-                    elif sz < 10*1024*1024: tier = "medium"
-                    elif sz < 100*1024*1024: tier = "large"
-                    else: tier = "xlarge"
+                    if sz < 1024 * 1024:
+                        tier = "small"
+                    elif sz < 10 * 1024 * 1024:
+                        tier = "medium"
+                    elif sz < 100 * 1024 * 1024:
+                        tier = "large"
+                    else:
+                        tier = "xlarge"
                     subdir = os.path.join(directory, tier)
                 os.makedirs(subdir, exist_ok=True)
                 dst = os.path.join(subdir, fname)
@@ -81,7 +101,8 @@ def run(action: str, directory: str = "", pattern: str = "*",
                         dups.append((fp, seen[key]))
                     else:
                         seen[key] = fp
-                except: pass
+                except:
+                    pass
             if not dups:
                 return "[file-organizer] 未找到重复文件"
             lines = [f"找到 {len(dups)} 组疑似重复:"]
@@ -96,7 +117,8 @@ def run(action: str, directory: str = "", pattern: str = "*",
             for fp in _walk():
                 try:
                     files.append((os.path.getmtime(fp), fp, os.path.getsize(fp)))
-                except: pass
+                except:
+                    pass
             files.sort(key=lambda x: -x[0])
             lines = [f"最近修改的文件 (共{len(files)}个):"]
             for mt, fp, sz in files[:20]:
@@ -111,7 +133,8 @@ def run(action: str, directory: str = "", pattern: str = "*",
 
 def _fmt_size(size):
     for unit in ("B", "KB", "MB", "GB"):
-        if size < 1024: return f"{size:.1f}{unit}"
+        if size < 1024:
+            return f"{size:.1f}{unit}"
         size /= 1024
     return f"{size:.1f}TB"
 

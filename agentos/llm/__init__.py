@@ -4,6 +4,7 @@ Nexus AgentOS LLM 模块。
 v1.3.36: +DeepSeekProvider +AnthropicProvider +Function Calling。
 """
 
+from agentos.llm.anthropic_provider import AnthropicProvider
 from agentos.llm.base import (
     CompletionChoice,
     CompletionResult,
@@ -18,11 +19,10 @@ from agentos.llm.base import (
     ToolFunction,
     ToolParameter,
 )
-from agentos.llm.factory import create_provider
-from agentos.llm.openai_provider import OpenAIProvider
 from agentos.llm.deepseek_provider import DeepSeekProvider
-from agentos.llm.anthropic_provider import AnthropicProvider
+from agentos.llm.factory import create_provider
 from agentos.llm.ollama_provider import OllamaProvider
+from agentos.llm.openai_provider import OpenAIProvider
 from agentos.llm.pangu_provider import PanguProvider
 
 __all__ = [

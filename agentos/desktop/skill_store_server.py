@@ -25,10 +25,11 @@ import webbrowser
 from pathlib import Path
 
 try:
-    from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-    from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-    from fastapi.staticfiles import StaticFiles
     import uvicorn
+    from fastapi import FastAPI
+    from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+    from fastapi.staticfiles import StaticFiles
+
     FASTAPI_AVAILABLE = True
 except ImportError:
     FASTAPI_AVAILABLE = False
@@ -127,24 +128,77 @@ SKILL_SOURCES: list[dict] = [
 
 # Known OpenClaw skills (from importer catalog + community)
 OPENCLAW_SKILLS: list[dict] = [
-    {"name": "skill-creator", "description": "Create new skills from templates", "tags": ["meta", "development"]},
-    {"name": "pdf-tools", "description": "PDF manipulation, merge, split, extract text", "tags": ["document", "pdf"]},
-    {"name": "xlsx-tools", "description": "Excel/Spreadsheet creation and editing", "tags": ["document", "excel"]},
+    {
+        "name": "skill-creator",
+        "description": "Create new skills from templates",
+        "tags": ["meta", "development"],
+    },
+    {
+        "name": "pdf-tools",
+        "description": "PDF manipulation, merge, split, extract text",
+        "tags": ["document", "pdf"],
+    },
+    {
+        "name": "xlsx-tools",
+        "description": "Excel/Spreadsheet creation and editing",
+        "tags": ["document", "excel"],
+    },
     {"name": "docx-tools", "description": "Word document processing", "tags": ["document", "word"]},
-    {"name": "pptx-tools", "description": "PowerPoint presentation generation", "tags": ["document", "ppt"]},
-    {"name": "image-tools", "description": "Image processing, resize, convert, OCR", "tags": ["media", "image"]},
-    {"name": "web-search", "description": "Advanced web search with multiple engines", "tags": ["search", "web"]},
-    {"name": "browser-automation", "description": "Browser automation with Playwright", "tags": ["browser", "automation"]},
-    {"name": "code-review", "description": "Automated code review and suggestions", "tags": ["code", "quality"]},
-    {"name": "git-tools", "description": "Git workflow automation and helpers", "tags": ["git", "devops"]},
-    {"name": "file-organizer", "description": "Automated file organization and cleanup", "tags": ["files", "automation"]},
-    {"name": "data-analysis", "description": "Data analysis and visualization", "tags": ["data", "analytics"]},
-    {"name": "api-tester", "description": "API testing and documentation generation", "tags": ["api", "testing"]},
-    {"name": "markdown-tools", "description": "Markdown editing, preview, and conversion", "tags": ["document", "markdown"]},
+    {
+        "name": "pptx-tools",
+        "description": "PowerPoint presentation generation",
+        "tags": ["document", "ppt"],
+    },
+    {
+        "name": "image-tools",
+        "description": "Image processing, resize, convert, OCR",
+        "tags": ["media", "image"],
+    },
+    {
+        "name": "web-search",
+        "description": "Advanced web search with multiple engines",
+        "tags": ["search", "web"],
+    },
+    {
+        "name": "browser-automation",
+        "description": "Browser automation with Playwright",
+        "tags": ["browser", "automation"],
+    },
+    {
+        "name": "code-review",
+        "description": "Automated code review and suggestions",
+        "tags": ["code", "quality"],
+    },
+    {
+        "name": "git-tools",
+        "description": "Git workflow automation and helpers",
+        "tags": ["git", "devops"],
+    },
+    {
+        "name": "file-organizer",
+        "description": "Automated file organization and cleanup",
+        "tags": ["files", "automation"],
+    },
+    {
+        "name": "data-analysis",
+        "description": "Data analysis and visualization",
+        "tags": ["data", "analytics"],
+    },
+    {
+        "name": "api-tester",
+        "description": "API testing and documentation generation",
+        "tags": ["api", "testing"],
+    },
+    {
+        "name": "markdown-tools",
+        "description": "Markdown editing, preview, and conversion",
+        "tags": ["document", "markdown"],
+    },
 ]
 
 
 # ── Server ──
+
 
 def create_app() -> FastAPI:
     """Create the FastAPI application for the skill store."""
@@ -164,23 +218,28 @@ def create_app() -> FastAPI:
             skills = OPENCLAW_SKILLS
             if search:
                 skills = [
-                    s for s in skills
+                    s
+                    for s in skills
                     if search.lower() in s["name"].lower()
                     or search.lower() in s["description"].lower()
                     or any(search.lower() in t.lower() for t in s.get("tags", []))
                 ]
-            return JSONResponse({
-                "source": "openclaw",
-                "source_name": "OpenClaw Skill Store",
-                "total": len(skills),
-                "skills": skills,
-            })
-        return JSONResponse({
-            "source": source,
-            "total": 0,
-            "skills": [],
-            "message": f"Source '{source}' is not locally installable. Open the marketplace URL to browse.",
-        })
+            return JSONResponse(
+                {
+                    "source": "openclaw",
+                    "source_name": "OpenClaw Skill Store",
+                    "total": len(skills),
+                    "skills": skills,
+                }
+            )
+        return JSONResponse(
+            {
+                "source": source,
+                "total": 0,
+                "skills": [],
+                "message": f"Source '{source}' is not locally installable. Open the marketplace URL to browse.",
+            }
+        )
 
     @app.post("/api/install")
     async def install_skill(skill_name: str, source: str = "openclaw"):
@@ -201,28 +260,42 @@ def create_app() -> FastAPI:
                 importer = OpenClawImporter(registry)
                 skill = await importer.import_skill(skill_name)
                 if skill:
-                    return JSONResponse({
-                        "status": "installed",
+                    return JSONResponse(
+                        {
+                            "status": "installed",
+                            "skill": skill_name,
+                            "path": (
+                                str(skill.path)
+                                if hasattr(skill, "path")
+                                else str(install_dir / skill_name)
+                            ),
+                        }
+                    )
+                return JSONResponse(
+                    {
+                        "status": "failed",
                         "skill": skill_name,
-                        "path": str(skill.path) if hasattr(skill, 'path') else str(install_dir / skill_name),
-                    })
-                return JSONResponse({
-                    "status": "failed",
-                    "skill": skill_name,
-                    "error": "Skill not found in OpenClaw store",
-                }, status_code=404)
+                        "error": "Skill not found in OpenClaw store",
+                    },
+                    status_code=404,
+                )
 
-            return JSONResponse({
-                "status": "not_installable",
-                "skill": skill_name,
-                "message": f"Source '{source}' requires manual installation.",
-            })
+            return JSONResponse(
+                {
+                    "status": "not_installable",
+                    "skill": skill_name,
+                    "message": f"Source '{source}' requires manual installation.",
+                }
+            )
         except Exception as e:
-            return JSONResponse({
-                "status": "error",
-                "skill": skill_name,
-                "error": str(e),
-            }, status_code=500)
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "skill": skill_name,
+                    "error": str(e),
+                },
+                status_code=500,
+            )
 
     @app.post("/api/install-all")
     async def install_all(source: str = "openclaw"):
@@ -241,14 +314,18 @@ def create_app() -> FastAPI:
             if source == "openclaw":
                 importer = OpenClawImporter(registry)
                 results = await importer.import_all()
-                return JSONResponse({
-                    "status": "completed",
-                    "total": len(results),
-                    "installed": [r.get("name", "") for r in results],
-                    "failed": [],
-                })
+                return JSONResponse(
+                    {
+                        "status": "completed",
+                        "total": len(results),
+                        "installed": [r.get("name", "") for r in results],
+                        "failed": [],
+                    }
+                )
 
-            return JSONResponse({"status": "error", "error": f"Cannot batch install from {source}"}, status_code=400)
+            return JSONResponse(
+                {"status": "error", "error": f"Cannot batch install from {source}"}, status_code=400
+            )
         except Exception as e:
             return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
 
@@ -327,6 +404,7 @@ _FALLBACK_HTML = """<!DOCTYPE html>
 
 # ── Entry Point ──
 
+
 def launch_skill_store(
     port: int = DEFAULT_PORT,
     host: str = "127.0.0.1",
@@ -356,6 +434,7 @@ def launch_skill_store(
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(description="NexusAgentOS Skill Store Server")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Server port")
     parser.add_argument("--host", default="127.0.0.1", help="Server host")

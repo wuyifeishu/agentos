@@ -5,9 +5,9 @@ Actions: backup, list_backups, restore_latest
 Creates timestamped .tar.gz archives.
 """
 
+import glob
 import os
 import shutil
-import glob
 from datetime import datetime
 from typing import Any
 
@@ -40,7 +40,9 @@ def run(action: str = "backup", source: str = "", target_name: str = "", **kwarg
         archive_path = os.path.join(BACKUP_DIR, archive_name)
 
         try:
-            shutil.make_archive(archive_path, "gztar", os.path.dirname(source), os.path.basename(source))
+            shutil.make_archive(
+                archive_path, "gztar", os.path.dirname(source), os.path.basename(source)
+            )
             final_path = archive_path + ".tar.gz"
             size = os.path.getsize(final_path)
             return f"[backup] Created: {os.path.basename(final_path)} ({size/1024:.1f} KB)"

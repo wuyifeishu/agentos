@@ -20,9 +20,10 @@ import json
 import logging
 import uuid
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 # ── Types ────────────────────────────────────
 
 
-class TaskNodeStatus(str, Enum):
+class TaskNodeStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -38,17 +39,19 @@ class TaskNodeStatus(str, Enum):
     SKIPPED = "skipped"
 
 
-class DecompositionStrategy(str, Enum):
+class DecompositionStrategy(StrEnum):
     """分解策略。"""
-    TOP_DOWN = "top_down"       # 从目标逐层拆解
-    BOTTOM_UP = "bottom_up"     # 从子任务聚合
-    RECURSIVE = "recursive"     # 递归分解直到原子任务
-    HEURISTIC = "heuristic"     # 基于规则/模式匹配
+
+    TOP_DOWN = "top_down"  # 从目标逐层拆解
+    BOTTOM_UP = "bottom_up"  # 从子任务聚合
+    RECURSIVE = "recursive"  # 递归分解直到原子任务
+    HEURISTIC = "heuristic"  # 基于规则/模式匹配
 
 
 @dataclass
 class TaskEdge:
     """DAG 边：from_node 完成后才能执行 to_node。"""
+
     from_node: str
     to_node: str
     dependency_type: str = "hard"  # hard / soft
@@ -57,14 +60,15 @@ class TaskEdge:
 @dataclass
 class TaskNode:
     """DAG 节点：单个可执行单元。"""
+
     id: str = field(default_factory=lambda: f"tn-{uuid.uuid4().hex[:8]}")
     description: str = ""
     input_schema: dict = field(default_factory=dict)
     output_schema: dict = field(default_factory=dict)
-    agent_type: str = "default"     # 推荐执行 Agent 类型
+    agent_type: str = "default"  # 推荐执行 Agent 类型
     estimated_duration_s: float = 0.0
-    confidence: float = 1.0         # 0~1，分解置信度
-    retry_policy: str = "once"      # once / retry_n / fallback
+    confidence: float = 1.0  # 0~1，分解置信度
+    retry_policy: str = "once"  # once / retry_n / fallback
     max_retries: int = 1
     status: TaskNodeStatus = TaskNodeStatus.PENDING
     result: Any = None
@@ -74,34 +78,35 @@ class TaskNode:
 @dataclass
 class TaskDAG:
     """完整的任务 DAG。"""
+
     dag_id: str = field(default_factory=lambda: f"dag-{uuid.uuid4().hex[:8]}")
-    root_task: str = ""             # 原始任务描述
-    nodes: Dict[str, TaskNode] = field(default_factory=dict)
-    edges: List[TaskEdge] = field(default_factory=list)
+    root_task: str = ""  # 原始任务描述
+    nodes: dict[str, TaskNode] = field(default_factory=dict)
+    edges: list[TaskEdge] = field(default_factory=list)
     strategy: DecompositionStrategy = DecompositionStrategy.TOP_DOWN
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: float = 0.0
 
-    def in_degree_map(self) -> Dict[str, int]:
+    def in_degree_map(self) -> dict[str, int]:
         """计算每个节点的入度。"""
-        indeg: Dict[str, int] = {nid: 0 for nid in self.nodes}
+        indeg: dict[str, int] = {nid: 0 for nid in self.nodes}
         for e in self.edges:
             indeg[e.to_node] = indeg.get(e.to_node, 0) + 1
         return indeg
 
-    def adjacency_map(self) -> Dict[str, List[str]]:
+    def adjacency_map(self) -> dict[str, list[str]]:
         """邻接表。"""
-        adj: Dict[str, List[str]] = {nid: [] for nid in self.nodes}
+        adj: dict[str, list[str]] = {nid: [] for nid in self.nodes}
         for e in self.edges:
             adj[e.from_node].append(e.to_node)
         return adj
 
-    def topological_order(self) -> List[str]:
+    def topological_order(self) -> list[str]:
         """Kahn 算法拓扑排序，遇循环抛 ValueError。"""
         indeg = self.in_degree_map()
         adj = self.adjacency_map()
         queue = deque([nid for nid, d in indeg.items() if d == 0])
-        order: List[str] = []
+        order: list[str] = []
 
         while queue:
             node = queue.popleft()
@@ -120,12 +125,12 @@ class TaskDAG:
 
         return order
 
-    def detect_cycles(self) -> Set[str]:
+    def detect_cycles(self) -> set[str]:
         """检测并返回所有参与循环的节点 ID 集合。"""
         indeg = self.in_degree_map()
         adj = self.adjacency_map()
         queue = deque([nid for nid, d in indeg.items() if d == 0])
-        acyclic: Set[str] = set()
+        acyclic: set[str] = set()
 
         while queue:
             node = queue.popleft()
@@ -137,13 +142,13 @@ class TaskDAG:
 
         return set(self.nodes) - acyclic
 
-    def parallel_groups(self) -> List[List[str]]:
+    def parallel_groups(self) -> list[list[str]]:
         """按拓扑层级分组，同一组内可并行执行。"""
         order = self.topological_order()
         indeg = self.in_degree_map()
         adj = self.adjacency_map()
 
-        groups: List[List[str]] = []
+        groups: list[list[str]] = []
         remaining = set(order)
 
         while remaining:
@@ -163,10 +168,11 @@ class TaskDAG:
 @dataclass
 class DecompositionTrace:
     """分解过程可观测性记录。"""
+
     iteration: int
-    action: str                    # split / merge / refine / replan
-    node_before: Optional[TaskNode] = None
-    nodes_after: List[TaskNode] = field(default_factory=list)
+    action: str  # split / merge / refine / replan
+    node_before: TaskNode | None = None
+    nodes_after: list[TaskNode] = field(default_factory=list)
     reason: str = ""
 
 
@@ -192,18 +198,18 @@ class TaskDecomposer:
         new_dag = decomposer.replan(dag, failed_nodes=["tn-xxx"])
     """
 
-    MAX_DEPTH = 8           # 最大递归深度
+    MAX_DEPTH = 8  # 最大递归深度
     MIN_NODE_DURATION = 1.0  # 最小节点估算时长（秒），低于此不再分解
-    MAX_NODES = 50           # 最多节点数
+    MAX_NODES = 50  # 最多节点数
 
     def __init__(
         self,
         strategy: DecompositionStrategy = DecompositionStrategy.RECURSIVE,
-        llm_call: Optional[Callable] = None,
+        llm_call: Callable | None = None,
     ):
         self._strategy = strategy
         self._llm_call = llm_call
-        self._trace: List[DecompositionTrace] = []
+        self._trace: list[DecompositionTrace] = []
         self._iteration = 0
 
     # ── Public API ─────────────────────────
@@ -211,7 +217,7 @@ class TaskDecomposer:
     def decompose(
         self,
         task: str,
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> TaskDAG:
         """将任务分解为 DAG。
 
@@ -249,7 +255,7 @@ class TaskDecomposer:
     def replan(
         self,
         dag: TaskDAG,
-        failed_nodes: List[str],
+        failed_nodes: list[str],
     ) -> TaskDAG:
         """在部分节点执行失败后动态重规划。
 
@@ -304,21 +310,23 @@ class TaskDecomposer:
                 if e.to_node not in affected:
                     new_dag.edges.append(TaskEdge(from_node=alt_node.id, to_node=e.to_node))
 
-            self._trace.append(DecompositionTrace(
-                iteration=self._iteration,
-                action="replan",
-                node_before=node,
-                nodes_after=[alt_node],
-                reason=f"Node {nid} failed: {node.error or 'unknown'}",
-            ))
+            self._trace.append(
+                DecompositionTrace(
+                    iteration=self._iteration,
+                    action="replan",
+                    node_before=node,
+                    nodes_after=[alt_node],
+                    reason=f"Node {nid} failed: {node.error or 'unknown'}",
+                )
+            )
 
         return new_dag
 
-    def get_trace(self) -> List[DecompositionTrace]:
+    def get_trace(self) -> list[DecompositionTrace]:
         """获取完整的分解轨迹（用于可观测性）。"""
         return list(self._trace)
 
-    def validate_dag(self, dag: TaskDAG) -> Tuple[bool, str]:
+    def validate_dag(self, dag: TaskDAG) -> tuple[bool, str]:
         """验证 DAG 的结构完整性。
 
         Returns:
@@ -334,7 +342,7 @@ class TaskDecomposer:
             return False, f"DAG contains cycles: {cycles}"
 
         # 孤立节点检测
-        connected: Set[str] = set()
+        connected: set[str] = set()
         for e in dag.edges:
             connected.add(e.from_node)
             connected.add(e.to_node)
@@ -386,10 +394,12 @@ class TaskDecomposer:
             dag.nodes[sub.id] = sub
             # 子任务按顺序或并行链接
             if i > 0:
-                dag.edges.append(TaskEdge(
-                    from_node=sub_tasks[i - 1].id,
-                    to_node=sub.id,
-                ))
+                dag.edges.append(
+                    TaskEdge(
+                        from_node=sub_tasks[i - 1].id,
+                        to_node=sub.id,
+                    )
+                )
 
         # 重连原节点的入边和出边
         incoming = [e for e in dag.edges if e.to_node == node_id]
@@ -406,13 +416,15 @@ class TaskDecomposer:
             for e in outgoing:
                 dag.edges.append(TaskEdge(from_node=last.id, to_node=e.to_node))
 
-        self._trace.append(DecompositionTrace(
-            iteration=self._iteration,
-            action="split",
-            node_before=node,
-            nodes_after=sub_tasks,
-            reason=f"Decomposed at depth {depth}",
-        ))
+        self._trace.append(
+            DecompositionTrace(
+                iteration=self._iteration,
+                action="split",
+                node_before=node,
+                nodes_after=sub_tasks,
+                reason=f"Decomposed at depth {depth}",
+            )
+        )
 
         # 递归分解子任务
         if len(dag.nodes) < self.MAX_NODES:
@@ -433,9 +445,7 @@ class TaskDecomposer:
             return True
         return False
 
-    def _generate_sub_tasks(
-        self, node: TaskNode, context: Dict[str, Any]
-    ) -> List[TaskNode]:
+    def _generate_sub_tasks(self, node: TaskNode, context: dict[str, Any]) -> list[TaskNode]:
         """生成节点的子任务列表。
 
         优先使用 LLM 调用，降级为启发式规则。
@@ -444,7 +454,7 @@ class TaskDecomposer:
             return self._llm_generate(node, context)
         return self._heuristic_generate(node)
 
-    def _llm_generate(self, node: TaskNode, context: Dict[str, Any]) -> List[TaskNode]:
+    def _llm_generate(self, node: TaskNode, context: dict[str, Any]) -> list[TaskNode]:
         """通过 LLM 调用生成子任务。"""
         prompt = f"""Break down the following task into 2-5 subtasks.
 
@@ -473,16 +483,20 @@ Only respond with the JSON array, no other text."""
             logger.warning(f"LLM decomposition failed: {e}, falling back to heuristic")
             return self._heuristic_generate(node)
 
-    def _heuristic_generate(self, node: TaskNode) -> List[TaskNode]:
+    def _heuristic_generate(self, node: TaskNode) -> list[TaskNode]:
         """启发式任务分解 — 基于关键词和模式匹配。"""
         desc = node.description.lower()
-        subtasks: List[TaskNode] = []
+        subtasks: list[TaskNode] = []
 
         # 模式 1：提取/收集 → 分析 → 生成
         if any(kw in desc for kw in ("extract", "collect", "fetch", "retrieve", "提取", "收集")):
-            subtasks.append(self._create_node(f"Phase 1: Collect data for: {node.description[:60]}"))
+            subtasks.append(
+                self._create_node(f"Phase 1: Collect data for: {node.description[:60]}")
+            )
             subtasks.append(self._create_node("Phase 2: Analyze/process collected data"))
-            subtasks.append(self._create_node(f"Phase 3: Generate output/report for: {node.description[:60]}"))
+            subtasks.append(
+                self._create_node(f"Phase 3: Generate output/report for: {node.description[:60]}")
+            )
 
         # 模式 2：对比/比较
         elif any(kw in desc for kw in ("compare", "vs", "对比", "比较", "versus")):
@@ -504,16 +518,18 @@ Only respond with the JSON array, no other text."""
         else:
             subtasks.append(self._create_node(f"Plan: outline steps for '{node.description[:60]}'"))
             subtasks.append(self._create_node(f"Execute: carry out '{node.description[:60]}'"))
-            subtasks.append(self._create_node(f"Validate: check results of '{node.description[:60]}'"))
+            subtasks.append(
+                self._create_node(f"Validate: check results of '{node.description[:60]}'")
+            )
 
         for sub in subtasks:
             sub.confidence = 0.6  # 启发式分解信心较低
         return subtasks
 
-    def _collect_downstream(self, dag: TaskDAG, failed_nodes: List[str]) -> Set[str]:
+    def _collect_downstream(self, dag: TaskDAG, failed_nodes: list[str]) -> set[str]:
         """收集失败节点及所有下游节点。"""
         adj = dag.adjacency_map()
-        affected: Set[str] = set()
+        affected: set[str] = set()
 
         queue = deque(failed_nodes)
         while queue:
@@ -527,13 +543,15 @@ Only respond with the JSON array, no other text."""
 
         return affected
 
-    def _break_cycles(self, dag: TaskDAG, cycles: Set[str]) -> TaskDAG:
+    def _break_cycles(self, dag: TaskDAG, cycles: set[str]) -> TaskDAG:
         """打破循环 — 移除循环中置信度最低的边。"""
         cycle_edges = [e for e in dag.edges if e.from_node in cycles and e.to_node in cycles]
         if cycle_edges:
             # 移除第一条循环边（可改进为最小置信度边）
             dag.edges.remove(cycle_edges[0])
-            logger.info(f"Removed edge {cycle_edges[0].from_node}→{cycle_edges[0].to_node} to break cycle")
+            logger.info(
+                f"Removed edge {cycle_edges[0].from_node}→{cycle_edges[0].to_node} to break cycle"
+            )
         return dag
 
 
@@ -542,6 +560,6 @@ Only respond with the JSON array, no other text."""
 
 def create_decomposer(
     strategy: DecompositionStrategy = DecompositionStrategy.RECURSIVE,
-    llm_call: Optional[Callable] = None,
+    llm_call: Callable | None = None,
 ) -> TaskDecomposer:
     return TaskDecomposer(strategy=strategy, llm_call=llm_call)

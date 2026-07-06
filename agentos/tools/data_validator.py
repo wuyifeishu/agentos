@@ -17,12 +17,13 @@ Supports:
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Dict, List, Optional, Union
-
+from collections.abc import Callable
+from typing import Any
 
 # ============================================================================
 # Schema definition
 # ============================================================================
+
 
 class Field:
     """A single field definition within a schema."""
@@ -32,16 +33,16 @@ class Field:
         field_type: type,
         required: bool = True,
         nullable: bool = False,
-        min_value: Optional[Union[int, float]] = None,
-        max_value: Optional[Union[int, float]] = None,
-        min_length: Optional[int] = None,
-        max_length: Optional[int] = None,
-        enum: Optional[List[Any]] = None,
-        pattern: Optional[str] = None,
-        custom: Optional[Callable[[Any], Optional[str]]] = None,
+        min_value: int | float | None = None,
+        max_value: int | float | None = None,
+        min_length: int | None = None,
+        max_length: int | None = None,
+        enum: list[Any] | None = None,
+        pattern: str | None = None,
+        custom: Callable[[Any], str | None] | None = None,
         # Nesting
-        nested: Optional[Dict[str, "Field"]] = None,
-        items: Optional["Field"] = None,
+        nested: dict[str, Field] | None = None,
+        items: Field | None = None,
     ):
         self.field_type = field_type
         self.required = required
@@ -61,10 +62,11 @@ class Field:
 # Validator
 # ============================================================================
 
+
 class ValidationError(Exception):
     """Raised when validation fails. Carries a list of error messages."""
 
-    def __init__(self, errors: List[str]):
+    def __init__(self, errors: list[str]):
         self.errors = errors
         super().__init__("\n".join(errors))
 
@@ -86,7 +88,7 @@ class DataValidator:
             ... # use result
     """
 
-    def __init__(self, schema: Dict[str, Field]):
+    def __init__(self, schema: dict[str, Field]):
         self._schema = schema
 
     def validate(self, data: dict) -> dict:
@@ -105,15 +107,17 @@ class DataValidator:
         except ValidationError:
             return False
 
-    def errors(self, data: dict) -> List[str]:
+    def errors(self, data: dict) -> list[str]:
         """Return list of validation error messages."""
-        errors_list: List[str] = []
+        errors_list: list[str] = []
         self._validate_dict(data, self._schema, "", errors_list)
         return errors_list
 
     # ---------- Internal ----------
 
-    def _validate_dict(self, data: dict, schema: Dict[str, Field], path: str, errors: List[str]) -> dict:
+    def _validate_dict(
+        self, data: dict, schema: dict[str, Field], path: str, errors: list[str]
+    ) -> dict:
         if not isinstance(data, dict):
             errors.append(f"{path or '(root)'}: expected dict, got {type(data).__name__}")
             return {}
@@ -136,7 +140,7 @@ class DataValidator:
         # Warn about unknown fields (can be made strict later)
         return result
 
-    def _validate_value(self, value: Any, field: Field, path: str, errors: List[str]) -> Any:
+    def _validate_value(self, value: Any, field: Field, path: str, errors: list[str]) -> Any:
         # Nullable check
         if value is None:
             if not field.nullable:
@@ -146,7 +150,9 @@ class DataValidator:
 
         # Type check
         if not isinstance(value, field.field_type):
-            errors.append(f"{path}: expected {field.field_type.__name__}, got {type(value).__name__}")
+            errors.append(
+                f"{path}: expected {field.field_type.__name__}, got {type(value).__name__}"
+            )
             return None
 
         # Min/max for numbers
@@ -187,7 +193,7 @@ class DataValidator:
 
         return value
 
-    def _validate_list(self, data: list, item_field: Field, path: str, errors: List[str]) -> list:
+    def _validate_list(self, data: list, item_field: Field, path: str, errors: list[str]) -> list:
         result = []
         for i, item in enumerate(data):
             item_path = f"{path}[{i}]"

@@ -3,12 +3,12 @@ Tests for HITL (Human-in-the-Loop) approval module.
 """
 
 from agentos.hitl.approver import (
-    HumanInTheLoop,
-    ApprovalRequest,
     ApprovalDecision,
-    ApprovalStatus,
-    RiskLevel,
     ApprovalPolicy,
+    ApprovalRequest,
+    ApprovalStatus,
+    HumanInTheLoop,
+    RiskLevel,
 )
 from agentos.hitl.presets import (
     default_approval_policy,
@@ -38,7 +38,9 @@ class TestApprovalDecision:
         assert not d.is_rejected
 
     def test_modified_is_approved(self):
-        d = ApprovalDecision(request_id="x", status=ApprovalStatus.MODIFIED, modified_args={"force": True})
+        d = ApprovalDecision(
+            request_id="x", status=ApprovalStatus.MODIFIED, modified_args={"force": True}
+        )
         assert d.is_approved
 
     def test_rejected(self):
@@ -102,9 +104,7 @@ class TestHumanInTheLoop:
             status=ApprovalStatus.REJECTED,
             reason="User said no",
         )
-        _, decision = hitl.request_and_decide(
-            action="delete", risk_level=RiskLevel.CRITICAL
-        )
+        _, decision = hitl.request_and_decide(action="delete", risk_level=RiskLevel.CRITICAL)
         assert decision.is_rejected
 
     def test_history(self):
@@ -118,9 +118,16 @@ class TestHumanInTheLoop:
         assert len(hitl.get_history()) == 2
 
     def test_pending_queue(self):
-        hitl = HumanInTheLoop(policy=ApprovalPolicy(require_approval_for_risk={
-            RiskLevel.LOW, RiskLevel.MEDIUM, RiskLevel.HIGH, RiskLevel.CRITICAL
-        }))
+        hitl = HumanInTheLoop(
+            policy=ApprovalPolicy(
+                require_approval_for_risk={
+                    RiskLevel.LOW,
+                    RiskLevel.MEDIUM,
+                    RiskLevel.HIGH,
+                    RiskLevel.CRITICAL,
+                }
+            )
+        )
         req = hitl.request_approval(action="x", risk_level=RiskLevel.LOW)
         assert len(hitl.get_pending()) == 1
 

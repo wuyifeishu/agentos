@@ -7,8 +7,8 @@ Dashboard HTTP 服务器 — 内嵌单页 HTML，无需外部依赖。
 
 from __future__ import annotations
 
-import json
 import http.server
+import json
 import queue
 import threading
 import webbrowser
@@ -22,6 +22,7 @@ PORT = 18500
 _sse_queues: list[queue.Queue] = []
 _sse_lock = threading.Lock()
 
+
 def _sse_broadcast(event_type: str, data: dict):
     """广播事件到所有 SSE 连接。"""
     payload = json.dumps({"type": event_type, "data": data}, ensure_ascii=False)
@@ -34,6 +35,7 @@ def _sse_broadcast(event_type: str, data: dict):
                 dead.append(q)
         for q in dead:
             _sse_queues.remove(q)
+
 
 # ============================================================
 # 内嵌前端（纯 HTML/CSS/JS，零外部依赖）
@@ -275,6 +277,7 @@ es.onerror = function() { console.log('[dashboard] SSE disconnected, retrying...
 # HTTP Handler
 # ============================================================
 
+
 class DashboardHandler(http.server.BaseHTTPRequestHandler):
     """Dashboard HTTP 请求处理器。"""
 
@@ -316,11 +319,13 @@ class DashboardHandler(http.server.BaseHTTPRequestHandler):
         # API: 健康检查
         if path == "/api/health":
             tracker = Tracker.get()
-            self._json({
-                "status": "ok",
-                "active_sessions": len(tracker._active),
-                "sse_clients": len(_sse_queues),
-            })
+            self._json(
+                {
+                    "status": "ok",
+                    "active_sessions": len(tracker._active),
+                    "sse_clients": len(_sse_queues),
+                }
+            )
             return
 
         self._html(404, "<h1>404</h1>")
@@ -362,7 +367,7 @@ class DashboardHandler(http.server.BaseHTTPRequestHandler):
             while True:
                 try:
                     payload = q.get(timeout=30)  # 30s 心跳
-                    self.wfile.write(f"data: {payload}\n\n".encode("utf-8"))
+                    self.wfile.write(f"data: {payload}\n\n".encode())
                     self.wfile.flush()
                 except queue.Empty:
                     # 心跳保活

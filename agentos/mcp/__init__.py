@@ -13,10 +13,9 @@ import asyncio
 import json
 import logging
 import subprocess
-import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -28,28 +27,31 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MCPServerConfig:
     """Configuration for connecting to an MCP server."""
+
     name: str
     transport: str = "stdio"  # stdio | sse
-    command: Optional[str] = None
-    args: List[str] = field(default_factory=list)
-    url: Optional[str] = None
-    env: Dict[str, str] = field(default_factory=dict)
+    command: str | None = None
+    args: list[str] = field(default_factory=list)
+    url: str | None = None
+    env: dict[str, str] = field(default_factory=dict)
     timeout: int = 30
-    capabilities: Dict[str, Any] = field(default_factory=dict)
+    capabilities: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class MCPToolInfo:
     """Metadata for a discovered MCP tool."""
+
     name: str
     description: str = ""
-    input_schema: Dict[str, Any] = field(default_factory=dict)
+    input_schema: dict[str, Any] = field(default_factory=dict)
     server_name: str = ""
 
 
 @dataclass
 class MCPResourceInfo:
     """Metadata for a discovered MCP resource."""
+
     uri: str
     name: str = ""
     description: str = ""
@@ -60,9 +62,10 @@ class MCPResourceInfo:
 @dataclass
 class MCPPromptInfo:
     """Metadata for a discovered MCP prompt."""
+
     name: str
     description: str = ""
-    arguments: List[Dict[str, Any]] = field(default_factory=list)
+    arguments: list[dict[str, Any]] = field(default_factory=list)
     server_name: str = ""
 
 
@@ -73,20 +76,16 @@ class MCPTransport(ABC):
     """Abstract transport layer for MCP JSON-RPC 2.0 communication."""
 
     @abstractmethod
-    async def connect(self, config: MCPServerConfig) -> None:
-        ...
+    async def connect(self, config: MCPServerConfig) -> None: ...
 
     @abstractmethod
-    async def send_request(self, method: str, params: Optional[Dict] = None) -> Dict[str, Any]:
-        ...
+    async def send_request(self, method: str, params: dict | None = None) -> dict[str, Any]: ...
 
     @abstractmethod
-    async def send_notification(self, method: str, params: Optional[Dict] = None) -> None:
-        ...
+    async def send_notification(self, method: str, params: dict | None = None) -> None: ...
 
     @abstractmethod
-    async def close(self) -> None:
-        ...
+    async def close(self) -> None: ...
 
 
 class StdioTransport(MCPTransport):
@@ -97,11 +96,11 @@ class StdioTransport(MCPTransport):
     """
 
     def __init__(self):
-        self._proc: Optional[subprocess.Popen] = None
+        self._proc: subprocess.Popen | None = None
         self._lock = asyncio.Lock()
         self._request_id = 0
-        self._pending: Dict[int, asyncio.Future] = {}
-        self._reader_task: Optional[asyncio.Task] = None
+        self._pending: dict[int, asyncio.Future] = {}
+        self._reader_task: asyncio.Task | None = None
 
     async def connect(self, config: MCPServerConfig) -> None:
         cmd = config.command or "npx"
@@ -131,16 +130,18 @@ class StdioTransport(MCPTransport):
                 if req_id is not None and req_id in self._pending:
                     future = self._pending.pop(req_id)
                     if "error" in data:
-                        future.set_exception(MCPError(
-                            data["error"].get("code", -1),
-                            data["error"].get("message", "Unknown error"),
-                        ))
+                        future.set_exception(
+                            MCPError(
+                                data["error"].get("code", -1),
+                                data["error"].get("message", "Unknown error"),
+                            )
+                        )
                     else:
                         future.set_result(data.get("result", {}))
             except Exception:
                 continue
 
-    async def send_request(self, method: str, params: Optional[Dict] = None) -> Dict[str, Any]:
+    async def send_request(self, method: str, params: dict | None = None) -> dict[str, Any]:
         """Send a JSON-RPC 2.0 request and await the response."""
         if not self._proc or self._proc.poll() is not None:
             raise MCPError(-32000, "MCP server process is not running")
@@ -165,11 +166,11 @@ class StdioTransport(MCPTransport):
 
             try:
                 return await asyncio.wait_for(future, timeout=30)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 self._pending.pop(req_id, None)
                 raise MCPError(-32001, "Request timed out")
 
-    async def send_notification(self, method: str, params: Optional[Dict] = None) -> None:
+    async def send_notification(self, method: str, params: dict | None = None) -> None:
         """Send a JSON-RPC 2.0 notification (no response expected)."""
         if not self._proc or self._proc.poll() is not None:
             return
@@ -209,10 +210,10 @@ class SSETransport(MCPTransport):
     """
 
     def __init__(self):
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
         self._request_id = 0
-        self._pending: Dict[int, asyncio.Future] = {}
-        self._sse_task: Optional[asyncio.Task] = None
+        self._pending: dict[int, asyncio.Future] = {}
+        self._sse_task: asyncio.Task | None = None
         self._response_queue: asyncio.Queue = asyncio.Queue()
         self._message_endpoint: str = ""
         self._sse_endpoint: str = ""
@@ -240,10 +241,12 @@ class SSETransport(MCPTransport):
                                 if req_id is not None and req_id in self._pending:
                                     future = self._pending.pop(req_id)
                                     if "error" in data:
-                                        future.set_exception(MCPError(
-                                            data["error"].get("code", -1),
-                                            data["error"].get("message", ""),
-                                        ))
+                                        future.set_exception(
+                                            MCPError(
+                                                data["error"].get("code", -1),
+                                                data["error"].get("message", ""),
+                                            )
+                                        )
                                     else:
                                         future.set_result(data.get("result", {}))
                             except json.JSONDecodeError:
@@ -251,7 +254,7 @@ class SSETransport(MCPTransport):
             except Exception:
                 await asyncio.sleep(1)
 
-    async def send_request(self, method: str, params: Optional[Dict] = None) -> Dict[str, Any]:
+    async def send_request(self, method: str, params: dict | None = None) -> dict[str, Any]:
         if not self._client:
             raise MCPError(-32000, "SSE transport not connected")
 
@@ -272,11 +275,11 @@ class SSETransport(MCPTransport):
 
         try:
             return await asyncio.wait_for(future, timeout=30)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._pending.pop(req_id, None)
             raise MCPError(-32001, "SSE request timed out")
 
-    async def send_notification(self, method: str, params: Optional[Dict] = None) -> None:
+    async def send_notification(self, method: str, params: dict | None = None) -> None:
         if not self._client:
             return
         notification = {
@@ -303,6 +306,7 @@ class SSETransport(MCPTransport):
 
 class MCPError(Exception):
     """MCP protocol error."""
+
     def __init__(self, code: int, message: str, data: Any = None):
         self.code = code
         self.message = message
@@ -335,20 +339,20 @@ class MCPClient:
     }
 
     def __init__(self):
-        self._servers: Dict[str, MCPTransport] = {}
-        self._server_configs: Dict[str, MCPServerConfig] = {}
-        self._tools: Dict[str, MCPToolInfo] = {}
-        self._resources: Dict[str, MCPResourceInfo] = {}
-        self._prompts: Dict[str, MCPPromptInfo] = {}
-        self._server_capabilities: Dict[str, Dict[str, Any]] = {}
+        self._servers: dict[str, MCPTransport] = {}
+        self._server_configs: dict[str, MCPServerConfig] = {}
+        self._tools: dict[str, MCPToolInfo] = {}
+        self._resources: dict[str, MCPResourceInfo] = {}
+        self._prompts: dict[str, MCPPromptInfo] = {}
+        self._server_capabilities: dict[str, dict[str, Any]] = {}
 
-    async def __aenter__(self) -> "MCPClient":
+    async def __aenter__(self) -> MCPClient:
         return self
 
     async def __aexit__(self, *args) -> None:
         await self.close_all()
 
-    async def connect_server(self, config: MCPServerConfig) -> Dict[str, Any]:
+    async def connect_server(self, config: MCPServerConfig) -> dict[str, Any]:
         """Connect to an MCP server and perform initialization handshake.
 
         Returns the server's capabilities dict.
@@ -361,14 +365,17 @@ class MCPClient:
         await transport.connect(config)
 
         # MCP Initialize handshake
-        init_result = await transport.send_request("initialize", {
-            "protocolVersion": "2024-11-05",
-            "capabilities": config.capabilities or {},
-            "clientInfo": {
-                "name": "agentos-mcp-client",
-                "version": "1.0.0",
+        init_result = await transport.send_request(
+            "initialize",
+            {
+                "protocolVersion": "2024-11-05",
+                "capabilities": config.capabilities or {},
+                "clientInfo": {
+                    "name": "agentos-mcp-client",
+                    "version": "1.0.0",
+                },
             },
-        })
+        )
 
         # Send initialized notification
         await transport.send_notification("notifications/initialized")
@@ -436,7 +443,7 @@ class MCPClient:
         self,
         server_name: str,
         tool_name: str,
-        arguments: Optional[Dict[str, Any]] = None,
+        arguments: dict[str, Any] | None = None,
     ) -> Any:
         """Call a tool on a connected MCP server.
 
@@ -452,10 +459,13 @@ class MCPClient:
             raise MCPError(-32602, f"Server '{server_name}' not connected")
 
         transport = self._servers[server_name]
-        result = await transport.send_request("tools/call", {
-            "name": tool_name,
-            "arguments": arguments or {},
-        })
+        result = await transport.send_request(
+            "tools/call",
+            {
+                "name": tool_name,
+                "arguments": arguments or {},
+            },
+        )
 
         content = result.get("content", [])
         if not content:
@@ -473,7 +483,7 @@ class MCPClient:
 
         return "\n".join(texts) if texts else content
 
-    async def read_resource(self, server_name: str, uri: str) -> Dict[str, Any]:
+    async def read_resource(self, server_name: str, uri: str) -> dict[str, Any]:
         """Read a resource from a connected MCP server."""
         if server_name not in self._servers:
             raise MCPError(-32602, f"Server '{server_name}' not connected")
@@ -486,49 +496,52 @@ class MCPClient:
         self,
         server_name: str,
         prompt_name: str,
-        arguments: Optional[Dict[str, str]] = None,
-    ) -> Dict[str, Any]:
+        arguments: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         """Get a prompt template from a connected MCP server."""
         if server_name not in self._servers:
             raise MCPError(-32602, f"Server '{server_name}' not connected")
 
         transport = self._servers[server_name]
-        result = await transport.send_request("prompts/get", {
-            "name": prompt_name,
-            "arguments": arguments or {},
-        })
+        result = await transport.send_request(
+            "prompts/get",
+            {
+                "name": prompt_name,
+                "arguments": arguments or {},
+            },
+        )
         return result
 
-    def list_tools(self, server_name: Optional[str] = None) -> List[MCPToolInfo]:
+    def list_tools(self, server_name: str | None = None) -> list[MCPToolInfo]:
         """List discovered tools, optionally filtered by server."""
         tools = list(self._tools.values())
         if server_name:
             tools = [t for t in tools if t.server_name == server_name]
         return tools
 
-    def list_resources(self, server_name: Optional[str] = None) -> List[MCPResourceInfo]:
+    def list_resources(self, server_name: str | None = None) -> list[MCPResourceInfo]:
         """List discovered resources, optionally filtered by server."""
         resources = list(self._resources.values())
         if server_name:
             resources = [r for r in resources if r.server_name == server_name]
         return resources
 
-    def list_prompts(self, server_name: Optional[str] = None) -> List[MCPPromptInfo]:
+    def list_prompts(self, server_name: str | None = None) -> list[MCPPromptInfo]:
         """List discovered prompts, optionally filtered by server."""
         prompts = list(self._prompts.values())
         if server_name:
             prompts = [p for p in prompts if p.server_name == server_name]
         return prompts
 
-    def get_server_capabilities(self, server_name: str) -> Dict[str, Any]:
+    def get_server_capabilities(self, server_name: str) -> dict[str, Any]:
         """Get the capabilities reported by a server."""
         return self._server_capabilities.get(server_name, {})
 
     def get_tool_schemas(
         self,
-        server_name: Optional[str] = None,
+        server_name: str | None = None,
         format: str = "openai",
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Export tool schemas in OpenAI or Anthropic function format.
 
         Args:
@@ -544,25 +557,29 @@ class MCPClient:
         for tool in tools:
             params = tool.input_schema
             if format == "openai":
-                schemas.append({
-                    "type": "function",
-                    "function": {
+                schemas.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": f"mcp__{tool.server_name}__{tool.name}",
+                            "description": tool.description,
+                            "parameters": params,
+                        },
+                    }
+                )
+            elif format == "anthropic":
+                schemas.append(
+                    {
                         "name": f"mcp__{tool.server_name}__{tool.name}",
                         "description": tool.description,
-                        "parameters": params,
-                    },
-                })
-            elif format == "anthropic":
-                schemas.append({
-                    "name": f"mcp__{tool.server_name}__{tool.name}",
-                    "description": tool.description,
-                    "input_schema": params,
-                })
+                        "input_schema": params,
+                    }
+                )
 
         return schemas
 
     @property
-    def connected_servers(self) -> List[str]:
+    def connected_servers(self) -> list[str]:
         """List names of connected servers."""
         return list(self._servers.keys())
 
@@ -574,18 +591,11 @@ class MCPClient:
             self._server_configs.pop(server_name, None)
             self._server_capabilities.pop(server_name, None)
             # Remove associated tools/resources/prompts
-            self._tools = {
-                k: v for k, v in self._tools.items()
-                if v.server_name != server_name
-            }
+            self._tools = {k: v for k, v in self._tools.items() if v.server_name != server_name}
             self._resources = {
-                k: v for k, v in self._resources.items()
-                if v.server_name != server_name
+                k: v for k, v in self._resources.items() if v.server_name != server_name
             }
-            self._prompts = {
-                k: v for k, v in self._prompts.items()
-                if v.server_name != server_name
-            }
+            self._prompts = {k: v for k, v in self._prompts.items() if v.server_name != server_name}
 
     async def close_all(self) -> None:
         """Disconnect from all MCP servers."""
@@ -597,7 +607,7 @@ class MCPClient:
 
 
 async def connect_mcp_servers(
-    configs: List[MCPServerConfig],
+    configs: list[MCPServerConfig],
 ) -> MCPClient:
     """Connect to multiple MCP servers at once.
 
@@ -619,10 +629,10 @@ async def connect_mcp_servers(
 # ── MCP Server (v1.5.2) ─────────────────────
 
 from agentos.mcp.server import (
+    MCPPromptDef,
+    MCPResource,
     MCPServer,
     MCPToolDef,
-    MCPResource,
-    MCPPromptDef,
     create_default_server,
     start_mcp_server,
 )
@@ -675,17 +685,18 @@ __all__ = [
 
 # ── Convenience alias ──
 from agentos.mcp.adapter import MCPToolAdapter  # noqa: E402, F811
+
 MCPAdapter = MCPToolAdapter
 
 # ── Built-in MCP Servers ──
 from agentos.mcp.builtin_servers import (  # noqa: E402
+    BuiltinMCPRegistry,
+    CodeServer,
     FilesystemServer,
-    WebFetchServer,
+    GitServer,
     MemoryServer,
     SearchServer,
-    GitServer,
     ShellServer,
-    CodeServer,
     TextServer,
-    BuiltinMCPRegistry,
+    WebFetchServer,
 )

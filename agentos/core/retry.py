@@ -14,9 +14,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Awaitable, Callable, List, Optional, Type, TypeVar
+from enum import StrEnum
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +28,14 @@ T = TypeVar("T")
 # Config
 # ============================================================================
 
-class JitterStrategy(str, Enum):
+
+class JitterStrategy(StrEnum):
     """Jitter algorithms for exponential backoff."""
 
-    NONE = "none"         # No jitter — deterministic
-    FULL = "full"         # random(0, delay)
+    NONE = "none"  # No jitter — deterministic
+    FULL = "full"  # random(0, delay)
     DECORRELATED = "decorrelated"  # random(base, delay) — AWS-style
-    EQUAL = "equal"       # delay/2 + random(0, delay/2)
+    EQUAL = "equal"  # delay/2 + random(0, delay/2)
 
 
 @dataclass
@@ -41,17 +43,18 @@ class RetryConfig:
     """Configuration for retry behavior."""
 
     max_retries: int = 3
-    base_delay: float = 1.0        # seconds
-    max_delay: float = 60.0        # cap
-    multiplier: float = 2.0        # exponential factor
+    base_delay: float = 1.0  # seconds
+    max_delay: float = 60.0  # cap
+    multiplier: float = 2.0  # exponential factor
     jitter: JitterStrategy = JitterStrategy.DECORRELATED
-    retryable_exceptions: tuple[Type[BaseException], ...] = (Exception,)
-    on_retry: Optional[Callable[[int, Exception, float], None]] = None  # (attempt, exc, delay) → None
+    retryable_exceptions: tuple[type[BaseException], ...] = (Exception,)
+    on_retry: Callable[[int, Exception, float], None] | None = None  # (attempt, exc, delay) → None
 
 
 # ============================================================================
 # Delay calculators
 # ============================================================================
+
 
 def _calc_jitter(delay: float, strategy: JitterStrategy) -> float:
     """Apply jitter to a computed delay."""
@@ -94,15 +97,16 @@ DelayFunc = Callable[[int, RetryConfig], float]
 # Retry executor
 # ============================================================================
 
+
 @dataclass
 class RetryResult:
     """Result of a retry operation."""
 
     attempts: int
     success: bool
-    last_exception: Optional[Exception] = None
+    last_exception: Exception | None = None
     total_delay: float = 0.0
-    attempt_history: List[tuple[int, float, Optional[Exception]]] = field(default_factory=list)
+    attempt_history: list[tuple[int, float, Exception | None]] = field(default_factory=list)
 
 
 class Retry:
@@ -132,7 +136,7 @@ class Retry:
         **kwargs: Any,
     ) -> T:
         """Execute fn with retry logic. Raises last exception if all retries exhausted."""
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
 
         for attempt in range(1, self.config.max_retries + 2):  # +2 for initial attempt + retries
             try:
@@ -143,7 +147,9 @@ class Retry:
                 if attempt > self.config.max_retries:
                     logger.warning(
                         "Retry exhausted after %d attempts — %s: %s",
-                        attempt, type(exc).__name__, exc,
+                        attempt,
+                        type(exc).__name__,
+                        exc,
                     )
                     raise
 
@@ -157,7 +163,10 @@ class Retry:
 
                 logger.debug(
                     "Retry attempt %d/%d after %.2fs — %s",
-                    attempt, self.config.max_retries, delay, exc,
+                    attempt,
+                    self.config.max_retries,
+                    delay,
+                    exc,
                 )
                 await asyncio.sleep(delay)
 
@@ -172,13 +181,13 @@ class Retry:
         **kwargs: Any,
     ) -> RetryResult:
         """Execute with retry and return detailed Result."""
-        history: List[tuple[int, float, Optional[Exception]]] = []
+        history: list[tuple[int, float, Exception | None]] = []
         total_delay = 0.0
-        last_exc: Optional[Exception] = None
+        last_exc: Exception | None = None
 
         for attempt in range(1, self.config.max_retries + 2):
             try:
-                result = await fn(*args, **kwargs)
+                await fn(*args, **kwargs)
                 history.append((attempt, 0.0, None))
                 return RetryResult(
                     attempts=attempt,
@@ -228,51 +237,60 @@ class Retry:
 # Pre-built retry policies
 # ============================================================================
 
+
 class RetryPolicies:
     """Factory for common retry configurations."""
 
     @staticmethod
     def fast() -> Retry:
         """3 retries, 100ms base, 2x multiplier — for idempotent API calls."""
-        return Retry(RetryConfig(
-            max_retries=3,
-            base_delay=0.1,
-            max_delay=1.0,
-            multiplier=2.0,
-            jitter=JitterStrategy.DECORRELATED,
-        ))
+        return Retry(
+            RetryConfig(
+                max_retries=3,
+                base_delay=0.1,
+                max_delay=1.0,
+                multiplier=2.0,
+                jitter=JitterStrategy.DECORRELATED,
+            )
+        )
 
     @staticmethod
     def standard() -> Retry:
         """5 retries, 500ms base, 2x — general purpose."""
-        return Retry(RetryConfig(
-            max_retries=5,
-            base_delay=0.5,
-            max_delay=30.0,
-            multiplier=2.0,
-            jitter=JitterStrategy.DECORRELATED,
-        ))
+        return Retry(
+            RetryConfig(
+                max_retries=5,
+                base_delay=0.5,
+                max_delay=30.0,
+                multiplier=2.0,
+                jitter=JitterStrategy.DECORRELATED,
+            )
+        )
 
     @staticmethod
     def persistent() -> Retry:
         """10 retries, 1s base, 2x, max 120s — for critical operations."""
-        return Retry(RetryConfig(
-            max_retries=10,
-            base_delay=1.0,
-            max_delay=120.0,
-            multiplier=2.0,
-            jitter=JitterStrategy.DECORRELATED,
-        ))
+        return Retry(
+            RetryConfig(
+                max_retries=10,
+                base_delay=1.0,
+                max_delay=120.0,
+                multiplier=2.0,
+                jitter=JitterStrategy.DECORRELATED,
+            )
+        )
 
     @staticmethod
     def immediate() -> Retry:
         """2 retries, no delay — for infallible operations."""
-        return Retry(RetryConfig(
-            max_retries=2,
-            base_delay=0.0,
-            max_delay=0.0,
-            jitter=JitterStrategy.NONE,
-        ))
+        return Retry(
+            RetryConfig(
+                max_retries=2,
+                base_delay=0.0,
+                max_delay=0.0,
+                jitter=JitterStrategy.NONE,
+            )
+        )
 
     @staticmethod
     def gentle() -> Retry:
@@ -291,6 +309,7 @@ class RetryPolicies:
 # ============================================================================
 # Sync retry (for non-async contexts)
 # ============================================================================
+
 
 class SyncRetry:
     """Synchronous retry executor — calls asyncio.run internally."""

@@ -18,12 +18,11 @@ import secrets
 import struct
 import time
 import uuid
-from typing import Optional
-
 
 # ============================================================================
 # UUID7 (time-ordered UUID, RFC 9562 draft)
 # ============================================================================
+
 
 def uuid7() -> str:
     """Generate a time-ordered UUIDv7 string."""
@@ -50,6 +49,7 @@ def uuid7() -> str:
 
 _CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
+
 def ulid() -> str:
     """Generate a ULID (26-character Crockford base32)."""
     ts = int(time.time() * 1000)
@@ -75,7 +75,8 @@ def ulid() -> str:
 # Nano ID
 # ============================================================================
 
-def nanoid(size: int = 21, alphabet: Optional[str] = None) -> str:
+
+def nanoid(size: int = 21, alphabet: str | None = None) -> str:
     """Generate a Nano ID string.
 
     Args:
@@ -103,6 +104,7 @@ def nanoid(size: int = 21, alphabet: Optional[str] = None) -> str:
 # ============================================================================
 # Snowflake
 # ============================================================================
+
 
 class Snowflake:
     """Snowflake-like distributed ID generator.
@@ -153,6 +155,7 @@ class Snowflake:
 
 _SHORT_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
+
 def short_id(length: int = 8) -> str:
     """Generate a short URL-safe random ID."""
     return "".join(secrets.choice(_SHORT_ALPHABET) for _ in range(length))
@@ -162,9 +165,11 @@ def short_id(length: int = 8) -> str:
 # Convenience
 # ============================================================================
 
+
 def uuid4() -> str:
     """Standard random UUIDv4."""
     return str(uuid.uuid4())
+
 
 def generate(style: str = "uuid4") -> str:
     """Generate an ID in the requested style.

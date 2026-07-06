@@ -38,9 +38,7 @@ class ToolRegistry:
         else:
             return [t.to_openai_schema() for t in self._tools.values()]
 
-    async def execute_batch(
-        self, calls: list[ToolCall], sandbox=None
-    ) -> list[ToolResult]:
+    async def execute_batch(self, calls: list[ToolCall], sandbox=None) -> list[ToolResult]:
         """并行执行一组工具调用。"""
         tasks = []
         for call in calls:
@@ -51,9 +49,7 @@ class ToolRegistry:
                 tasks.append(self._execute_one(tool, call, sandbox))
         return await asyncio.gather(*tasks)
 
-    async def _execute_one(
-        self, tool: BaseTool, call: ToolCall, sandbox=None
-    ) -> ToolResult:
+    async def _execute_one(self, tool: BaseTool, call: ToolCall, sandbox=None) -> ToolResult:
         try:
             return await tool.execute(call.arguments, sandbox=sandbox)
         except Exception as e:

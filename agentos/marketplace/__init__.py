@@ -18,16 +18,12 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
-import shutil
-import tempfile
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set, Tuple, Union
-from urllib.parse import urlparse
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -36,31 +32,33 @@ logger = logging.getLogger(__name__)
 # Data types
 # ---------------------------------------------------------------------------
 
+
 class TemplateCategory(Enum):
-    CHAT       = "chat"
-    CODING     = "coding"
-    ANALYSIS   = "analysis"
+    CHAT = "chat"
+    CODING = "coding"
+    ANALYSIS = "analysis"
     AUTOMATION = "automation"
-    RESEARCH   = "research"
-    CREATIVE   = "creative"
+    RESEARCH = "research"
+    CREATIVE = "creative"
     ENTERPRISE = "enterprise"
-    UTILITY    = "utility"
-    OTHER      = "other"
+    UTILITY = "utility"
+    OTHER = "other"
 
 
 class TemplateStatus(Enum):
-    DRAFT       = "draft"
-    PUBLISHED   = "published"
-    DEPRECATED  = "deprecated"
-    ARCHIVED    = "archived"
+    DRAFT = "draft"
+    PUBLISHED = "published"
+    DEPRECATED = "deprecated"
+    ARCHIVED = "archived"
     UNDER_REVIEW = "under_review"
 
 
 @dataclass
 class TemplateDependency:
     """A dependency required by a template."""
+
     name: str
-    version_spec: str = "*"   # PEP 440 version specifier
+    version_spec: str = "*"  # PEP 440 version specifier
     optional: bool = False
     description: str = ""
 
@@ -68,12 +66,13 @@ class TemplateDependency:
 @dataclass
 class TemplateVersion:
     """A specific version of a template."""
-    version: str                  # SemVer
+
+    version: str  # SemVer
     changelog: str = ""
     min_agentos_version: str = "1.0.0"
-    files: Dict[str, str] = field(default_factory=dict)   # path → content
-    dependencies: List[TemplateDependency] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    files: dict[str, str] = field(default_factory=dict)  # path → content
+    dependencies: list[TemplateDependency] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
     published_at: float = 0.0
     download_count: int = 0
 
@@ -81,8 +80,9 @@ class TemplateVersion:
 @dataclass
 class TemplateReview:
     """User review of a template."""
+
     user_id: str
-    rating: float                # 1.0 - 5.0
+    rating: float  # 1.0 - 5.0
     comment: str = ""
     timestamp: float = field(default_factory=time.time)
     helpful_count: int = 0
@@ -91,6 +91,7 @@ class TemplateReview:
 @dataclass
 class AgentTemplate:
     """An agent template in the marketplace."""
+
     # Identity
     id: str
     name: str
@@ -98,32 +99,32 @@ class AgentTemplate:
     author: str
     description: str = ""
     category: TemplateCategory = TemplateCategory.OTHER
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     icon_url: str = ""
 
     # Status
     status: TemplateStatus = TemplateStatus.PUBLISHED
 
     # Content
-    versions: List[TemplateVersion] = field(default_factory=list)
+    versions: list[TemplateVersion] = field(default_factory=list)
     readme: str = ""
     license: str = "MIT"
 
     # Engagement
     stars: int = 0
     downloads: int = 0
-    reviews: List[TemplateReview] = field(default_factory=list)
+    reviews: list[TemplateReview] = field(default_factory=list)
 
     # Compatibility
     compatible_agentos_versions: str = ">=1.0.0"
-    requires: List[TemplateDependency] = field(default_factory=list)
+    requires: list[TemplateDependency] = field(default_factory=list)
 
     # Metadata
     created_at: float = field(default_factory=time.time)
     updated_at: float = field(default_factory=time.time)
     source_url: str = ""
     documentation_url: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def rating(self) -> float:
@@ -133,7 +134,7 @@ class AgentTemplate:
         return sum(r.rating for r in self.reviews) / len(self.reviews)
 
     @property
-    def latest_version(self) -> Optional[TemplateVersion]:
+    def latest_version(self) -> TemplateVersion | None:
         """Get the latest published version."""
         published = [v for v in self.versions if v.published_at > 0]
         if not published:
@@ -144,13 +145,14 @@ class AgentTemplate:
 @dataclass
 class MarketSearchQuery:
     """Search query for the marketplace."""
+
     keywords: str = ""
-    category: Optional[TemplateCategory] = None
-    tags: List[str] = field(default_factory=list)
+    category: TemplateCategory | None = None
+    tags: list[str] = field(default_factory=list)
     min_rating: float = 0.0
     min_stars: int = 0
-    author: Optional[str] = None
-    sort_by: str = "relevance"   # relevance, downloads, rating, stars, updated
+    author: str | None = None
+    sort_by: str = "relevance"  # relevance, downloads, rating, stars, updated
     sort_order: str = "desc"
     limit: int = 20
     offset: int = 0
@@ -159,54 +161,50 @@ class MarketSearchQuery:
 @dataclass
 class MarketSearchResult:
     """Search result from the marketplace."""
+
     template: AgentTemplate
     score: float = 0.0
-    matched_tags: List[str] = field(default_factory=list)
+    matched_tags: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
 # Registry backends
 # ---------------------------------------------------------------------------
 
+
 class MarketRegistryBackend(ABC):
     """Abstract backend for template storage and retrieval."""
 
     @abstractmethod
     async def list_templates(
-        self, query: Optional[MarketSearchQuery] = None
-    ) -> List[MarketSearchResult]:
-        ...
+        self, query: MarketSearchQuery | None = None
+    ) -> list[MarketSearchResult]: ...
 
     @abstractmethod
-    async def get_template(self, template_id: str) -> Optional[AgentTemplate]:
-        ...
+    async def get_template(self, template_id: str) -> AgentTemplate | None: ...
 
     @abstractmethod
-    async def publish_template(self, template: AgentTemplate) -> bool:
-        ...
+    async def publish_template(self, template: AgentTemplate) -> bool: ...
 
     @abstractmethod
-    async def unpublish_template(self, template_id: str) -> bool:
-        ...
+    async def unpublish_template(self, template_id: str) -> bool: ...
 
     @abstractmethod
-    async def add_review(self, template_id: str, review: TemplateReview) -> bool:
-        ...
+    async def add_review(self, template_id: str, review: TemplateReview) -> bool: ...
 
     @abstractmethod
-    async def get_stats(self) -> Dict[str, Any]:
-        ...
+    async def get_stats(self) -> dict[str, Any]: ...
 
 
 class InMemoryMarketBackend(MarketRegistryBackend):
     """In-memory registry for development and testing."""
 
     def __init__(self):
-        self._templates: Dict[str, AgentTemplate] = {}
+        self._templates: dict[str, AgentTemplate] = {}
 
     async def list_templates(
-        self, query: Optional[MarketSearchQuery] = None
-    ) -> List[MarketSearchResult]:
+        self, query: MarketSearchQuery | None = None
+    ) -> list[MarketSearchResult]:
         results = []
         for tpl in self._templates.values():
             if tpl.status != TemplateStatus.PUBLISHED:
@@ -246,11 +244,13 @@ class InMemoryMarketBackend(MarketRegistryBackend):
                 if query.author and tpl.author != query.author:
                     continue
 
-            results.append(MarketSearchResult(
-                template=tpl,
-                score=score,
-                matched_tags=matched_tags,
-            ))
+            results.append(
+                MarketSearchResult(
+                    template=tpl,
+                    score=score,
+                    matched_tags=matched_tags,
+                )
+            )
 
         # Sort
         if query:
@@ -268,11 +268,11 @@ class InMemoryMarketBackend(MarketRegistryBackend):
                 results.sort(key=lambda r: r.score, reverse=reverse)
 
             # Paginate
-            results = results[query.offset:query.offset + query.limit]
+            results = results[query.offset : query.offset + query.limit]
 
         return results
 
-    async def get_template(self, template_id: str) -> Optional[AgentTemplate]:
+    async def get_template(self, template_id: str) -> AgentTemplate | None:
         return self._templates.get(template_id)
 
     async def publish_template(self, template: AgentTemplate) -> bool:
@@ -293,7 +293,7 @@ class InMemoryMarketBackend(MarketRegistryBackend):
         tpl.reviews.append(review)
         return True
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         total = len(self._templates)
         by_category = {}
         for tpl in self._templates.values():
@@ -309,16 +309,16 @@ class InMemoryMarketBackend(MarketRegistryBackend):
 class FileMarketBackend(MarketRegistryBackend):
     """JSON-file-based registry for local/CI usage."""
 
-    def __init__(self, storage_dir: Union[str, Path]):
+    def __init__(self, storage_dir: str | Path):
         self._dir = Path(storage_dir)
         self._dir.mkdir(parents=True, exist_ok=True)
         self._index_file = self._dir / "index.json"
-        self._templates: Dict[str, AgentTemplate] = {}
+        self._templates: dict[str, AgentTemplate] = {}
         self._load()
 
     def _load(self) -> None:
         if self._index_file.exists():
-            with open(self._index_file, "r") as f:
+            with open(self._index_file) as f:
                 data = json.load(f)
             for raw in data.get("templates", []):
                 tpl = self._dict_to_template(raw)
@@ -332,7 +332,7 @@ class FileMarketBackend(MarketRegistryBackend):
         with open(self._index_file, "w") as f:
             json.dump(data, f, indent=2, default=str)
 
-    def _template_to_dict(self, tpl: AgentTemplate) -> Dict[str, Any]:
+    def _template_to_dict(self, tpl: AgentTemplate) -> dict[str, Any]:
         return {
             "id": tpl.id,
             "name": tpl.name,
@@ -351,7 +351,7 @@ class FileMarketBackend(MarketRegistryBackend):
             "updated_at": tpl.updated_at,
         }
 
-    def _dict_to_template(self, d: Dict[str, Any]) -> AgentTemplate:
+    def _dict_to_template(self, d: dict[str, Any]) -> AgentTemplate:
         return AgentTemplate(
             id=d["id"],
             name=d["name"],
@@ -378,10 +378,13 @@ class FileMarketBackend(MarketRegistryBackend):
         return self._templates.get(template_id)
 
     async def publish_template(self, template):
-        tpl = AgentTemplate(**{
-            k: v for k, v in template.__dict__.items()
-            if k in AgentTemplate.__dataclass_fields__
-        })
+        AgentTemplate(
+            **{
+                k: v
+                for k, v in template.__dict__.items()
+                if k in AgentTemplate.__dataclass_fields__
+            }
+        )
         template.updated_at = time.time()
         self._templates[template.id] = template
         self._save()
@@ -412,17 +415,18 @@ class FileMarketBackend(MarketRegistryBackend):
 # Remote registry client
 # ---------------------------------------------------------------------------
 
+
 class RemoteMarketClient:
     """HTTP client for remote marketplace registries."""
 
-    def __init__(self, base_url: str, api_key: Optional[str] = None):
+    def __init__(self, base_url: str, api_key: str | None = None):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
 
-    async def search(self, query: MarketSearchQuery) -> List[MarketSearchResult]:
+    async def search(self, query: MarketSearchQuery) -> list[MarketSearchResult]:
         """Search the remote marketplace."""
-        import urllib.request
         import urllib.parse
+        import urllib.request
 
         params = {}
         if query.keywords:
@@ -440,6 +444,7 @@ class RemoteMarketClient:
 
         # Use asyncio-compatible HTTP
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
             headers = {}
             if self.api_key:
@@ -454,9 +459,10 @@ class RemoteMarketClient:
                     for item in data.get("results", [])
                 ]
 
-    async def get_template(self, template_id: str) -> Optional[AgentTemplate]:
+    async def get_template(self, template_id: str) -> AgentTemplate | None:
         """Fetch a template from the remote registry."""
         import aiohttp
+
         async with aiohttp.ClientSession() as session:
             headers = {}
             if self.api_key:
@@ -470,11 +476,10 @@ class RemoteMarketClient:
                 data = await resp.json()
                 return AgentTemplate(**data)
 
-    async def download_template(
-        self, template_id: str, target_dir: Union[str, Path]
-    ) -> bool:
+    async def download_template(self, template_id: str, target_dir: str | Path) -> bool:
         """Download and extract a template to a local directory."""
         import aiohttp
+
         target = Path(target_dir)
         target.mkdir(parents=True, exist_ok=True)
 
@@ -489,8 +494,9 @@ class RemoteMarketClient:
                 if resp.status != 200:
                     return False
 
-                import tarfile
                 import io
+                import tarfile
+
                 data = await resp.read()
                 with tarfile.open(fileobj=io.BytesIO(data)) as tar:
                     tar.extractall(path=target)
@@ -501,14 +507,15 @@ class RemoteMarketClient:
 # Marketplace Manager
 # ---------------------------------------------------------------------------
 
+
 class MarketplaceManager:
     """Central marketplace management — search, install, publish."""
 
     def __init__(
         self,
-        local_backend: Optional[MarketRegistryBackend] = None,
-        remote_clients: Optional[List[RemoteMarketClient]] = None,
-        install_dir: Union[str, Path] = "~/.agentos/templates",
+        local_backend: MarketRegistryBackend | None = None,
+        remote_clients: list[RemoteMarketClient] | None = None,
+        install_dir: str | Path = "~/.agentos/templates",
     ):
         self.local = local_backend or InMemoryMarketBackend()
         self.remote_clients = remote_clients or []
@@ -517,7 +524,7 @@ class MarketplaceManager:
 
     async def search(
         self, query: MarketSearchQuery, include_remote: bool = True
-    ) -> List[MarketSearchResult]:
+    ) -> list[MarketSearchResult]:
         """Search local and remote registries."""
         results = await self.local.list_templates(query)
 
@@ -530,7 +537,7 @@ class MarketplaceManager:
                     logger.warning(f"Remote search failed: {e}")
 
         # Deduplicate by template ID
-        seen: Set[str] = set()
+        seen: set[str] = set()
         deduped = []
         for r in results:
             if r.template.id not in seen:
@@ -539,7 +546,7 @@ class MarketplaceManager:
 
         return deduped
 
-    async def install(self, template_id: str, version: Optional[str] = None) -> Path:
+    async def install(self, template_id: str, version: str | None = None) -> Path:
         """Install a template from local or remote registry."""
         # Check local first
         tpl = await self.local.get_template(template_id)
@@ -601,11 +608,11 @@ class MarketplaceManager:
 
         return True
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Get marketplace statistics."""
         return await self.local.get_stats()
 
-    async def get_featured(self, limit: int = 10) -> List[AgentTemplate]:
+    async def get_featured(self, limit: int = 10) -> list[AgentTemplate]:
         """Get featured/popular templates."""
         query = MarketSearchQuery(sort_by="downloads", limit=limit)
         results = await self.local.list_templates(query)
@@ -613,7 +620,7 @@ class MarketplaceManager:
 
     async def get_by_category(
         self, category: TemplateCategory, limit: int = 20
-    ) -> List[AgentTemplate]:
+    ) -> list[AgentTemplate]:
         """Get templates by category."""
         query = MarketSearchQuery(category=category, limit=limit)
         results = await self.local.list_templates(query)
@@ -623,6 +630,7 @@ class MarketplaceManager:
 # ---------------------------------------------------------------------------
 # Template builder
 # ---------------------------------------------------------------------------
+
 
 class TemplateBuilder:
     """Helper to build AgentTemplate objects programmatically."""
@@ -648,7 +656,7 @@ class TemplateBuilder:
         return self
 
     def add_version(
-        self, version: str, files: Dict[str, str], changelog: str = ""
+        self, version: str, files: dict[str, str], changelog: str = ""
     ) -> "TemplateBuilder":
         tv = TemplateVersion(
             version=version,
@@ -683,58 +691,70 @@ class TemplateBuilder:
 # Pre-seeded templates
 # ---------------------------------------------------------------------------
 
+
 def seed_default_templates(manager: MarketplaceManager) -> None:
     """Seed the marketplace with default templates."""
     templates = [
         TemplateBuilder("Conversational Agent", "AgentOS Team")
-            .description("General-purpose conversational agent with memory and tool use")
-            .category(TemplateCategory.CHAT)
-            .tags("chat", "conversation", "memory")
-            .add_version("1.0.0", {
+        .description("General-purpose conversational agent with memory and tool use")
+        .category(TemplateCategory.CHAT)
+        .tags("chat", "conversation", "memory")
+        .add_version(
+            "1.0.0",
+            {
                 "agent.yaml": "name: conversational-agent\ntype: chat\nmemory: enabled",
                 "main.py": "from agentos import Agent\n\nagent = Agent(...)",
-            })
-            .build(),
-
+            },
+        )
+        .build(),
         TemplateBuilder("Code Review Assistant", "AgentOS Team")
-            .description("AI-powered code reviewer with PR integration")
-            .category(TemplateCategory.CODING)
-            .tags("code", "review", "github", "pr")
-            .add_version("1.0.0", {
+        .description("AI-powered code reviewer with PR integration")
+        .category(TemplateCategory.CODING)
+        .tags("code", "review", "github", "pr")
+        .add_version(
+            "1.0.0",
+            {
                 "agent.yaml": "name: code-reviewer\ntype: coding\n",
                 "review.py": "async def review_pr(pr_url): ...",
-            })
-            .build(),
-
+            },
+        )
+        .build(),
         TemplateBuilder("Research Analyst", "AgentOS Team")
-            .description("Multi-source research agent with deep analysis capabilities")
-            .category(TemplateCategory.RESEARCH)
-            .tags("research", "analysis", "web")
-            .add_version("1.0.0", {
+        .description("Multi-source research agent with deep analysis capabilities")
+        .category(TemplateCategory.RESEARCH)
+        .tags("research", "analysis", "web")
+        .add_version(
+            "1.0.0",
+            {
                 "agent.yaml": "name: research-analyst\ntype: research\n",
                 "analyst.py": "async def deep_research(topic): ...",
-            })
-            .build(),
-
+            },
+        )
+        .build(),
         TemplateBuilder("Data Pipeline Agent", "AgentOS Team")
-            .description("Automated ETL and data processing pipeline")
-            .category(TemplateCategory.AUTOMATION)
-            .tags("etl", "data", "pipeline", "automation")
-            .add_version("1.0.0", {
+        .description("Automated ETL and data processing pipeline")
+        .category(TemplateCategory.AUTOMATION)
+        .tags("etl", "data", "pipeline", "automation")
+        .add_version(
+            "1.0.0",
+            {
                 "agent.yaml": "name: data-pipeline\ntype: automation\n",
                 "pipeline.py": "async def run_pipeline(config): ...",
-            })
-            .build(),
-
+            },
+        )
+        .build(),
         TemplateBuilder("Document Writer", "AgentOS Team")
-            .description("Professional document generation from outlines or templates")
-            .category(TemplateCategory.CREATIVE)
-            .tags("writing", "document", "report")
-            .add_version("1.0.0", {
+        .description("Professional document generation from outlines or templates")
+        .category(TemplateCategory.CREATIVE)
+        .tags("writing", "document", "report")
+        .add_version(
+            "1.0.0",
+            {
                 "agent.yaml": "name: doc-writer\ntype: creative\n",
                 "writer.py": "async def generate_doc(outline): ...",
-            })
-            .build(),
+            },
+        )
+        .build(),
     ]
 
     async def _seed():

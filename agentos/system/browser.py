@@ -14,11 +14,10 @@ import asyncio
 from dataclasses import dataclass
 
 from agentos.system.permissions import (
-    SystemPermissionManager,
-    PermissionTier,
     PermissionDenied,
+    PermissionTier,
+    SystemPermissionManager,
 )
-
 
 # ── 浏览器动作定义 ─────────────────────────────────────────────
 
@@ -26,24 +25,26 @@ from agentos.system.permissions import (
 @dataclass
 class BrowserAction:
     """浏览器操作定义。"""
-    action_type: str        # navigate / click / type / screenshot / extract / js / wait / scroll
-    url: str = ""           # 导航目标 URL
-    selector: str = ""      # CSS/XPath 选择器
-    value: str = ""         # 输入值 / JS 代码 / 等待时间
+
+    action_type: str  # navigate / click / type / screenshot / extract / js / wait / scroll
+    url: str = ""  # 导航目标 URL
+    selector: str = ""  # CSS/XPath 选择器
+    value: str = ""  # 输入值 / JS 代码 / 等待时间
     screenshot_path: str = ""  # 截图保存路径
-    wait_until: str = "load"   # 等待条件: load / networkidle / domcontentloaded
+    wait_until: str = "load"  # 等待条件: load / networkidle / domcontentloaded
 
 
 @dataclass
 class BrowserResult:
     """浏览器操作结果。"""
+
     success: bool
     action: str
     url: str = ""
-    text: str = ""           # 提取的文本
-    html: str = ""           # 页面 HTML
+    text: str = ""  # 提取的文本
+    html: str = ""  # 页面 HTML
     screenshot_path: str = ""  # 截图文件路径
-    title: str = ""          # 页面标题
+    title: str = ""  # 页面标题
     error: str = ""
     duration_ms: float = 0
 
@@ -61,8 +62,13 @@ class BrowserSession:
             await browser.screenshot("page.png")
     """
 
-    def __init__(self, headless: bool = True, slow_mo: int = 0,
-                 viewport_width: int = 1280, viewport_height: int = 720):
+    def __init__(
+        self,
+        headless: bool = True,
+        slow_mo: int = 0,
+        viewport_width: int = 1280,
+        viewport_height: int = 720,
+    ):
         self._headless = headless
         self._slow_mo = slow_mo
         self._viewport = {"width": viewport_width, "height": viewport_height}
@@ -112,6 +118,7 @@ class BrowserSession:
     async def navigate(self, url: str, wait_until: str = "load") -> BrowserResult:
         """导航到指定 URL。"""
         import time
+
         t0 = time.time()
         try:
             resp = await self._page.goto(url, wait_until=wait_until, timeout=30000)
@@ -127,47 +134,64 @@ class BrowserSession:
             )
         except Exception as e:
             return BrowserResult(
-                success=False, action="navigate", url=url,
-                error=str(e), duration_ms=(time.time() - t0) * 1000,
+                success=False,
+                action="navigate",
+                url=url,
+                error=str(e),
+                duration_ms=(time.time() - t0) * 1000,
             )
 
     async def click(self, selector: str) -> BrowserResult:
         """点击元素。"""
         import time
+
         t0 = time.time()
         try:
             await self._page.click(selector, timeout=10000)
             return BrowserResult(
-                success=True, action="click",
-                url=self._page.url, selector=selector,
+                success=True,
+                action="click",
+                url=self._page.url,
+                selector=selector,
                 duration_ms=(time.time() - t0) * 1000,
             )
         except Exception as e:
             return BrowserResult(
-                success=False, action="click", selector=selector,
-                error=str(e), duration_ms=(time.time() - t0) * 1000,
+                success=False,
+                action="click",
+                selector=selector,
+                error=str(e),
+                duration_ms=(time.time() - t0) * 1000,
             )
 
     async def type_text(self, selector: str, text: str) -> BrowserResult:
         """在输入框中输入文本。"""
         import time
+
         t0 = time.time()
         try:
             await self._page.fill(selector, text, timeout=10000)
             return BrowserResult(
-                success=True, action="type",
-                url=self._page.url, selector=selector, text=text,
+                success=True,
+                action="type",
+                url=self._page.url,
+                selector=selector,
+                text=text,
                 duration_ms=(time.time() - t0) * 1000,
             )
         except Exception as e:
             return BrowserResult(
-                success=False, action="type", selector=selector,
-                error=str(e), duration_ms=(time.time() - t0) * 1000,
+                success=False,
+                action="type",
+                selector=selector,
+                error=str(e),
+                duration_ms=(time.time() - t0) * 1000,
             )
 
     async def extract_text(self, selector: str = "body") -> BrowserResult:
         """提取页面文本。"""
         import time
+
         t0 = time.time()
         try:
             element = await self._page.query_selector(selector)
@@ -176,71 +200,91 @@ class BrowserSession:
             else:
                 text = ""
             return BrowserResult(
-                success=True, action="extract",
-                url=self._page.url, text=text,
+                success=True,
+                action="extract",
+                url=self._page.url,
+                text=text,
                 duration_ms=(time.time() - t0) * 1000,
             )
         except Exception as e:
             return BrowserResult(
-                success=False, action="extract",
-                error=str(e), duration_ms=(time.time() - t0) * 1000,
+                success=False,
+                action="extract",
+                error=str(e),
+                duration_ms=(time.time() - t0) * 1000,
             )
 
     async def extract_html(self) -> BrowserResult:
         """获取完整 HTML。"""
         import time
+
         t0 = time.time()
         try:
             html = await self._page.content()
             return BrowserResult(
-                success=True, action="extract",
-                url=self._page.url, html=html,
+                success=True,
+                action="extract",
+                url=self._page.url,
+                html=html,
                 duration_ms=(time.time() - t0) * 1000,
             )
         except Exception as e:
             return BrowserResult(
-                success=False, action="extract",
-                error=str(e), duration_ms=(time.time() - t0) * 1000,
+                success=False,
+                action="extract",
+                error=str(e),
+                duration_ms=(time.time() - t0) * 1000,
             )
 
     async def screenshot(self, path: str = "", full_page: bool = True) -> BrowserResult:
         """截取页面截图。"""
         import time
+
         t0 = time.time()
         save_path = path or f"/tmp/agentos_screenshot_{int(t0)}.png"
         try:
             await self._page.screenshot(path=save_path, full_page=full_page)
             return BrowserResult(
-                success=True, action="screenshot",
-                url=self._page.url, screenshot_path=save_path,
+                success=True,
+                action="screenshot",
+                url=self._page.url,
+                screenshot_path=save_path,
                 duration_ms=(time.time() - t0) * 1000,
             )
         except Exception as e:
             return BrowserResult(
-                success=False, action="screenshot",
-                error=str(e), duration_ms=(time.time() - t0) * 1000,
+                success=False,
+                action="screenshot",
+                error=str(e),
+                duration_ms=(time.time() - t0) * 1000,
             )
 
     async def execute_js(self, code: str) -> BrowserResult:
         """在页面中执行 JavaScript。"""
         import time
+
         t0 = time.time()
         try:
             result = await self._page.evaluate(code)
             return BrowserResult(
-                success=True, action="js",
-                url=self._page.url, text=str(result),
+                success=True,
+                action="js",
+                url=self._page.url,
+                text=str(result),
                 duration_ms=(time.time() - t0) * 1000,
             )
         except Exception as e:
             return BrowserResult(
-                success=False, action="js",
-                error=str(e), duration_ms=(time.time() - t0) * 1000,
+                success=False,
+                action="js",
+                error=str(e),
+                duration_ms=(time.time() - t0) * 1000,
             )
 
     async def wait(self, selector: str = "", milliseconds: int = 1000) -> BrowserResult:
         """等待元素出现或等待指定毫秒。"""
         import time
+
         t0 = time.time()
         try:
             if selector:
@@ -248,19 +292,25 @@ class BrowserSession:
             else:
                 await asyncio.sleep(milliseconds / 1000)
             return BrowserResult(
-                success=True, action="wait",
-                url=self._page.url, selector=selector,
+                success=True,
+                action="wait",
+                url=self._page.url,
+                selector=selector,
                 duration_ms=(time.time() - t0) * 1000,
             )
         except Exception as e:
             return BrowserResult(
-                success=False, action="wait", selector=selector,
-                error=str(e), duration_ms=(time.time() - t0) * 1000,
+                success=False,
+                action="wait",
+                selector=selector,
+                error=str(e),
+                duration_ms=(time.time() - t0) * 1000,
             )
 
     async def scroll(self, direction: str = "down", amount: int = 500) -> BrowserResult:
         """滚动页面。"""
         import time
+
         t0 = time.time()
         try:
             if direction == "down":
@@ -272,14 +322,18 @@ class BrowserSession:
             elif direction == "top":
                 await self._page.evaluate("window.scrollTo(0, 0)")
             return BrowserResult(
-                success=True, action="scroll",
-                url=self._page.url, text=f"已滚动 {direction}",
+                success=True,
+                action="scroll",
+                url=self._page.url,
+                text=f"已滚动 {direction}",
                 duration_ms=(time.time() - t0) * 1000,
             )
         except Exception as e:
             return BrowserResult(
-                success=False, action="scroll",
-                error=str(e), duration_ms=(time.time() - t0) * 1000,
+                success=False,
+                action="scroll",
+                error=str(e),
+                duration_ms=(time.time() - t0) * 1000,
             )
 
     @property
@@ -302,8 +356,9 @@ class CDPBrowser:
             text = await sess.extract_text()
     """
 
-    def __init__(self, perm_manager: SystemPermissionManager, session_id: str,
-                 headless: bool = True):
+    def __init__(
+        self, perm_manager: SystemPermissionManager, session_id: str, headless: bool = True
+    ):
         self._pm = perm_manager
         self._sid = session_id
         self._headless = headless
@@ -316,7 +371,8 @@ class CDPBrowser:
             self._pm.require(self._sid, PermissionTier.BROWSER, "browser:*")
         except PermissionDenied as e:
             raise PermissionDenied(
-                PermissionTier.BROWSER, "browser:*",
+                PermissionTier.BROWSER,
+                "browser:*",
                 f"浏览器自动化需要 BROWSER 权限: {e}",
             )
 
@@ -367,4 +423,6 @@ class CDPBrowser:
         elif action.action_type == "scroll":
             return await sess.scroll(action.value or "down")
         else:
-            return BrowserResult(success=False, action=action.action_type, error=f"未知动作: {action.action_type}")
+            return BrowserResult(
+                success=False, action=action.action_type, error=f"未知动作: {action.action_type}"
+            )

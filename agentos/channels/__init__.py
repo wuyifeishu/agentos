@@ -22,32 +22,40 @@ AgentOS Messaging Channels — Unified multi-channel message gateway.
   Agent Engine (Marvis)
 """
 
-from agentos.channels.message import (
-    ChannelMessage,
-    ChannelType,
-    MessageType,
-    ConversationContext,
-)
 from agentos.channels.base import (
     BaseChannelAdapter,
     ChannelConfig,
     ReplyResult,
 )
-from agentos.channels.router import ChannelRouter
 from agentos.channels.gateway import (
     create_app,
-    on_message,
     get_router,
+    on_message,
     register_adapter,
 )
+from agentos.channels.message import (
+    ChannelMessage,
+    ChannelType,
+    ConversationContext,
+    MessageType,
+)
+from agentos.channels.router import ChannelRouter
 
 __all__ = [
     # message
-    "ChannelMessage", "ChannelType", "MessageType", "ConversationContext",
+    "ChannelMessage",
+    "ChannelType",
+    "MessageType",
+    "ConversationContext",
     # base
-    "BaseChannelAdapter", "ChannelConfig", "ReplyResult",
+    "BaseChannelAdapter",
+    "ChannelConfig",
+    "ReplyResult",
     # router
     "ChannelRouter",
     # gateway
-    "create_app", "on_message", "get_router", "register_adapter",
+    "create_app",
+    "on_message",
+    "get_router",
+    "register_adapter",
 ]

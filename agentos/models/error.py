@@ -10,15 +10,14 @@ Provides a hierarchy of FastAPI-compatible HTTP exceptions with:
 from __future__ import annotations
 
 import logging
-from enum import Enum
-from typing import Dict, List, Optional
+from enum import StrEnum
 
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     """Machine-readable error codes for API responses."""
 
     # General
@@ -68,6 +67,7 @@ class ErrorCode(str, Enum):
 # Base error
 # ============================================================================
 
+
 class AgentOSError(HTTPException):
     """Base exception for all AgentOS API errors.
 
@@ -80,8 +80,8 @@ class AgentOSError(HTTPException):
         status_code: int,
         code: ErrorCode,
         detail: str = "",
-        field: Optional[str] = None,
-        headers: Optional[Dict[str, str]] = None,
+        field: str | None = None,
+        headers: dict[str, str] | None = None,
     ):
         super().__init__(status_code=status_code, detail=detail, headers=headers)
         self.code = code
@@ -127,6 +127,7 @@ class AgentOSError(HTTPException):
 # Concrete error types
 # ============================================================================
 
+
 class ValidationError(AgentOSError):
     """422 — Input validation failed.
 
@@ -136,8 +137,8 @@ class ValidationError(AgentOSError):
     def __init__(
         self,
         detail: str = "Validation failed",
-        field: Optional[str] = None,
-        errors: Optional[List[Dict[str, str]]] = None,
+        field: str | None = None,
+        errors: list[dict[str, str]] | None = None,
     ):
         super().__init__(
             status_code=422,
@@ -145,7 +146,7 @@ class ValidationError(AgentOSError):
             detail=detail,
             field=field,
         )
-        self.errors: List[Dict[str, str]] = errors or []
+        self.errors: list[dict[str, str]] = errors or []
         if field and detail:
             self.errors.append({"field": field, "message": detail})
 
@@ -211,7 +212,7 @@ class RateLimitError(AgentOSError):
     def __init__(
         self,
         detail: str = "Rate limit exceeded",
-        retry_after: Optional[int] = None,
+        retry_after: int | None = None,
     ):
         headers = {}
         if retry_after is not None:
@@ -242,7 +243,7 @@ class ServiceUnavailableError(AgentOSError):
     def __init__(
         self,
         detail: str = "Service temporarily unavailable",
-        retry_after: Optional[int] = None,
+        retry_after: int | None = None,
     ):
         headers = {}
         if retry_after is not None:

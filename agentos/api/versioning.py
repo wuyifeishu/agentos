@@ -19,14 +19,14 @@ Architecture:
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from typing import Any
 
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
-
 
 # ---------------------------------------------------------------------------
 # Semantic Version
@@ -36,6 +36,7 @@ from starlette.responses import JSONResponse, Response
 @dataclass(order=True, frozen=True)
 class SemVer:
     """Semantic version (major.minor.patch)."""
+
     major: int
     minor: int = 0
     patch: int = 0
@@ -43,7 +44,7 @@ class SemVer:
     _PARSE_RE = re.compile(r"^v?(\d+)(?:\.(\d+)(?:\.(\d+))?)?")
 
     @classmethod
-    def parse(cls, version_str: str) -> Optional["SemVer"]:
+    def parse(cls, version_str: str) -> SemVer | None:
         """Parse a version string like 'v1', '2.0', '1.2.3'."""
         m = cls._PARSE_RE.match(version_str.strip())
         if not m:
@@ -54,7 +55,7 @@ class SemVer:
             patch=int(m.group(3) or 0),
         )
 
-    def is_compatible(self, other: "SemVer") -> bool:
+    def is_compatible(self, other: SemVer) -> bool:
         """Check if other version is API-compatible (same major)."""
         return self.major == other.major
 
@@ -67,26 +68,27 @@ class SemVer:
 # ---------------------------------------------------------------------------
 
 
-class VersionStrategy(str, Enum):
+class VersionStrategy(StrEnum):
     """How to extract API version from requests."""
-    URL_PATH = "url_path"            # /v1/resource
-    HEADER = "header"               # Accept: application/json; version=1
-    QUERY_PARAM = "query_param"     # /resource?api_version=1
+
+    URL_PATH = "url_path"  # /v1/resource
+    HEADER = "header"  # Accept: application/json; version=1
+    QUERY_PARAM = "query_param"  # /resource?api_version=1
 
 
 class VersionExtractor:
     """Extract API version from incoming requests."""
 
-    STRATEGIES: List[VersionStrategy] = [
+    STRATEGIES: list[VersionStrategy] = [
         VersionStrategy.URL_PATH,
         VersionStrategy.HEADER,
         VersionStrategy.QUERY_PARAM,
     ]
 
-    def __init__(self, strategies: Optional[List[VersionStrategy]] = None):
+    def __init__(self, strategies: list[VersionStrategy] | None = None):
         self._strategies = strategies or self.STRATEGIES
 
-    def extract(self, request: Request) -> Optional[SemVer]:
+    def extract(self, request: Request) -> SemVer | None:
         """Try each strategy in order; return first match."""
         for strategy in self._strategies:
             version = self._try_strategy(request, strategy)
@@ -94,7 +96,7 @@ class VersionExtractor:
                 return version
         return None
 
-    def _try_strategy(self, request: Request, strategy: VersionStrategy) -> Optional[SemVer]:
+    def _try_strategy(self, request: Request, strategy: VersionStrategy) -> SemVer | None:
         if strategy == VersionStrategy.URL_PATH:
             return self._from_url(request)
         elif strategy == VersionStrategy.HEADER:
@@ -104,7 +106,7 @@ class VersionExtractor:
         return None
 
     @staticmethod
-    def _from_url(request: Request) -> Optional[SemVer]:
+    def _from_url(request: Request) -> SemVer | None:
         """Extract from /v{major}/... or /v{major}.{minor}/..."""
         path = request.url.path.lstrip("/")
         parts = path.split("/")
@@ -114,7 +116,7 @@ class VersionExtractor:
         return None
 
     @staticmethod
-    def _from_header(request: Request) -> Optional[SemVer]:
+    def _from_header(request: Request) -> SemVer | None:
         """Extract from Accept header or custom X-API-Version."""
         custom = request.headers.get("X-API-Version")
         if custom:
@@ -127,7 +129,7 @@ class VersionExtractor:
         return None
 
     @staticmethod
-    def _from_query(request: Request) -> Optional[SemVer]:
+    def _from_query(request: Request) -> SemVer | None:
         """Extract from ?api_version=1 or ?v=2.0."""
         for param in ("api_version", "v", "version"):
             value = request.query_params.get(param)
@@ -144,30 +146,31 @@ class VersionExtractor:
 @dataclass
 class DeprecationInfo:
     """Information about a deprecated API version."""
+
     version: SemVer
-    sunset_date: Optional[datetime] = None
-    migration_guide_url: Optional[str] = None
+    sunset_date: datetime | None = None
+    migration_guide_url: str | None = None
     message: str = "This API version is deprecated."
 
     @property
     def is_sunset(self) -> bool:
         if self.sunset_date is None:
             return False
-        return datetime.now(timezone.utc) > self.sunset_date
+        return datetime.now(UTC) > self.sunset_date
 
 
 class DeprecationPolicy:
     """Manage API version deprecation."""
 
     def __init__(self):
-        self._deprecated: Dict[SemVer, DeprecationInfo] = {}
+        self._deprecated: dict[SemVer, DeprecationInfo] = {}
 
     def deprecate(self, version: str, sunset_days: int = 90, **kwargs) -> None:
         """Mark a version as deprecated."""
         semver = SemVer.parse(version)
         if semver is None:
             raise ValueError(f"Invalid version: {version}")
-        sunset = datetime.now(timezone.utc) + timedelta(days=sunset_days)
+        sunset = datetime.now(UTC) + timedelta(days=sunset_days)
         self._deprecated[semver] = DeprecationInfo(
             version=semver,
             sunset_date=sunset,
@@ -177,14 +180,14 @@ class DeprecationPolicy:
     def is_deprecated(self, version: SemVer) -> bool:
         return version in self._deprecated
 
-    def get_info(self, version: SemVer) -> Optional[DeprecationInfo]:
+    def get_info(self, version: SemVer) -> DeprecationInfo | None:
         return self._deprecated.get(version)
 
     def should_block(self, version: SemVer) -> bool:
         info = self._deprecated.get(version)
         return info is not None and info.is_sunset
 
-    def list_deprecated(self) -> Dict[str, Dict[str, Any]]:
+    def list_deprecated(self) -> dict[str, dict[str, Any]]:
         return {
             str(v): {
                 "sunset_date": d.sunset_date.isoformat() if d.sunset_date else None,
@@ -211,8 +214,8 @@ class VersionedRouter:
     """
 
     def __init__(self):
-        self._handlers: Dict[SemVer, Callable] = {}
-        self._default_version: Optional[SemVer] = None
+        self._handlers: dict[SemVer, Callable] = {}
+        self._default_version: SemVer | None = None
 
     def register(self, version: str, handler: Callable) -> None:
         """Register a handler for a specific version."""
@@ -225,7 +228,7 @@ class VersionedRouter:
         """Set the default version when no version is specified."""
         self._default_version = SemVer.parse(version)
 
-    def resolve(self, requested: SemVer) -> Tuple[Optional[Callable], Optional[SemVer]]:
+    def resolve(self, requested: SemVer) -> tuple[Callable | None, SemVer | None]:
         """
         Resolve a version to its handler.
         Returns (handler, actual_version) or (None, None).
@@ -235,10 +238,7 @@ class VersionedRouter:
             return self._handlers[requested], requested
 
         # Minor fallback: within same major, find closest <= requested
-        candidates = [
-            v for v in self._handlers
-            if v.major == requested.major and v <= requested
-        ]
+        candidates = [v for v in self._handlers if v.major == requested.major and v <= requested]
         if candidates:
             best = max(candidates)  # highest compatible version
             return self._handlers[best], best
@@ -250,7 +250,7 @@ class VersionedRouter:
 
         return None, None
 
-    def list_versions(self) -> List[str]:
+    def list_versions(self) -> list[str]:
         return sorted(str(v) for v in self._handlers.keys())
 
 
@@ -275,10 +275,10 @@ class APIVersioningMiddleware:
     def __init__(
         self,
         app,
-        supported_versions: Optional[List[str]] = None,
-        default_version: Optional[str] = None,
-        deprecation_policy: Optional[DeprecationPolicy] = None,
-        strategies: Optional[List[VersionStrategy]] = None,
+        supported_versions: list[str] | None = None,
+        default_version: str | None = None,
+        deprecation_policy: DeprecationPolicy | None = None,
+        strategies: list[VersionStrategy] | None = None,
     ):
         self.app = app
         self._supported = {SemVer.parse(v) for v in (supported_versions or []) if SemVer.parse(v)}
@@ -324,16 +324,16 @@ class APIVersioningMiddleware:
 
         await self.app(scope, receive, send)
 
-    async def _with_deprecation_warning(
-        self, scope, receive, send, info: DeprecationInfo
-    ) -> None:
+    async def _with_deprecation_warning(self, scope, receive, send, info: DeprecationInfo) -> None:
         """Wrap response with deprecation headers."""
 
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
                 headers = dict(message.get("headers", []))
                 headers[b"deprecation"] = b"true"
-                headers[b"sunset"] = info.sunset_date.isoformat().encode() if info.sunset_date else b"unknown"
+                headers[b"sunset"] = (
+                    info.sunset_date.isoformat().encode() if info.sunset_date else b"unknown"
+                )
                 if info.migration_guide_url:
                     headers[b"link"] = f'<{info.migration_guide_url}>; rel="deprecation"'.encode()
                 message["headers"] = list(headers.items())
@@ -361,6 +361,6 @@ class APIVersioningMiddleware:
 # ---------------------------------------------------------------------------
 
 # Old API → New API mapping
-APIVersion = SemVer           # SemVer replaces APIVersion
+APIVersion = SemVer  # SemVer replaces APIVersion
 VersionConfig = DeprecationPolicy  # DeprecationPolicy replaces VersionConfig
 VersionNegotiator = VersionedRouter  # VersionedRouter replaces VersionNegotiator

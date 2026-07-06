@@ -14,17 +14,19 @@ import os
 import uuid
 from dataclasses import dataclass
 
-from agentos.system.permissions import (
-    SystemPermissionManager,
-    PermissionTier,
-)
-from agentos.system.file_ops import FileOperator, FileOpResult
-from agentos.system.shell_exec import ShellExecutor
-from agentos.system.approval import ApprovalEngine
-from agentos.enterprise.api_keys import (
-    APIKeyManager, KeyScope, KeyCreateRequest,
-)
 from agentos.cli.config_panel import CONFIG_DIR, CONFIG_FILE, ENV_FILE
+from agentos.enterprise.api_keys import (
+    APIKeyManager,
+    KeyCreateRequest,
+    KeyScope,
+)
+from agentos.system.approval import ApprovalEngine
+from agentos.system.file_ops import FileOperator, FileOpResult
+from agentos.system.permissions import (
+    PermissionTier,
+    SystemPermissionManager,
+)
+from agentos.system.shell_exec import ShellExecutor
 
 APP_VERSION = "1.7.1"
 
@@ -64,13 +66,14 @@ class DesktopServer:
 
     def build_app(self):
         from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-        from fastapi.staticfiles import StaticFiles
         from fastapi.responses import FileResponse, HTMLResponse
+        from fastapi.staticfiles import StaticFiles
 
         app = FastAPI(title="AgentOS Desktop", version=APP_VERSION, docs_url=None, redoc_url=None)
 
         async def push_approval(data: dict) -> None:
             await self._broadcast(data)
+
         self._approval.set_push_callback(push_approval)
 
         # ── WebSocket ──
@@ -79,13 +82,15 @@ class DesktopServer:
             await ws.accept()
             self._ws_clients.append(ws)
             try:
-                await ws.send_json({
-                    "type": "connected",
-                    "session_id": self._sid,
-                    "permission_mode": self._config.permission_mode,
-                    "work_dir": os.getcwd(),
-                    "version": APP_VERSION,
-                })
+                await ws.send_json(
+                    {
+                        "type": "connected",
+                        "session_id": self._sid,
+                        "permission_mode": self._config.permission_mode,
+                        "work_dir": os.getcwd(),
+                        "version": APP_VERSION,
+                    }
+                )
                 while True:
                     data = await ws.receive_json()
                     resp = await self._handle_ws_message(data)
@@ -116,7 +121,9 @@ class DesktopServer:
 
         @app.post("/api/fs/write")
         async def api_write_file(data: dict):
-            return self._file_result_to_dict(self.file_op.write(data.get("path", ""), data.get("content", "")))
+            return self._file_result_to_dict(
+                self.file_op.write(data.get("path", ""), data.get("content", ""))
+            )
 
         @app.post("/api/fs/mkdir")
         async def api_mkdir(data: dict):
@@ -140,10 +147,14 @@ class DesktopServer:
             tier = tier_map.get(data.get("tier", "standard"), PermissionTier.SHELL_STANDARD)
             result = self.shell_exec.execute_checked(data.get("command", ""), tier)
             return {
-                "success": result.success, "command": result.command,
-                "stdout": result.stdout, "stderr": result.stderr,
-                "exit_code": result.exit_code, "duration_ms": result.duration_ms,
-                "timeout": result.timeout, "error": result.error,
+                "success": result.success,
+                "command": result.command,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "exit_code": result.exit_code,
+                "duration_ms": result.duration_ms,
+                "timeout": result.timeout,
+                "error": result.error,
             }
 
         @app.post("/api/permission/mode")
@@ -172,10 +183,12 @@ class DesktopServer:
             ok = self._approval.resolve(ticket_id, approved, remember)
             status = "approved" if approved else ("denied_remember" if remember else "denied")
             if ok:
-                await self._broadcast({
-                    "type": "approval_resolved",
-                    "data": {"ticket_id": ticket_id, "status": status},
-                })
+                await self._broadcast(
+                    {
+                        "type": "approval_resolved",
+                        "data": {"ticket_id": ticket_id, "status": status},
+                    }
+                )
             return {"success": ok, "ticket_id": ticket_id, "status": status}
 
         # ── API Key 管理 API ──
@@ -243,6 +256,7 @@ class DesktopServer:
         @app.get("/api/config")
         async def api_get_config():
             import yaml
+
             config = {}
             if CONFIG_FILE.exists():
                 with open(CONFIG_FILE) as f:
@@ -259,6 +273,7 @@ class DesktopServer:
         @app.post("/api/config")
         async def api_set_config(data: dict):
             import yaml
+
             config = data.get("config", {})
             env_vars = data.get("env_vars", {})
             section = data.get("section")
@@ -321,13 +336,20 @@ class DesktopServer:
             return {
                 "type": "shell_result",
                 "data": {
-                    "success": r.success, "stdout": r.stdout, "stderr": r.stderr,
-                    "exit_code": r.exit_code, "duration_ms": r.duration_ms, "error": r.error,
+                    "success": r.success,
+                    "stdout": r.stdout,
+                    "stderr": r.stderr,
+                    "exit_code": r.exit_code,
+                    "duration_ms": r.duration_ms,
+                    "error": r.error,
                 },
             }
 
         if msg_type == "get_pending_tickets":
-            return {"type": "pending_tickets", "data": {"tickets": self._approval.get_pending_tickets()}}
+            return {
+                "type": "pending_tickets",
+                "data": {"tickets": self._approval.get_pending_tickets()},
+            }
 
         if msg_type == "resolve_ticket":
             ticket_id = payload.get("ticket_id", "")
@@ -336,11 +358,16 @@ class DesktopServer:
             ok = self._approval.resolve(ticket_id, approved, remember)
             status = "approved" if approved else ("denied_remember" if remember else "denied")
             if ok:
-                await self._broadcast({
-                    "type": "approval_resolved",
-                    "data": {"ticket_id": ticket_id, "status": status},
-                })
-            return {"type": "resolve_ticket_result", "data": {"success": ok, "ticket_id": ticket_id, "status": status}}
+                await self._broadcast(
+                    {
+                        "type": "approval_resolved",
+                        "data": {"ticket_id": ticket_id, "status": status},
+                    }
+                )
+            return {
+                "type": "resolve_ticket_result",
+                "data": {"success": ok, "ticket_id": ticket_id, "status": status},
+            }
 
         if msg_type == "ping":
             return {"type": "pong"}
@@ -357,17 +384,27 @@ class DesktopServer:
     @staticmethod
     def _file_result_to_dict(result: FileOpResult) -> dict:
         return {
-            "success": result.success, "action": result.action,
-            "path": result.path, "content": result.content, "error": result.error,
+            "success": result.success,
+            "action": result.action,
+            "path": result.path,
+            "content": result.content,
+            "error": result.error,
             "listing": [
-                {"name": e.name, "path": e.path, "is_dir": e.is_dir,
-                 "size_bytes": e.size_bytes, "modified_at": e.modified_at, "mime_type": e.mime_type}
+                {
+                    "name": e.name,
+                    "path": e.path,
+                    "is_dir": e.is_dir,
+                    "size_bytes": e.size_bytes,
+                    "modified_at": e.modified_at,
+                    "mime_type": e.mime_type,
+                }
                 for e in (result.listing or [])
             ],
         }
 
     def serve(self) -> None:
         import uvicorn
+
         app = self.build_app()
         print(f"\n  AgentOS Desktop v{APP_VERSION}")
         print("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -381,6 +418,9 @@ class DesktopServer:
         uvicorn.run(app, host=self._config.host, port=self._config.port, log_level="warning")
 
 
-def launch_desktop(host: str = "0.0.0.0", port: int = 19999,
-                   mode: str = "dev", auto_open: bool = True) -> None:
-    DesktopServer(DesktopConfig(host=host, port=port, permission_mode=mode, auto_open=auto_open)).serve()
+def launch_desktop(
+    host: str = "0.0.0.0", port: int = 19999, mode: str = "dev", auto_open: bool = True
+) -> None:
+    DesktopServer(
+        DesktopConfig(host=host, port=port, permission_mode=mode, auto_open=auto_open)
+    ).serve()

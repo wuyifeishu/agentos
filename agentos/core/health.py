@@ -18,7 +18,6 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +27,14 @@ class ComponentHealth:
     name: str
     status: str  # "healthy" | "degraded" | "unhealthy"
     latency_ms: float
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
 class HealthReport:
     status: str  # "healthy" | "degraded" | "unhealthy"
     uptime_seconds: float
-    components: Dict[str, ComponentHealth] = field(default_factory=dict)
+    components: dict[str, ComponentHealth] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
 
@@ -45,8 +44,8 @@ class HealthChecker:
     def __init__(
         self,
         start_time: float,
-        db_url: Optional[str] = None,
-        redis_url: Optional[str] = None,
+        db_url: str | None = None,
+        redis_url: str | None = None,
     ):
         self.start_time = start_time
         self.db_url = db_url
@@ -59,18 +58,14 @@ class HealthChecker:
             await asyncio.wait_for(check_fn(), timeout=timeout)
             latency = (time.perf_counter() - t0) * 1000
             return ComponentHealth(name=name, status="healthy", latency_ms=latency)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             latency = (time.perf_counter() - t0) * 1000
             return ComponentHealth(
-                name=name, status="unhealthy", latency_ms=latency,
-                error=f"Timeout after {timeout}s"
+                name=name, status="unhealthy", latency_ms=latency, error=f"Timeout after {timeout}s"
             )
         except Exception as e:
             latency = (time.perf_counter() - t0) * 1000
-            return ComponentHealth(
-                name=name, status="unhealthy", latency_ms=latency,
-                error=str(e)
-            )
+            return ComponentHealth(name=name, status="unhealthy", latency_ms=latency, error=str(e))
 
     async def check(self) -> HealthReport:
         """Run a full health check across all configured components."""
@@ -78,24 +73,18 @@ class HealthChecker:
 
         # DB probe
         if self.db_url:
-            probes.append(
-                self._probe("database", self._check_db)
-            )
+            probes.append(self._probe("database", self._check_db))
 
         # Redis probe
         if self.redis_url:
-            probes.append(
-                self._probe("redis", self._check_redis)
-            )
+            probes.append(self._probe("redis", self._check_redis))
 
         # Always probe disk (write test)
-        probes.append(
-            self._probe("disk", self._check_disk)
-        )
+        probes.append(self._probe("disk", self._check_disk))
 
         results = await asyncio.gather(*probes, return_exceptions=True)
 
-        components: Dict[str, ComponentHealth] = {}
+        components: dict[str, ComponentHealth] = {}
         overall = "healthy"
 
         for r in results:
@@ -109,8 +98,7 @@ class HealthChecker:
             elif isinstance(r, Exception):
                 # Probe itself crashed
                 components["internal"] = ComponentHealth(
-                    name="internal", status="unhealthy",
-                    latency_ms=0, error=str(r)
+                    name="internal", status="unhealthy", latency_ms=0, error=str(r)
                 )
                 overall = "unhealthy"
 
@@ -122,8 +110,8 @@ class HealthChecker:
 
     async def _check_db(self):
         """Database connectivity probe."""
-        from sqlalchemy.ext.asyncio import create_async_engine
         from sqlalchemy import text
+        from sqlalchemy.ext.asyncio import create_async_engine
 
         engine = create_async_engine(self.db_url, echo=False)
         async with engine.connect() as conn:
@@ -140,8 +128,8 @@ class HealthChecker:
 
     async def _check_disk(self):
         """Filesystem write test."""
-        import tempfile
         import os
+        import tempfile
 
         with tempfile.NamedTemporaryFile(delete=False, prefix="health_", suffix=".tmp") as f:
             f.write(b"ok")

@@ -33,29 +33,25 @@ from __future__ import annotations
 import asyncio
 import importlib
 import importlib.util
-import inspect
 import json
-import os
-import sys
 import time
-import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import (
-    Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union,
+    Any,
 )
-
 
 # ── Plugin Metadata ─────────────────────────
 
 
-class PluginStatus(str, Enum):
-    REGISTERED = "registered"   # 已注册但未加载
-    LOADED = "loaded"           # 已加载但未激活
-    ACTIVE = "active"           # 已激活，正在运行
-    ERROR = "error"             # 加载失败
-    DISABLED = "disabled"       # 已禁用
+class PluginStatus(StrEnum):
+    REGISTERED = "registered"  # 已注册但未加载
+    LOADED = "loaded"  # 已加载但未激活
+    ACTIVE = "active"  # 已激活，正在运行
+    ERROR = "error"  # 加载失败
+    DISABLED = "disabled"  # 已禁用
 
 
 @dataclass
@@ -69,26 +65,26 @@ class PluginManifest:
     license: str = "MIT"
 
     # Entry point
-    entry_point: str = ""        # module:class or module:function
-    plugin_class: str = ""       # 插件主类名
+    entry_point: str = ""  # module:class or module:function
+    plugin_class: str = ""  # 插件主类名
 
     # Capabilities
-    provides_tools: List[str] = field(default_factory=list)      # 提供的工具名
-    provides_middleware: List[str] = field(default_factory=list)  # 提供的中间件
-    provides_providers: List[str] = field(default_factory=list)   # 提供的 LLM 提供者
-    provides_backends: List[str] = field(default_factory=list)    # 提供的后端
+    provides_tools: list[str] = field(default_factory=list)  # 提供的工具名
+    provides_middleware: list[str] = field(default_factory=list)  # 提供的中间件
+    provides_providers: list[str] = field(default_factory=list)  # 提供的 LLM 提供者
+    provides_backends: list[str] = field(default_factory=list)  # 提供的后端
 
     # Dependencies
-    depends_on: List[str] = field(default_factory=list)           # 依赖的其他插件
+    depends_on: list[str] = field(default_factory=list)  # 依赖的其他插件
     min_agentos_version: str = "1.0.0"
 
     # Discovery
     discoverable: bool = True
-    auto_activate: bool = False   # 加载后自动激活
-    tags: List[str] = field(default_factory=list)
+    auto_activate: bool = False  # 加载后自动激活
+    tags: list[str] = field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "PluginManifest":
+    def from_dict(cls, data: dict) -> PluginManifest:
         return cls(
             name=data.get("name", ""),
             version=data.get("version", "0.1.0"),
@@ -158,9 +154,9 @@ class BasePlugin:
 
     def __init__(self):
         self._status = PluginStatus.REGISTERED
-        self._tools: Dict[str, Callable] = {}
-        self._middleware: List[Callable] = []
-        self._config: Dict[str, Any] = {}
+        self._tools: dict[str, Callable] = {}
+        self._middleware: list[Callable] = []
+        self._config: dict[str, Any] = {}
 
     # ── Lifecycle ──
 
@@ -202,19 +198,15 @@ class BasePlugin:
 
     def on_load(self) -> None:
         """子类实现：加载时调用。"""
-        pass
 
     def on_activate(self) -> None:
         """子类实现：激活时调用。"""
-        pass
 
     def on_deactivate(self) -> None:
         """子类实现：停用时调用。"""
-        pass
 
     def on_unload(self) -> None:
         """子类实现：卸载时调用。"""
-        pass
 
     # ── Tool Registration ──
 
@@ -237,11 +229,11 @@ class BasePlugin:
         return self._status
 
     @property
-    def tools(self) -> Dict[str, Callable]:
+    def tools(self) -> dict[str, Callable]:
         return dict(self._tools)
 
     @property
-    def middleware(self) -> List[Callable]:
+    def middleware(self) -> list[Callable]:
         return list(self._middleware)
 
     @property
@@ -271,9 +263,9 @@ class PluginRegistry:
         all_tools = registry.get_all_tools()
     """
 
-    _instance: Optional["PluginRegistry"] = None
+    _instance: PluginRegistry | None = None
 
-    def __new__(cls) -> "PluginRegistry":
+    def __new__(cls) -> PluginRegistry:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
@@ -283,11 +275,11 @@ class PluginRegistry:
         if self._initialized:
             return
         self._initialized = True
-        self._plugins: Dict[str, BasePlugin] = {}       # name → plugin instance
-        self._manifests: Dict[str, PluginManifest] = {}  # name → manifest
-        self._tools_index: Dict[str, str] = {}           # tool_name → plugin_name
-        self._discovery_paths: List[str] = []
-        self._watchers: List[Any] = []                    # file watchers
+        self._plugins: dict[str, BasePlugin] = {}  # name → plugin instance
+        self._manifests: dict[str, PluginManifest] = {}  # name → manifest
+        self._tools_index: dict[str, str] = {}  # tool_name → plugin_name
+        self._discovery_paths: list[str] = []
+        self._watchers: list[Any] = []  # file watchers
 
     # ── Registration ──
 
@@ -313,19 +305,17 @@ class PluginRegistry:
         self._manifests.pop(name, None)
 
         # Clean tool index
-        self._tools_index = {
-            tn: pn for tn, pn in self._tools_index.items() if pn != name
-        }
+        self._tools_index = {tn: pn for tn, pn in self._tools_index.items() if pn != name}
         return True
 
     # ── Discovery ──
 
-    def discover(self, path: str, recursive: bool = True) -> List[str]:
+    def discover(self, path: str, recursive: bool = True) -> list[str]:
         """从目录中发现插件。
 
         扫描 plugin.json / agentos_plugin.json 文件。
         """
-        discovered: List[str] = []
+        discovered: list[str] = []
         base = Path(path)
 
         if not base.exists():
@@ -334,7 +324,7 @@ class PluginRegistry:
         pattern = "**/plugin.json" if recursive else "plugin.json"
         for manifest_file in base.glob(pattern):
             try:
-                with open(manifest_file, "r", encoding="utf-8") as f:
+                with open(manifest_file, encoding="utf-8") as f:
                     data = json.load(f)
 
                 manifest = PluginManifest.from_dict(data)
@@ -371,7 +361,7 @@ class PluginRegistry:
 
     # ── Loading ──
 
-    def load(self, name: str) -> Optional[BasePlugin]:
+    def load(self, name: str) -> BasePlugin | None:
         """加载单个插件。"""
         manifest = self._manifests.get(name)
         if not manifest:
@@ -398,9 +388,9 @@ class PluginRegistry:
         except Exception:
             return None
 
-    def load_all(self) -> Dict[str, Optional[BasePlugin]]:
+    def load_all(self) -> dict[str, BasePlugin | None]:
         """加载所有已发现但未加载的插件（按依赖拓扑排序）。"""
-        results: Dict[str, Optional[BasePlugin]] = {}
+        results: dict[str, BasePlugin | None] = {}
 
         order = self._resolve_order()
 
@@ -467,10 +457,10 @@ class PluginRegistry:
 
     # ── Queries ──
 
-    def get_plugin(self, name: str) -> Optional[BasePlugin]:
+    def get_plugin(self, name: str) -> BasePlugin | None:
         return self._plugins.get(name)
 
-    def get_tool(self, tool_name: str) -> Optional[Callable]:
+    def get_tool(self, tool_name: str) -> Callable | None:
         """通过工具名获取工具函数。"""
         plugin_name = self._tools_index.get(tool_name)
         if not plugin_name:
@@ -480,27 +470,29 @@ class PluginRegistry:
             return None
         return plugin.tools.get(tool_name)
 
-    def get_all_tools(self) -> Dict[str, Callable]:
+    def get_all_tools(self) -> dict[str, Callable]:
         """获取所有已激活插件的工具。"""
-        tools: Dict[str, Callable] = {}
+        tools: dict[str, Callable] = {}
         for plugin in self._plugins.values():
             if plugin.is_active:
                 tools.update(plugin.tools)
         return tools
 
-    def list_plugins(self) -> List[dict]:
+    def list_plugins(self) -> list[dict]:
         """列出所有插件及其状态。"""
         result = []
         for name, manifest in self._manifests.items():
             plugin = self._plugins.get(name)
-            result.append({
-                "name": name,
-                "version": manifest.version,
-                "status": plugin.status.value if plugin else "not_loaded",
-                "description": manifest.description,
-                "tools": manifest.provides_tools,
-                "depends_on": manifest.depends_on,
-            })
+            result.append(
+                {
+                    "name": name,
+                    "version": manifest.version,
+                    "status": plugin.status.value if plugin else "not_loaded",
+                    "description": manifest.description,
+                    "tools": manifest.provides_tools,
+                    "depends_on": manifest.depends_on,
+                }
+            )
         return result
 
     def get_active_count(self) -> int:
@@ -508,7 +500,7 @@ class PluginRegistry:
 
     # ── Internal ──
 
-    def _instantiate_plugin(self, manifest: PluginManifest) -> Optional[BasePlugin]:
+    def _instantiate_plugin(self, manifest: PluginManifest) -> BasePlugin | None:
         """从 entry_point 实例化插件。"""
         if not manifest.entry_point:
             return None
@@ -534,11 +526,11 @@ class PluginRegistry:
                 return False
         return True
 
-    def _resolve_order(self) -> List[str]:
+    def _resolve_order(self) -> list[str]:
         """按依赖拓扑排序解析加载顺序。"""
         # Kahn's algorithm
-        in_degree: Dict[str, int] = {}
-        graph: Dict[str, List[str]] = {}
+        in_degree: dict[str, int] = {}
+        graph: dict[str, list[str]] = {}
 
         for name in self._manifests:
             in_degree[name] = 0
@@ -583,8 +575,8 @@ class PluginFileWatcher:
         self._registry = registry
         self._poll_interval = poll_interval
         self._running = False
-        self._task: Optional[asyncio.Task] = None
-        self._file_mtimes: Dict[str, float] = {}
+        self._task: asyncio.Task | None = None
+        self._file_mtimes: dict[str, float] = {}
 
     async def start(self) -> None:
         """启动监控。"""
@@ -712,27 +704,30 @@ def create_registry_with_builtins() -> PluginRegistry:
 
 # ── Missing compat classes (required by agentos/__init__.py) ──
 
+
 @dataclass
 class RegisteredPlugin:
     """已注册插件快照。"""
+
     manifest: PluginManifest
     status: PluginStatus = PluginStatus.REGISTERED
-    loaded_at: Optional[float] = None
-    error: Optional[str] = None
+    loaded_at: float | None = None
+    error: str | None = None
 
 
 @dataclass
 class DiscoveredPlugin:
     """从文件系统发现的插件元信息。"""
+
     name: str
     path: str
-    manifest: Optional[PluginManifest] = None
+    manifest: PluginManifest | None = None
 
 
 class PluginDiscovery:
     """插件发现器。"""
 
-    def __init__(self, paths: Optional[list[str]] = None):
+    def __init__(self, paths: list[str] | None = None):
         self._paths = paths or []
 
     def discover(self) -> list[DiscoveredPlugin]:
@@ -742,7 +737,7 @@ class PluginDiscovery:
 class PluginLoader:
     """插件加载器。"""
 
-    def __init__(self, registry: Optional[PluginRegistry] = None):
+    def __init__(self, registry: PluginRegistry | None = None):
         self._registry = registry or PluginRegistry()
 
     def load_from_discovery(self, discovered: list[DiscoveredPlugin]) -> int:
@@ -752,7 +747,7 @@ class PluginLoader:
 class LifecycleManager:
     """插件生命周期管理器。"""
 
-    def __init__(self, registry: Optional[PluginRegistry] = None):
+    def __init__(self, registry: PluginRegistry | None = None):
         self._registry = registry or PluginRegistry()
 
     def start_all(self) -> None:

@@ -3,17 +3,20 @@
 Supports OpenAI, Azure OpenAI, and any OpenAI-compatible API (DeepSeek, Groq, etc.).
 """
 
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional
-
 import os
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
 class OpenAIConfig:
     """Configuration for OpenAI backend."""
+
     api_key: str = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY", ""))
-    base_url: str = field(default_factory=lambda: os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"))
+    base_url: str = field(
+        default_factory=lambda: os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    )
     model: str = "gpt-4o"
     temperature: float = 0.7
     max_tokens: int = 4096
@@ -37,13 +40,13 @@ class OpenAIClient:
     - Any OpenAI-compatible endpoint
     """
 
-    def __init__(self, config: Optional[OpenAIConfig] = None):
+    def __init__(self, config: OpenAIConfig | None = None):
         self.config = config or OpenAIConfig()
         self._client = None
         self._async_client = None
 
     @property
-    def headers(self) -> Dict[str, str]:
+    def headers(self) -> dict[str, str]:
         h = {
             "Authorization": f"Bearer {self.config.api_key}",
             "Content-Type": "application/json",
@@ -56,7 +59,7 @@ class OpenAIClient:
     def _chat_url(self) -> str:
         return f"{self.config.base_url}/chat/completions"
 
-    async def _async_request(self, messages: List[Dict], **kwargs) -> Dict:
+    async def _async_request(self, messages: list[dict], **kwargs) -> dict:
         import httpx
 
         timeout = httpx.Timeout(self.config.timeout)
@@ -93,16 +96,17 @@ class OpenAIClient:
                     raise
                 if e.response.status_code >= 500:
                     import asyncio
-                    await asyncio.sleep(2 ** attempt)
+
+                    await asyncio.sleep(2**attempt)
                     continue
                 raise
 
     async def chat(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Send a chat completion request.
 
         Args:
@@ -141,10 +145,10 @@ class OpenAIClient:
 
     async def chat_stream(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> AsyncIterator[Dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, Any]]:
         """Stream chat completion tokens.
 
         Yields dicts with 'delta', 'finish_reason', 'tool_call_delta'.
@@ -180,6 +184,7 @@ class OpenAIClient:
                         if data == "[DONE]":
                             break
                         import json
+
                         try:
                             chunk = json.loads(data)
                             choice = chunk["choices"][0]
@@ -194,10 +199,10 @@ class OpenAIClient:
 
     def sync_chat(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Synchronous chat completion."""
         import asyncio
 

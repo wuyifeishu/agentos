@@ -19,10 +19,9 @@ import time
 from collections import OrderedDict
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 from uuid import uuid4
-
 
 # ============================================================================
 # Correlation & context
@@ -46,7 +45,8 @@ def get_correlation_id() -> str:
 # Metrics Core
 # ============================================================================
 
-class MetricType(str, Enum):
+
+class MetricType(StrEnum):
     COUNTER = "counter"
     GAUGE = "gauge"
     HISTOGRAM = "histogram"
@@ -86,7 +86,7 @@ class _HistogramBucket:
     """Thread-safe histogram bucket."""
 
     def __init__(self):
-        self._values: List[float] = []
+        self._values: list[float] = []
         self._lock = threading.Lock()
         self._sum = 0.0
 
@@ -95,7 +95,7 @@ class _HistogramBucket:
             self._values.append(value)
             self._sum += value
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         with self._lock:
             vals = sorted(self._values) if self._values else []
             count = len(vals)
@@ -112,7 +112,7 @@ class _HistogramBucket:
             }
 
 
-def _percentile(sorted_vals: List[float], p: int) -> float:
+def _percentile(sorted_vals: list[float], p: int) -> float:
     if not sorted_vals:
         return 0.0
     k = (len(sorted_vals) - 1) * p / 100.0
@@ -127,10 +127,11 @@ def _percentile(sorted_vals: List[float], p: int) -> float:
 # Metrics
 # ============================================================================
 
+
 class Counter:
     """Monotonic counter (only increases). Prometheus-compatible."""
 
-    def __init__(self, name: str, help_text: str = "", labels: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, help_text: str = "", labels: dict[str, str] | None = None):
         self.name = name
         self.help = help_text
         self.labels = labels or {}
@@ -146,7 +147,7 @@ class Counter:
 class Gauge:
     """Gauge that can go up and down."""
 
-    def __init__(self, name: str, help_text: str = "", labels: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, help_text: str = "", labels: dict[str, str] | None = None):
         self.name = name
         self.help = help_text
         self.labels = labels or {}
@@ -172,8 +173,8 @@ class Histogram:
         self,
         name: str,
         help_text: str = "",
-        labels: Optional[Dict[str, str]] = None,
-        buckets: Optional[List[float]] = None,
+        labels: dict[str, str] | None = None,
+        buckets: list[float] | None = None,
     ):
         self.name = name
         self.help = help_text
@@ -184,33 +185,36 @@ class Histogram:
     def observe(self, value: float) -> None:
         self._bucket.observe(value)
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         return self._bucket.snapshot()
 
 
 class Summary(Histogram):
     """Summary metric (alias for Histogram with quantiles)."""
-    pass
+
 
 
 # ============================================================================
 # Metrics Registry
 # ============================================================================
 
+
 class MetricsRegistry:
     """Collect, query, and export all registered metrics."""
 
     def __init__(self):
-        self._metrics: Dict[str, Any] = OrderedDict()
+        self._metrics: dict[str, Any] = OrderedDict()
         self._lock = threading.Lock()
 
-    def counter(self, name: str, help_text: str = "", labels: Optional[Dict[str, str]] = None) -> Counter:
+    def counter(
+        self, name: str, help_text: str = "", labels: dict[str, str] | None = None
+    ) -> Counter:
         with self._lock:
             if name not in self._metrics:
                 self._metrics[name] = Counter(name=name, help_text=help_text, labels=labels)
             return self._metrics[name]
 
-    def gauge(self, name: str, help_text: str = "", labels: Optional[Dict[str, str]] = None) -> Gauge:
+    def gauge(self, name: str, help_text: str = "", labels: dict[str, str] | None = None) -> Gauge:
         with self._lock:
             if name not in self._metrics:
                 self._metrics[name] = Gauge(name=name, help_text=help_text, labels=labels)
@@ -220,12 +224,14 @@ class MetricsRegistry:
         self,
         name: str,
         help_text: str = "",
-        labels: Optional[Dict[str, str]] = None,
-        buckets: Optional[List[float]] = None,
+        labels: dict[str, str] | None = None,
+        buckets: list[float] | None = None,
     ) -> Histogram:
         with self._lock:
             if name not in self._metrics:
-                self._metrics[name] = Histogram(name=name, help_text=help_text, labels=labels, buckets=buckets)
+                self._metrics[name] = Histogram(
+                    name=name, help_text=help_text, labels=labels, buckets=buckets
+                )
             return self._metrics[name]
 
     def get(self, name: str):
@@ -233,7 +239,7 @@ class MetricsRegistry:
 
     def export_prometheus(self) -> str:
         """Export all metrics in Prometheus text format."""
-        lines: List[str] = []
+        lines: list[str] = []
         with self._lock:
             for metric in self._metrics.values():
                 if metric.help:
@@ -254,9 +260,9 @@ class MetricsRegistry:
             lines.append("")
         return "\n".join(lines)
 
-    def export_dict(self) -> Dict[str, Any]:
+    def export_dict(self) -> dict[str, Any]:
         """Export all metrics as a Python dict (for JSON APIs)."""
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         with self._lock:
             for name, metric in self._metrics.items():
                 if isinstance(metric, (Counter, Gauge)):
@@ -274,7 +280,7 @@ class MetricsRegistry:
             return "histogram"
         return "untyped"
 
-    def _format_labels(self, labels: Dict[str, str]) -> str:
+    def _format_labels(self, labels: dict[str, str]) -> str:
         if not labels:
             return ""
         parts = [f'{k}="{v}"' for k, v in labels.items()]
@@ -285,11 +291,12 @@ class MetricsRegistry:
 # Tracing (minimal span-based)
 # ============================================================================
 
+
 @dataclass
 class SpanContext:
     trace_id: str = field(default_factory=lambda: str(uuid4())[:16])
     span_id: str = field(default_factory=lambda: str(uuid4())[:12])
-    parent_span_id: Optional[str] = None
+    parent_span_id: str | None = None
 
 
 class Span:
@@ -298,8 +305,8 @@ class Span:
     def __init__(
         self,
         name: str,
-        parent: Optional[Span] = None,
-        trace_id: Optional[str] = None,
+        parent: Span | None = None,
+        trace_id: str | None = None,
     ):
         self.name = name
         self.context = SpanContext(
@@ -308,19 +315,21 @@ class Span:
             parent_span_id=parent.context.span_id if parent else None,
         )
         self.start_time = time.monotonic()
-        self.end_time: Optional[float] = None
-        self._tags: Dict[str, str] = {}
-        self._events: List[Dict[str, Any]] = []
+        self.end_time: float | None = None
+        self._tags: dict[str, str] = {}
+        self._events: list[dict[str, Any]] = []
 
     def set_tag(self, key: str, value: str) -> None:
         self._tags[key] = value
 
     def add_event(self, name: str, **attributes) -> None:
-        self._events.append({
-            "name": name,
-            "timestamp": time.monotonic(),
-            "attributes": attributes,
-        })
+        self._events.append(
+            {
+                "name": name,
+                "timestamp": time.monotonic(),
+                "attributes": attributes,
+            }
+        )
 
     def finish(self) -> None:
         self.end_time = time.monotonic()
@@ -330,7 +339,7 @@ class Span:
         end = self.end_time or time.monotonic()
         return (end - self.start_time) * 1000
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "trace_id": self.context.trace_id,
@@ -345,10 +354,10 @@ class Span:
 class Tracer:
     """Creates spans and manages active trace context."""
 
-    _active_span: ContextVar[Optional[Span]] = ContextVar("active_span", default=None)
+    _active_span: ContextVar[Span | None] = ContextVar("active_span", default=None)
 
     @classmethod
-    def noop(cls) -> "Tracer":
+    def noop(cls) -> Tracer:
         """Return a no-op tracer that creates no spans."""
         return cls()
 
@@ -367,7 +376,7 @@ class Tracer:
         self._active_span.set(None)
 
     @property
-    def active_span(self) -> Optional[Span]:
+    def active_span(self) -> Span | None:
         return self._active_span.get()
 
     def span_context(self) -> SpanContext:
@@ -381,11 +390,12 @@ class Tracer:
 # Structured Logging
 # ============================================================================
 
+
 class JsonFormatter(logging.Formatter):
     """JSON structured log formatter with correlation ID injection."""
 
     def format(self, record: logging.LogRecord) -> str:
-        log_entry: Dict[str, Any] = OrderedDict()
+        log_entry: dict[str, Any] = OrderedDict()
         log_entry["timestamp"] = self.formatTime(record, self.datefmt)
         log_entry["level"] = record.levelname
         log_entry["logger"] = record.name
@@ -422,6 +432,7 @@ def setup_structured_logging(level: int = logging.INFO):
 # Pre-built metric sets
 # ============================================================================
 
+
 @dataclass
 class StandardMetrics:
     """Common agent metrics used across AgentOS."""
@@ -442,9 +453,7 @@ class StandardMetrics:
         )
 
         # Agent metrics
-        self.active_agents = registry.gauge(
-            f"{prefix}_active_agents", "Currently running agents"
-        )
+        self.active_agents = registry.gauge(f"{prefix}_active_agents", "Currently running agents")
         self.agent_invocations = registry.counter(
             f"{prefix}_agent_invocations_total", "Total agent invocations"
         )

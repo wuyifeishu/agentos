@@ -11,8 +11,9 @@ import asyncio
 import json
 import time
 from collections import defaultdict
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Optional
+from typing import Any
 
 
 @dataclass
@@ -25,10 +26,10 @@ class StreamEvent:
     data: dict[str, Any]
     """Event payload as JSON-serializable dict."""
 
-    id: Optional[str] = None
+    id: str | None = None
     """Optional event ID for resume support."""
 
-    retry: Optional[int] = None
+    retry: int | None = None
     """Reconnection retry interval in milliseconds."""
 
     def to_sse(self) -> str:
@@ -110,9 +111,7 @@ class StreamingAgent:
 
         # Simulate streaming chunks (integrate with real agent loop)
         chunks = self._generate_chunks(message)
-        heartbeat_task = asyncio.create_task(
-            self._heartbeat_loop(session_id)
-        )
+        heartbeat_task = asyncio.create_task(self._heartbeat_loop(session_id))
 
         try:
             async for chunk in chunks:
@@ -143,15 +142,9 @@ class StreamingAgent:
     def stream_chat_sync(self, message: str, session_id: str = "default"):
         """Synchronous wrapper for stream_chat."""
         loop = asyncio.get_event_loop()
-        return _SyncSSEWrapper(
-            loop.run_until_complete(
-                self._collect_events(message, session_id)
-            )
-        )
+        return _SyncSSEWrapper(loop.run_until_complete(self._collect_events(message, session_id)))
 
-    async def _collect_events(
-        self, message: str, session_id: str
-    ) -> list[str]:
+    async def _collect_events(self, message: str, session_id: str) -> list[str]:
         events: list[str] = []
         async for sse in self.stream_chat(message, session_id):
             events.append(sse)
@@ -194,9 +187,7 @@ class StreamingAgent:
             },
         ).to_sse()
 
-    def emit_tool_result(
-        self, session_id: str, tool_name: str, result: Any
-    ) -> str:
+    def emit_tool_result(self, session_id: str, tool_name: str, result: Any) -> str:
         """Emit a tool_result SSE event."""
         return StreamEvent(
             event="tool_result",
@@ -214,7 +205,7 @@ class StreamingAgent:
             data={"session_id": session_id, "error": error},
         ).to_sse()
 
-    def get_session(self, session_id: str) -> Optional[StreamSession]:
+    def get_session(self, session_id: str) -> StreamSession | None:
         return self._sessions.get(session_id)
 
     def list_sessions(self) -> dict[str, StreamSession]:

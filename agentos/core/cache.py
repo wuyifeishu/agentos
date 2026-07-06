@@ -19,17 +19,19 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import pickle
 import time
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import wraps
 from typing import (
-    Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar,
+    Any,
+    Generic,
+    TypeVar,
 )
-
-import logging
 
 logger = logging.getLogger("agentos.cache")
 
@@ -38,6 +40,7 @@ T = TypeVar("T")
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
+
 
 class CacheError(Exception):
     """Base cache error."""
@@ -54,6 +57,7 @@ class SerializationError(CacheError):
 # ---------------------------------------------------------------------------
 # Serializer
 # ---------------------------------------------------------------------------
+
 
 class Serializer(ABC):
     """Serialization interface for cache values."""
@@ -85,6 +89,7 @@ class JSONSerializer(Serializer):
 # Stats
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CacheStats:
     hits: int = 0
@@ -99,7 +104,7 @@ class CacheStats:
         total = self.hits + self.misses
         return self.hits / total if total > 0 else 0.0
 
-    def snapshot(self) -> Dict[str, int]:
+    def snapshot(self) -> dict[str, int]:
         return {
             "hits": self.hits,
             "misses": self.misses,
@@ -114,14 +119,15 @@ class CacheStats:
 # Backends
 # ---------------------------------------------------------------------------
 
+
 class CacheBackend(ABC):
     """Abstract cache backend."""
 
     @abstractmethod
-    async def get(self, key: str) -> Optional[bytes]: ...
+    async def get(self, key: str) -> bytes | None: ...
 
     @abstractmethod
-    async def set(self, key: str, value: bytes, ttl: Optional[float] = None) -> None: ...
+    async def set(self, key: str, value: bytes, ttl: float | None = None) -> None: ...
 
     @abstractmethod
     async def delete(self, key: str) -> bool: ...
@@ -132,15 +138,14 @@ class CacheBackend(ABC):
     @abstractmethod
     async def clear(self) -> None: ...
 
-    async def get_many(self, keys: List[str]) -> Dict[str, bytes]:
+    async def get_many(self, keys: list[str]) -> dict[str, bytes]:
         results = await asyncio.gather(*(self.get(k) for k in keys), return_exceptions=True)
-        return {k: v for k, v in zip(keys, results)
-                if not isinstance(v, (Exception, type(None)))}
+        return {k: v for k, v in zip(keys, results) if not isinstance(v, (Exception, type(None)))}
 
-    async def set_many(self, items: Dict[str, bytes], ttl: Optional[float] = None) -> None:
+    async def set_many(self, items: dict[str, bytes], ttl: float | None = None) -> None:
         await asyncio.gather(*(self.set(k, v, ttl) for k, v in items.items()))
 
-    async def delete_many(self, keys: List[str]) -> int:
+    async def delete_many(self, keys: list[str]) -> int:
         results = await asyncio.gather(*(self.delete(k) for k in keys), return_exceptions=True)
         return sum(1 for r in results if r is True)
 
@@ -148,10 +153,10 @@ class CacheBackend(ABC):
 class MemoryCacheBackend(CacheBackend):
     """In-memory LRU cache with TTL support and stampede protection."""
 
-    def __init__(self, max_size: int = 10_000, default_ttl: Optional[float] = 300.0):
+    def __init__(self, max_size: int = 10_000, default_ttl: float | None = 300.0):
         self._max_size = max_size
         self._default_ttl = default_ttl
-        self._store: OrderedDict[str, Tuple[bytes, float, Optional[float]]] = OrderedDict()
+        self._store: OrderedDict[str, tuple[bytes, float, float | None]] = OrderedDict()
         # OrderedDict: key → (value, inserted_at, custom_ttl)
 
     @property
@@ -172,7 +177,7 @@ class MemoryCacheBackend(CacheBackend):
         while len(self._store) > self._max_size:
             self._store.popitem(last=False)
 
-    async def get(self, key: str) -> Optional[bytes]:
+    async def get(self, key: str) -> bytes | None:
         self._evict_expired()
         entry = self._store.get(key)
         if entry is None:
@@ -186,7 +191,7 @@ class MemoryCacheBackend(CacheBackend):
         self._store.move_to_end(key)
         return value
 
-    async def set(self, key: str, value: bytes, ttl: Optional[float] = None) -> None:
+    async def set(self, key: str, value: bytes, ttl: float | None = None) -> None:
         self._evict_expired()
         self._store[key] = (value, time.monotonic(), ttl)
         self._store.move_to_end(key)
@@ -211,9 +216,12 @@ class RedisCacheBackend(CacheBackend):
     Requires: pip install redis[hiredis]
     """
 
-    def __init__(self, url: str = "redis://localhost:6379/0",
-                 default_ttl: Optional[float] = 300.0,
-                 prefix: str = "agentos:cache:"):
+    def __init__(
+        self,
+        url: str = "redis://localhost:6379/0",
+        default_ttl: float | None = 300.0,
+        prefix: str = "agentos:cache:",
+    ):
         self._url = url
         self._default_ttl = default_ttl
         self._prefix = prefix
@@ -232,11 +240,11 @@ class RedisCacheBackend(CacheBackend):
     def _key(self, raw: str) -> str:
         return f"{self._prefix}{raw}"
 
-    async def get(self, key: str) -> Optional[bytes]:
+    async def get(self, key: str) -> bytes | None:
         await self._ensure_client()
         return await self._client.get(self._key(key))
 
-    async def set(self, key: str, value: bytes, ttl: Optional[float] = None) -> None:
+    async def set(self, key: str, value: bytes, ttl: float | None = None) -> None:
         await self._ensure_client()
         ttl_val = ttl if ttl is not None else self._default_ttl
         if ttl_val is not None:
@@ -272,15 +280,17 @@ class RedisCacheBackend(CacheBackend):
 # Cache Manager
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class CacheConfig:
     """Cache configuration."""
+
     serializer: Serializer = field(default_factory=PickleSerializer)
     key_prefix: str = ""
-    hash_keys: bool = False          # SHA-256 hash long keys
+    hash_keys: bool = False  # SHA-256 hash long keys
     stampede_protection: bool = True
-    stampede_beta: float = 1.0       # recompute window multiplier
-    stampede_delta: float = 0.0      # extra fixed window
+    stampede_beta: float = 1.0  # recompute window multiplier
+    stampede_delta: float = 0.0  # extra fixed window
     log_stats: bool = False
 
 
@@ -297,7 +307,7 @@ class Cache(Generic[T]):
     def __init__(
         self,
         backend: CacheBackend,
-        config: Optional[CacheConfig] = None,
+        config: CacheConfig | None = None,
     ):
         self._backend = backend
         self._config = config or CacheConfig()
@@ -316,7 +326,7 @@ class Cache(Generic[T]):
 
     # -- Core ops --
 
-    async def get(self, key: str) -> Optional[T]:
+    async def get(self, key: str) -> T | None:
         try:
             raw = await self._backend.get(self._make_key(key))
         except Exception as exc:
@@ -332,7 +342,7 @@ class Cache(Generic[T]):
         except Exception:
             return None
 
-    async def set(self, key: str, value: T, ttl: Optional[float] = None) -> None:
+    async def set(self, key: str, value: T, ttl: float | None = None) -> None:
         try:
             data = self._config.serializer.dumps(value)
             await self._backend.set(self._make_key(key), data, ttl)
@@ -361,8 +371,10 @@ class Cache(Generic[T]):
     # -- Atomic get-or-set with stampede protection --
 
     async def get_or_set(
-        self, key: str, factory: Callable[[], Any],
-        ttl: Optional[float] = None,
+        self,
+        key: str,
+        factory: Callable[[], Any],
+        ttl: float | None = None,
         force_refresh: bool = False,
     ) -> T:
         """Get from cache, or compute via factory and store.
@@ -396,13 +408,13 @@ class Cache(Generic[T]):
 
     # -- Bulk ops --
 
-    async def get_many(self, keys: List[str]) -> Dict[str, Optional[T]]:
+    async def get_many(self, keys: list[str]) -> dict[str, T | None]:
         try:
             cache_keys = [self._make_key(k) for k in keys]
             raw_map = await self._backend.get_many(cache_keys)
         except Exception:
             return {k: None for k in keys}
-        result: Dict[str, Optional[T]] = {}
+        result: dict[str, T | None] = {}
         for k, ck in zip(keys, cache_keys):
             raw = raw_map.get(ck)
             if raw is not None:
@@ -416,22 +428,19 @@ class Cache(Generic[T]):
                 result[k] = None
         return result
 
-    async def set_many(self, mapping: Dict[str, T], ttl: Optional[float] = None) -> None:
+    async def set_many(self, mapping: dict[str, T], ttl: float | None = None) -> None:
         try:
             items = {
-                self._make_key(k): self._config.serializer.dumps(v)
-                for k, v in mapping.items()
+                self._make_key(k): self._config.serializer.dumps(v) for k, v in mapping.items()
             }
             await self._backend.set_many(items, ttl)
             self._stats.sets += len(items)
         except Exception:
             self._stats.errors += 1
 
-    async def delete_many(self, keys: List[str]) -> int:
+    async def delete_many(self, keys: list[str]) -> int:
         try:
-            count = await self._backend.delete_many(
-                [self._make_key(k) for k in keys]
-            )
+            count = await self._backend.delete_many([self._make_key(k) for k in keys])
             self._stats.deletes += count
             return count
         except Exception:
@@ -450,6 +459,7 @@ class Cache(Generic[T]):
 # Tiered Cache
 # ---------------------------------------------------------------------------
 
+
 class TieredCache(Generic[T]):
     """Two-tier cache: L1 (fast, small) → L2 (slower, larger).
 
@@ -457,13 +467,12 @@ class TieredCache(Generic[T]):
     L2: typically RedisCacheBackend
     """
 
-    def __init__(self, l1: Cache[T], l2: Cache[T],
-                 promote_on_read: bool = True):
+    def __init__(self, l1: Cache[T], l2: Cache[T], promote_on_read: bool = True):
         self.l1 = l1
         self.l2 = l2
         self._promote_on_read = promote_on_read
 
-    async def get(self, key: str) -> Optional[T]:
+    async def get(self, key: str) -> T | None:
         # Try L1
         value = await self.l1.get(key)
         if value is not None:
@@ -474,7 +483,7 @@ class TieredCache(Generic[T]):
             await self.l1.set(key, value)
         return value
 
-    async def set(self, key: str, value: T, ttl: Optional[float] = None) -> None:
+    async def set(self, key: str, value: T, ttl: float | None = None) -> None:
         await asyncio.gather(
             self.l1.set(key, value, ttl),
             self.l2.set(key, value, ttl),
@@ -491,7 +500,7 @@ class TieredCache(Generic[T]):
         await asyncio.gather(self.l1.clear(), self.l2.clear())
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "l1": self.l1.stats.snapshot(),
             "l2": self.l2.stats.snapshot(),
@@ -502,11 +511,12 @@ class TieredCache(Generic[T]):
 # Decorator
 # ---------------------------------------------------------------------------
 
+
 def cached(
     cache_instance: Cache,
     key_prefix: str = "",
-    ttl: Optional[float] = None,
-    key_builder: Optional[Callable[..., str]] = None,
+    ttl: float | None = None,
+    key_builder: Callable[..., str] | None = None,
 ):
     """Decorator to cache async function results.
 
@@ -517,6 +527,7 @@ def cached(
         async def get_user(user_id: str) -> dict:
             return await db.fetch_user(user_id)
     """
+
     def decorator(fn):
         @wraps(fn)
         async def wrapper(*args, **kwargs):
@@ -531,7 +542,9 @@ def cached(
             result = await fn(*args, **kwargs)
             await cache_instance.set(cache_key, result, ttl)
             return result
+
         return wrapper
+
     return decorator
 
 

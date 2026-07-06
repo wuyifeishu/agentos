@@ -15,24 +15,28 @@ warnings.warn(
 )
 
 from agentos.swarm.coordinator import (
+    ConflictResolver,
+    ConflictType,
+    MessageBus,
     # Core coordinator
     SwarmCoordinator,
-    # Topology
-    SwarmTopology,
     # Message types
     SwarmMessage,
-    MessageBus,
-    # Enums
-    SwarmAgentRole as AgentRole,
-    TaskPriority,
-    TaskStatus,
-    ConflictType,
-    # Dataclasses
-    SwarmAgentInfo as AgentInfo,
     SwarmTask,
+    # Topology
+    SwarmTopology,
     # Classes
     TaskAllocator,
-    ConflictResolver,
+    TaskPriority,
+    TaskStatus,
+)
+from agentos.swarm.coordinator import (
+    # Dataclasses
+    SwarmAgentInfo as AgentInfo,
+)
+from agentos.swarm.coordinator import (
+    # Enums
+    SwarmAgentRole as AgentRole,
 )
 
 __all__ = [

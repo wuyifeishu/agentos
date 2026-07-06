@@ -24,22 +24,21 @@ Inspired by: LangSmith, Weave, Arize Phoenix
 
 from __future__ import annotations
 
-import json
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import (
-    Any, Callable, Dict, Iterator, List, Optional, Set, Tuple, Union,
+    Any,
 )
-
 
 # ── Span & Trace Types ──────────────────────
 
 
-class SpanKind(str, Enum):
+class SpanKind(StrEnum):
     AGENT = "agent"
     LLM = "llm"
     TOOL = "tool"
@@ -49,7 +48,7 @@ class SpanKind(str, Enum):
     EMBEDDING = "embedding"
 
 
-class SpanStatus(str, Enum):
+class SpanStatus(StrEnum):
     OK = "ok"
     ERROR = "error"
     TIMEOUT = "timeout"
@@ -58,9 +57,10 @@ class SpanStatus(str, Enum):
 @dataclass
 class SpanEvent:
     """Span 中的事件。"""
+
     name: str
     timestamp: float = field(default_factory=time.time)
-    attributes: Dict[str, Any] = field(default_factory=dict)
+    attributes: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -68,18 +68,18 @@ class Span:
     """OpenTelemetry 风格的 Span。"""
 
     span_id: str = field(default_factory=lambda: f"span-{uuid.uuid4().hex[:12]}")
-    parent_id: Optional[str] = None
+    parent_id: str | None = None
     trace_id: str = field(default_factory=lambda: f"trace-{uuid.uuid4().hex[:16]}")
     name: str = ""
     kind: SpanKind = SpanKind.AGENT
 
     start_time: float = field(default_factory=time.time)
-    end_time: Optional[float] = None
+    end_time: float | None = None
     status: SpanStatus = SpanStatus.OK
 
-    attributes: Dict[str, Any] = field(default_factory=dict)
-    events: List[SpanEvent] = field(default_factory=list)
-    children: List["Span"] = field(default_factory=list)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    events: list[SpanEvent] = field(default_factory=list)
+    children: list[Span] = field(default_factory=list)
 
     # Agent-specific
     model_name: str = ""
@@ -92,7 +92,7 @@ class Span:
         end = self.end_time or time.time()
         return (end - self.start_time) * 1000
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None) -> SpanEvent:
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None) -> SpanEvent:
         event = SpanEvent(name=name, attributes=attributes or {})
         self.events.append(event)
         return event
@@ -126,8 +126,8 @@ class Trace:
     """一次完整的 Agent 调用链路。"""
 
     trace_id: str = field(default_factory=lambda: f"trace-{uuid.uuid4().hex[:16]}")
-    root_span: Optional[Span] = None
-    spans: List[Span] = field(default_factory=list)
+    root_span: Span | None = None
+    spans: list[Span] = field(default_factory=list)
 
     @property
     def total_duration_ms(self) -> float:
@@ -171,9 +171,9 @@ class Tracer:
 
     def __init__(self, service_name: str = "agentos"):
         self._service_name = service_name
-        self._active_trace: Optional[Trace] = None
-        self._span_stack: List[Span] = []
-        self._exporters: List[Callable] = []
+        self._active_trace: Trace | None = None
+        self._span_stack: list[Span] = []
+        self._exporters: list[Callable] = []
         self._trace_count: int = 0
 
     def add_exporter(self, exporter: Callable[[Trace], None]) -> None:
@@ -208,7 +208,7 @@ class Tracer:
         self,
         name: str,
         kind: SpanKind = SpanKind.AGENT,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: dict[str, Any] | None = None,
     ) -> Iterator[Span]:
         """在当前 Trace 中创建 Span。"""
         span = Span(
@@ -258,17 +258,20 @@ class Tracer:
         """记录工具调用。"""
         if self._span_stack:
             span = self._span_stack[-1]
-            span.add_event("tool_call", {
-                "tool_name": tool_name,
-                "success": success,
-                "duration_ms": duration_ms,
-            })
+            span.add_event(
+                "tool_call",
+                {
+                    "tool_name": tool_name,
+                    "success": success,
+                    "duration_ms": duration_ms,
+                },
+            )
 
 
 # ── Metrics ─────────────────────────────────
 
 
-class MetricType(str, Enum):
+class MetricType(StrEnum):
     COUNTER = "counter"
     GAUGE = "gauge"
     HISTOGRAM = "histogram"
@@ -277,10 +280,11 @@ class MetricType(str, Enum):
 @dataclass
 class Metric:
     """单个指标。"""
+
     name: str
     type: MetricType
     description: str = ""
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
     value: float = 0.0
     timestamp: float = field(default_factory=time.time)
 
@@ -298,12 +302,12 @@ class MetricsRegistry:
     """
 
     def __init__(self):
-        self._metrics: Dict[str, Metric] = {}
-        self._counters: Dict[str, "Counter"] = {}
-        self._histograms: Dict[str, "Histogram"] = {}
-        self._gauges: Dict[str, "Gauge"] = {}
+        self._metrics: dict[str, Metric] = {}
+        self._counters: dict[str, Counter] = {}
+        self._histograms: dict[str, Histogram] = {}
+        self._gauges: dict[str, Gauge] = {}
 
-    def counter(self, name: str, description: str = "") -> "Counter":
+    def counter(self, name: str, description: str = "") -> Counter:
         if name not in self._counters:
             c = Counter(name, description)
             self._counters[name] = c
@@ -312,8 +316,9 @@ class MetricsRegistry:
             )
         return self._counters[name]
 
-    def histogram(self, name: str, description: str = "",
-                  buckets: Optional[List[float]] = None) -> "Histogram":
+    def histogram(
+        self, name: str, description: str = "", buckets: list[float] | None = None
+    ) -> Histogram:
         if name not in self._histograms:
             h = Histogram(name, description, buckets)
             self._histograms[name] = h
@@ -322,45 +327,49 @@ class MetricsRegistry:
             )
         return self._histograms[name]
 
-    def gauge(self, name: str, description: str = "") -> "Gauge":
+    def gauge(self, name: str, description: str = "") -> Gauge:
         if name not in self._gauges:
             g = Gauge(name, description)
             self._gauges[name] = g
-            self._metrics[name] = Metric(
-                name=name, type=MetricType.GAUGE, description=description
-            )
+            self._metrics[name] = Metric(name=name, type=MetricType.GAUGE, description=description)
         return self._gauges[name]
 
-    def collect(self) -> List[dict]:
+    def collect(self) -> list[dict]:
         """收集所有指标的当前值（Prometheus scrape 格式）。"""
         results = []
         now = time.time()
 
         for name, counter in self._counters.items():
-            results.append({
-                "name": name,
-                "type": "counter",
-                "value": counter.value,
-                "timestamp": now,
-            })
+            results.append(
+                {
+                    "name": name,
+                    "type": "counter",
+                    "value": counter.value,
+                    "timestamp": now,
+                }
+            )
 
         for name, histogram in self._histograms.items():
-            results.append({
-                "name": name,
-                "type": "histogram",
-                "count": histogram.count,
-                "sum": histogram.sum,
-                "buckets": dict(histogram.buckets),
-                "timestamp": now,
-            })
+            results.append(
+                {
+                    "name": name,
+                    "type": "histogram",
+                    "count": histogram.count,
+                    "sum": histogram.sum,
+                    "buckets": dict(histogram.buckets),
+                    "timestamp": now,
+                }
+            )
 
         for name, gauge in self._gauges.items():
-            results.append({
-                "name": name,
-                "type": "gauge",
-                "value": gauge.value,
-                "timestamp": now,
-            })
+            results.append(
+                {
+                    "name": name,
+                    "type": "gauge",
+                    "value": gauge.value,
+                    "timestamp": now,
+                }
+            )
 
         return results
 
@@ -413,12 +422,11 @@ class Gauge:
 class Histogram:
     DEFAULT_BUCKETS = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 5000, 10000]
 
-    def __init__(self, name: str, description: str = "",
-                 buckets: Optional[List[float]] = None):
+    def __init__(self, name: str, description: str = "", buckets: list[float] | None = None):
         self.name = name
         self.description = description
-        self.buckets: Dict[float, int] = {}
-        for b in (buckets or self.DEFAULT_BUCKETS):
+        self.buckets: dict[float, int] = {}
+        for b in buckets or self.DEFAULT_BUCKETS:
             self.buckets[b] = 0
         self._count: int = 0
         self._sum: float = 0.0
@@ -443,7 +451,7 @@ class Histogram:
 # ── Structured Logger ───────────────────────
 
 
-class LogLevel(str, Enum):
+class LogLevel(StrEnum):
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
@@ -459,9 +467,9 @@ class StructuredLogger:
         logger.info("Agent started", agent_name="ToolAgent", user_id="123")
     """
 
-    def __init__(self, tracer: Optional[Tracer] = None):
+    def __init__(self, tracer: Tracer | None = None):
         self._tracer = tracer
-        self._handlers: List[Callable] = []
+        self._handlers: list[Callable] = []
         self._level = LogLevel.INFO
 
     def add_handler(self, handler: Callable[[dict], None]) -> None:
@@ -522,13 +530,13 @@ class ObservabilityDashboard:
     def __init__(self, tracer: Tracer, metrics: MetricsRegistry):
         self._tracer = tracer
         self._metrics = metrics
-        self._trace_buffer: List[Trace] = []
+        self._trace_buffer: list[Trace] = []
         self._max_buffer = 1000
 
     def record_trace(self, trace: Trace) -> None:
         self._trace_buffer.append(trace)
         if len(self._trace_buffer) > self._max_buffer:
-            self._trace_buffer = self._trace_buffer[-self._max_buffer:]
+            self._trace_buffer = self._trace_buffer[-self._max_buffer :]
 
     def get_summary(self) -> dict:
         """获取综合摘要。"""
@@ -543,7 +551,7 @@ class ObservabilityDashboard:
         durations.sort()
 
         # Span kind distribution
-        kind_counts: Dict[str, int] = defaultdict(int)
+        kind_counts: dict[str, int] = defaultdict(int)
         error_count = 0
         for t in traces:
             for s in t.spans:
@@ -569,9 +577,9 @@ class ObservabilityDashboard:
             "metrics": self._metrics.collect(),
         }
 
-    def get_latency_breakdown(self) -> List[dict]:
+    def get_latency_breakdown(self) -> list[dict]:
         """按 pipeline 阶段拆分延迟。"""
-        breakdown: Dict[str, List[float]] = defaultdict(list)
+        breakdown: dict[str, list[float]] = defaultdict(list)
 
         for trace in self._trace_buffer[-100:]:
             for span in trace.spans:
@@ -581,13 +589,15 @@ class ObservabilityDashboard:
         for kind, values in breakdown.items():
             values.sort()
             n = len(values)
-            result.append({
-                "stage": kind,
-                "count": n,
-                "avg_ms": sum(values) / n if n else 0,
-                "p50_ms": values[n // 2] if n else 0,
-                "p95_ms": values[int(n * 0.95)] if n > 1 else (values[0] if values else 0),
-            })
+            result.append(
+                {
+                    "stage": kind,
+                    "count": n,
+                    "avg_ms": sum(values) / n if n else 0,
+                    "p50_ms": values[n // 2] if n else 0,
+                    "p95_ms": values[int(n * 0.95)] if n > 1 else (values[0] if values else 0),
+                }
+            )
 
         return result
 
@@ -618,9 +628,10 @@ def create_observability_stack(service_name: str = "agentos"):
 
 # ── Missing compat classes ───────────────────
 
+
 class MetricsCollector(MetricsRegistry):
     """Alias for MetricsRegistry — required by agentos/__init__.py."""
-    pass
+
 
 
 class NoopTracer(Tracer):
@@ -656,7 +667,9 @@ class CostAnalytics:
         return {
             "total_cost": self.total_cost,
             "total_tokens": self.prompt_tokens + self.completion_tokens,
-            "avg_cost_per_call": sum(self.cost_per_call) / len(self.cost_per_call) if self.cost_per_call else 0,
+            "avg_cost_per_call": (
+                sum(self.cost_per_call) / len(self.cost_per_call) if self.cost_per_call else 0
+            ),
         }
 
 
@@ -668,7 +681,7 @@ class BudgetAlert:
     current_spend: float = 0.0
     threshold_pct: float = 80.0
 
-    def check(self) -> Optional[str]:
+    def check(self) -> str | None:
         if self.budget_limit <= 0:
             return None
         pct = (self.current_spend / self.budget_limit) * 100
@@ -679,10 +692,3 @@ class BudgetAlert:
 
 # ── Re-export tracing module for convenience ───────────────────────────
 
-from agentos.observability.tracing import (
-    setup_tracing,
-    shutdown_tracing,
-    get_tracer,
-    trace_function,
-    get_current_span,
-)

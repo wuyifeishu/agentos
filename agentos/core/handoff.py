@@ -29,6 +29,7 @@ class Handoff:
                     return transfer_to(BillingAgent(), ctx.deps)
                 return "General support"
     """
+
     target_agent: Agent[Any, Any]
     input_data: Any
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -51,6 +52,7 @@ class HandoffResult:
     - target_agent: Name of the agent that handled it
     - handoff_chain: List of agents involved
     """
+
     output: Any
     source_agent: str
     target_agent: str
@@ -58,12 +60,7 @@ class HandoffResult:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-def transfer_to(
-    agent: Agent[Any, Any],
-    input_data: Any,
-    reason: str = "",
-    **metadata
-) -> Handoff:
+def transfer_to(agent: Agent[Any, Any], input_data: Any, reason: str = "", **metadata) -> Handoff:
     """
     Create a handoff to another agent.
 
@@ -101,16 +98,13 @@ def can_handle(agent: Agent[Any, Any], input_data: Any) -> bool:
     Returns:
         True if agent can handle, False otherwise
     """
-    if hasattr(agent, 'can_handle'):
+    if hasattr(agent, "can_handle"):
         return agent.can_handle(input_data)
     return True
 
 
 async def execute_with_handoff(
-    agent: Agent[Any, Any],
-    input_data: Any,
-    max_hops: int = 10,
-    **metadata
+    agent: Agent[Any, Any], input_data: Any, max_hops: int = 10, **metadata
 ) -> HandoffResult | Any:
     """
     Execute an agent with automatic handoff handling.

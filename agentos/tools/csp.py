@@ -16,38 +16,64 @@ Supports:
 from __future__ import annotations
 
 import secrets
-from typing import List, Optional
-
 
 # ============================================================================
 # Constants
 # ============================================================================
 
-ALL_DIRECTIVES = frozenset({
-    "default-src", "script-src", "script-src-elem", "script-src-attr",
-    "style-src", "style-src-elem", "style-src-attr",
-    "img-src", "connect-src", "font-src", "object-src", "media-src",
-    "frame-src", "frame-ancestors", "form-action", "base-uri",
-    "report-uri", "report-to", "sandbox",
-    "worker-src", "manifest-src", "prefetch-src", "navigate-to",
-    "child-src", "fenced-frame-src",
-    "upgrade-insecure-requests", "block-all-mixed-content",
-    "require-trusted-types-for",
-})
+ALL_DIRECTIVES = frozenset(
+    {
+        "default-src",
+        "script-src",
+        "script-src-elem",
+        "script-src-attr",
+        "style-src",
+        "style-src-elem",
+        "style-src-attr",
+        "img-src",
+        "connect-src",
+        "font-src",
+        "object-src",
+        "media-src",
+        "frame-src",
+        "frame-ancestors",
+        "form-action",
+        "base-uri",
+        "report-uri",
+        "report-to",
+        "sandbox",
+        "worker-src",
+        "manifest-src",
+        "prefetch-src",
+        "navigate-to",
+        "child-src",
+        "fenced-frame-src",
+        "upgrade-insecure-requests",
+        "block-all-mixed-content",
+        "require-trusted-types-for",
+    }
+)
 
 FLAG_DIRECTIVES = frozenset({"upgrade-insecure-requests", "block-all-mixed-content"})
 
-KEYWORD_SOURCES = frozenset({
-    "'self'", "'none'", "'strict-dynamic'",
-    "'unsafe-inline'", "'unsafe-eval'",
-    "'unsafe-hashes'", "'unsafe-allow-redirects'",
-    "'wasm-unsafe-eval'",
-})
+KEYWORD_SOURCES = frozenset(
+    {
+        "'self'",
+        "'none'",
+        "'strict-dynamic'",
+        "'unsafe-inline'",
+        "'unsafe-eval'",
+        "'unsafe-hashes'",
+        "'unsafe-allow-redirects'",
+        "'wasm-unsafe-eval'",
+    }
+)
 
 
 # ============================================================================
 # Nonce
 # ============================================================================
+
 
 def generate_nonce(length: int = 32) -> str:
     """Generate a cryptographically random base64 nonce."""
@@ -57,6 +83,7 @@ def generate_nonce(length: int = 32) -> str:
 # ============================================================================
 # CSP
 # ============================================================================
+
 
 class CSP:
     """Fluent Content Security Policy builder.
@@ -82,14 +109,16 @@ class CSP:
     def default_src(self, *sources: str) -> CSP:
         return self._set("default-src", *sources)
 
-    def script_src(self, *sources: str, nonce: Optional[str] = None, hashes: Optional[List[str]] = None) -> CSP:
+    def script_src(
+        self, *sources: str, nonce: str | None = None, hashes: list[str] | None = None
+    ) -> CSP:
         if nonce:
             sources = sources + (f"'nonce-{nonce}'",)
         if hashes:
             sources = sources + tuple(h for h in hashes)
         return self._set("script-src", *sources)
 
-    def script_src_elem(self, *sources: str, nonce: Optional[str] = None) -> CSP:
+    def script_src_elem(self, *sources: str, nonce: str | None = None) -> CSP:
         if nonce:
             sources = sources + (f"'nonce-{nonce}'",)
         return self._set("script-src-elem", *sources)
@@ -97,12 +126,12 @@ class CSP:
     def script_src_attr(self, *sources: str) -> CSP:
         return self._set("script-src-attr", *sources)
 
-    def style_src(self, *sources: str, nonce: Optional[str] = None) -> CSP:
+    def style_src(self, *sources: str, nonce: str | None = None) -> CSP:
         if nonce:
             sources = sources + (f"'nonce-{nonce}'",)
         return self._set("style-src", *sources)
 
-    def style_src_elem(self, *sources: str, nonce: Optional[str] = None) -> CSP:
+    def style_src_elem(self, *sources: str, nonce: str | None = None) -> CSP:
         if nonce:
             sources = sources + (f"'nonce-{nonce}'",)
         return self._set("style-src-elem", *sources)
@@ -225,7 +254,7 @@ class CSP:
         return name in ALL_DIRECTIVES
 
     @classmethod
-    def strict_policy(cls, nonce: Optional[str] = None) -> CSP:
+    def strict_policy(cls, nonce: str | None = None) -> CSP:
         """Pre-built strict CSP with nonce or hash-based approach."""
         csp = cls()
         csp.base_uri("'self'")

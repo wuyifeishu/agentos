@@ -13,21 +13,21 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 
-class TenantStatus(str, Enum):
+class TenantStatus(StrEnum):
     ACTIVE = "active"
     SUSPENDED = "suspended"
     DELETED = "deleted"
 
 
-class TenantTier(str, Enum):
+class TenantTier(StrEnum):
     """租户等级。"""
-    FREE = "free"            # 100 调用/天, 1 并发
-    STARTER = "starter"      # 1000 调用/天, 3 并发
-    PRO = "pro"              # 10000 调用/天, 10 并发
+
+    FREE = "free"  # 100 调用/天, 1 并发
+    STARTER = "starter"  # 1000 调用/天, 3 并发
+    PRO = "pro"  # 10000 调用/天, 10 并发
     ENTERPRISE = "enterprise"  # 自定义
 
 
@@ -66,9 +66,12 @@ TIER_QUOTAS = {
 @dataclass
 class TenantConfig:
     """租户级配置覆盖。"""
+
     default_model: str = "gpt-4o-mini"
     default_provider: str = "openai"
-    allowed_providers: list[str] = field(default_factory=lambda: ["openai", "deepseek", "anthropic"])
+    allowed_providers: list[str] = field(
+        default_factory=lambda: ["openai", "deepseek", "anthropic"]
+    )
     max_iterations: int = 10
     guardrail_level: str = "standard"  # none / standard / strict
     custom_settings: dict = field(default_factory=dict)
@@ -77,6 +80,7 @@ class TenantConfig:
 @dataclass
 class TenantUsage:
     """租户用量统计（当日）。"""
+
     tenant_id: str
     date: str  # YYYY-MM-DD
     api_calls: int = 0
@@ -88,6 +92,7 @@ class TenantUsage:
 @dataclass
 class Tenant:
     """租户实体。"""
+
     tenant_id: str
     name: str
     tier: TenantTier
@@ -121,11 +126,12 @@ class TenantManager:
         self,
         name: str,
         tier: TenantTier = TenantTier.FREE,
-        config: Optional[TenantConfig] = None,
+        config: TenantConfig | None = None,
         metadata: dict = None,
     ) -> Tenant:
         """创建租户。"""
         import uuid
+
         tenant_id = f"tn_{uuid.uuid4().hex[:12]}"
         tenant = Tenant(
             tenant_id=tenant_id,
@@ -137,16 +143,16 @@ class TenantManager:
         self._tenants[tenant_id] = tenant
         return tenant
 
-    def get_tenant(self, tenant_id: str) -> Optional[Tenant]:
+    def get_tenant(self, tenant_id: str) -> Tenant | None:
         return self._tenants.get(tenant_id)
 
-    def list_tenants(self, status: Optional[TenantStatus] = None) -> list[Tenant]:
+    def list_tenants(self, status: TenantStatus | None = None) -> list[Tenant]:
         tenants = list(self._tenants.values())
         if status:
             tenants = [t for t in tenants if t.status == status]
         return sorted(tenants, key=lambda t: t.created_at)
 
-    def update_tenant(self, tenant_id: str, **kwargs) -> Optional[Tenant]:
+    def update_tenant(self, tenant_id: str, **kwargs) -> Tenant | None:
         tenant = self._tenants.get(tenant_id)
         if not tenant:
             return None
@@ -215,7 +221,9 @@ class TenantManager:
 
     # ── 用量追踪 ──
 
-    def record_usage(self, tenant_id: str, api_calls: int = 0, tokens: int = 0, concurrency_delta: int = 0):
+    def record_usage(
+        self, tenant_id: str, api_calls: int = 0, tokens: int = 0, concurrency_delta: int = 0
+    ):
         """记录一次用量。"""
         if not self._tenants.get(tenant_id):
             return
@@ -225,7 +233,7 @@ class TenantManager:
         usage.current_concurrency = max(0, usage.current_concurrency + concurrency_delta)
         usage.last_updated = time.time()
 
-    def get_usage(self, tenant_id: str) -> Optional[TenantUsage]:
+    def get_usage(self, tenant_id: str) -> TenantUsage | None:
         return self._get_usage(tenant_id)
 
     def reset_daily_usage(self, tenant_id: str = None):

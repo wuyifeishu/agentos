@@ -15,12 +15,11 @@ import hashlib
 import hmac
 import time
 import urllib.parse
-from typing import Optional, Tuple
-
 
 # ============================================================================
 # URLSigner
 # ============================================================================
+
 
 class URLSigner:
     """HMAC-based URL signing for secure temporary links.
@@ -49,8 +48,8 @@ class URLSigner:
     def sign(
         self,
         url: str,
-        ttl: Optional[float] = None,
-        extra_params: Optional[dict] = None,
+        ttl: float | None = None,
+        extra_params: dict | None = None,
     ) -> str:
         """Sign a URL with optional TTL and extra params.
 
@@ -80,7 +79,7 @@ class URLSigner:
         new_query = urllib.parse.urlencode(params)
         return urllib.parse.urlunparse(parsed._replace(query=new_query))
 
-    def verify(self, url: str) -> Tuple[bool, Optional[str]]:
+    def verify(self, url: str) -> tuple[bool, str | None]:
         """Verify a signed URL. Returns (is_valid, error_message)."""
         parsed = urllib.parse.urlparse(url)
         params = dict(urllib.parse.parse_qsl(parsed.query))
@@ -94,7 +93,10 @@ class URLSigner:
         if exp:
             exp_val = int(exp)
             if time.time() > exp_val:
-                return False, f"URL expired at {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(exp_val))}"
+                return (
+                    False,
+                    f"URL expired at {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime(exp_val))}",
+                )
 
         # Recompute
         path = parsed.path
@@ -109,5 +111,5 @@ class URLSigner:
         data = path.encode("utf-8")
         for k in sorted(params.keys()):
             v = params[k]
-            data += f"|{k}={v}".encode("utf-8")
+            data += f"|{k}={v}".encode()
         return hmac.new(self._secret, data, self._hash_func).hexdigest()

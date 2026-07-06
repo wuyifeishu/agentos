@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 @dataclass
 class StepTrace:
     """单步追踪记录。"""
+
     name: str
     start_time: float = 0.0
     end_time: float = 0.0
@@ -27,6 +28,7 @@ class StepTrace:
 @dataclass
 class TokenStats:
     """Token 使用统计。"""
+
     total_input: int = 0
     total_output: int = 0
     by_model: dict[str, dict[str, int]] = field(default_factory=dict)
@@ -35,6 +37,7 @@ class TokenStats:
 @dataclass
 class ObservabilityReport:
     """可观测性报告。"""
+
     session_id: str
     total_duration_ms: float = 0.0
     steps: list[StepTrace] = field(default_factory=list)
@@ -65,7 +68,7 @@ class Tracer:
         self.start_time = time.time()
 
     @classmethod
-    def noop(cls) -> "Tracer":
+    def noop(cls) -> Tracer:
         return NoopTracer()
 
     @contextmanager

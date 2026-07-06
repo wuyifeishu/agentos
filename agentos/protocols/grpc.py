@@ -21,11 +21,12 @@ import struct
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
-from agentos.protocols.registry import AgentRegistry, AgentInfo
+from agentos.protocols.registry import AgentInfo, AgentRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ logger = logging.getLogger(__name__)
 # pure-Python implementation that follows the gRPC/protobuf wire protocol.
 # ---------------------------------------------------------------------------
 
-PROTOBUF_WIRE_VARINT  = 0
+PROTOBUF_WIRE_VARINT = 0
 PROTOBUF_WIRE_LEN_DELIM = 2
 
 # Field numbers for our AgentService messages
@@ -49,6 +50,7 @@ PROTOBUF_WIRE_LEN_DELIM = 2
 # Wire protocol helpers
 # ---------------------------------------------------------------------------
 
+
 def _encode_varint(value: int) -> bytes:
     """Encode a varint for protobuf wire format."""
     buf = bytearray()
@@ -59,7 +61,7 @@ def _encode_varint(value: int) -> bytes:
     return bytes(buf)
 
 
-def _decode_varint(data: bytes, offset: int = 0) -> Tuple[int, int]:
+def _decode_varint(data: bytes, offset: int = 0) -> tuple[int, int]:
     """Decode a varint; returns (value, bytes_consumed)."""
     value = 0
     shift = 0
@@ -110,9 +112,10 @@ def _encode_bytes(field_num: int, data: bytes) -> bytes:
 # Frame-based gRPC-over-TCP
 # ---------------------------------------------------------------------------
 
+
 class GrpcFrameCodec:
     """Encode/decode gRPC frames (length-prefixed messages) over a raw TCP stream.
-    
+
     gRPC frame format:
       [1 byte: compressed-flag (0)]
       [4 bytes: message length, big-endian]
@@ -127,13 +130,13 @@ class GrpcFrameCodec:
         return compressed_flag + length + message
 
     @staticmethod
-    async def read_frame(reader: asyncio.StreamReader) -> Optional[bytes]:
+    async def read_frame(reader: asyncio.StreamReader) -> bytes | None:
         """Read a single gRPC frame from a stream."""
         try:
             header = await reader.readexactly(5)
         except asyncio.IncompleteReadError:
             return None
-        compressed = header[0]
+        header[0]
         length = struct.unpack(">I", header[1:5])[0]
         try:
             return await reader.readexactly(length)
@@ -152,25 +155,27 @@ class GrpcFrameCodec:
 # Message types
 # ---------------------------------------------------------------------------
 
+
 class TaskStatus(Enum):
-    PENDING     = 0
-    RUNNING     = 1
-    SUCCESS     = 2
-    FAILED      = 3
-    CANCELLED   = 4
-    TIMEOUT     = 5
+    PENDING = 0
+    RUNNING = 1
+    SUCCESS = 2
+    FAILED = 3
+    CANCELLED = 4
+    TIMEOUT = 5
 
 
 @dataclass
 class GrpcTaskRequest:
     """Task request sent over gRPC."""
+
     agent_id: str
     task_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     payload: str = ""
-    metadata: Dict[str, str] = field(default_factory=dict)
-    reply_to: str = ""          # agent_id to reply to
-    timeout: float = 60.0       # seconds
-    priority: int = 0           # higher = more urgent
+    metadata: dict[str, str] = field(default_factory=dict)
+    reply_to: str = ""  # agent_id to reply to
+    timeout: float = 60.0  # seconds
+    priority: int = 0  # higher = more urgent
 
     def encode(self) -> bytes:
         msg = b""
@@ -195,12 +200,13 @@ class GrpcTaskRequest:
 @dataclass
 class GrpcTaskResponse:
     """Task response sent back over gRPC."""
+
     task_id: str
     status: TaskStatus
     result: str = ""
     error: str = ""
     elapsed: float = 0.0
-    metadata: Dict[str, str] = field(default_factory=dict)
+    metadata: dict[str, str] = field(default_factory=dict)
 
     def encode(self) -> bytes:
         msg = b""
@@ -215,10 +221,11 @@ class GrpcTaskResponse:
 @dataclass
 class GrpcHeartbeat:
     """Heartbeat message for agent liveness."""
+
     agent_id: str
     timestamp: int = field(default_factory=lambda: int(time.time() * 1000))
     load: float = 0.0
-    capabilities: List[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
 
     def encode(self) -> bytes:
         msg = b""
@@ -233,6 +240,7 @@ class GrpcHeartbeat:
 @dataclass
 class GrpcStreamChunk:
     """A chunk in a streaming response."""
+
     stream_id: str
     chunk: bytes = b""
     seq: int = 0
@@ -259,23 +267,23 @@ HANDSHAKE_PREAMBLE = b"PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
 
 
 class GrpcStatusCode(Enum):
-    OK                  = 0
-    CANCELLED           = 1
-    UNKNOWN             = 2
-    INVALID_ARGUMENT    = 3
-    DEADLINE_EXCEEDED   = 4
-    NOT_FOUND           = 5
-    ALREADY_EXISTS      = 6
-    PERMISSION_DENIED   = 7
-    UNAUTHENTICATED     = 16
-    RESOURCE_EXHAUSTED  = 8
+    OK = 0
+    CANCELLED = 1
+    UNKNOWN = 2
+    INVALID_ARGUMENT = 3
+    DEADLINE_EXCEEDED = 4
+    NOT_FOUND = 5
+    ALREADY_EXISTS = 6
+    PERMISSION_DENIED = 7
+    UNAUTHENTICATED = 16
+    RESOURCE_EXHAUSTED = 8
     FAILED_PRECONDITION = 9
-    ABORTED             = 10
-    OUT_OF_RANGE        = 11
-    UNIMPLEMENTED       = 12
-    INTERNAL            = 13
-    UNAVAILABLE         = 14
-    DATA_LOSS           = 15
+    ABORTED = 10
+    OUT_OF_RANGE = 11
+    UNIMPLEMENTED = 12
+    INTERNAL = 13
+    UNAVAILABLE = 14
+    DATA_LOSS = 15
 
 
 class GrpcAgentService(ABC):
@@ -307,12 +315,12 @@ class GrpcAgentService(ABC):
         ...
 
     @abstractmethod
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         """Return health/status of this agent."""
         ...
 
     @abstractmethod
-    async def list_capabilities(self) -> List[str]:
+    async def list_capabilities(self) -> list[str]:
         """Return this agent's capabilities."""
         ...
 
@@ -328,7 +336,6 @@ class A2AGrpcServer:
 
     def serve(self) -> None:
         """Start serving — compliance entry point."""
-        pass
 
     async def start(self) -> None:
         await self._server.start()
@@ -341,15 +348,16 @@ class A2AGrpcServer:
 # gRPC Server
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class GrpcServerConfig:
     host: str = "0.0.0.0"
     port: int = 50051
     max_workers: int = 10
     enable_tls: bool = False
-    cert_file: Optional[str] = None
-    key_file: Optional[str] = None
-    ca_file: Optional[str] = None          # for mTLS
+    cert_file: str | None = None
+    key_file: str | None = None
+    ca_file: str | None = None  # for mTLS
     enable_reflection: bool = True
     max_message_length: int = 4 * 1024 * 1024  # 4 MB
 
@@ -373,9 +381,9 @@ class GrpcServer:
     ):
         self._service = service
         self._config = config
-        self._registry: Optional[AgentRegistry] = None
-        self._server: Optional[asyncio.AbstractServer] = None
-        self._tasks: Dict[str, asyncio.Task] = {}
+        self._registry: AgentRegistry | None = None
+        self._server: asyncio.AbstractServer | None = None
+        self._tasks: dict[str, asyncio.Task] = {}
         self._shutdown_event = asyncio.Event()
         self._agent_id: str = socket.gethostname()
 
@@ -405,13 +413,15 @@ class GrpcServer:
 
         # Register self in A2A registry
         if self._registry:
-            await self._registry.register(AgentInfo(
-                agent_id=self._agent_id,
-                endpoint=f"grpc://{self._config.host}:{self._config.port}",
-                capabilities=await self._service.list_capabilities(),
-                version="1.14.4",
-                transport="grpc",
-            ))
+            await self._registry.register(
+                AgentInfo(
+                    agent_id=self._agent_id,
+                    endpoint=f"grpc://{self._config.host}:{self._config.port}",
+                    capabilities=await self._service.list_capabilities(),
+                    version="1.14.4",
+                    transport="grpc",
+                )
+            )
 
         logger.info(f"[gRPC] AgentService listening on {self._config.host}:{self._config.port}")
 
@@ -454,7 +464,7 @@ class GrpcServer:
             except Exception:
                 pass
 
-    async def _dispatch(self, frame: bytes) -> Optional[bytes]:
+    async def _dispatch(self, frame: bytes) -> bytes | None:
         """Route a gRPC frame to the appropriate RPC handler."""
         try:
             # Minimal routing: check if frame starts with a known method code
@@ -468,11 +478,13 @@ class GrpcServer:
             elif '"HealthCheck"' in data or '"health_check"' in data:
                 result = await self._service.health_check()
                 import json
+
                 return json.dumps(result).encode("utf-8")
 
             elif '"ListCapabilities"' in data or '"list_capabilities"' in data:
                 caps = await self._service.list_capabilities()
                 import json
+
                 return json.dumps(caps).encode("utf-8")
 
             else:
@@ -494,13 +506,15 @@ class GrpcServer:
 # gRPC Client
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class GrpcClientConfig:
     """Configuration for gRPC client connections."""
+
     connect_timeout: float = 10.0
     request_timeout: float = 60.0
     enable_tls: bool = False
-    ca_file: Optional[str] = None
+    ca_file: str | None = None
     max_retries: int = 3
     retry_backoff: float = 1.0
 
@@ -511,13 +525,15 @@ class GrpcClient:
     def __init__(
         self,
         config: GrpcClientConfig,
-        registry: Optional[AgentRegistry] = None,
+        registry: AgentRegistry | None = None,
     ):
         self._config = config
         self._registry = registry
-        self._connections: Dict[str, Tuple[asyncio.StreamReader, asyncio.StreamWriter]] = {}
+        self._connections: dict[str, tuple[asyncio.StreamReader, asyncio.StreamWriter]] = {}
 
-    async def _get_connection(self, agent_id: str) -> Tuple[asyncio.StreamReader, asyncio.StreamWriter]:
+    async def _get_connection(
+        self, agent_id: str
+    ) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
         """Get or create a TCP connection to an agent by its ID."""
         if agent_id in self._connections:
             reader, writer = self._connections[agent_id]
@@ -552,7 +568,7 @@ class GrpcClient:
         self,
         agent_id: str,
         payload: str,
-        metadata: Optional[Dict[str, str]] = None,
+        metadata: dict[str, str] | None = None,
         timeout: float = 60.0,
     ) -> GrpcTaskResponse:
         """Submit a task to a remote agent (unary RPC)."""
@@ -587,9 +603,11 @@ class GrpcClient:
                 if agent_id in self._connections:
                     del self._connections[agent_id]
                 if attempt < self._config.max_retries:
-                    await asyncio.sleep(self._config.retry_backoff * (2 ** attempt))
+                    await asyncio.sleep(self._config.retry_backoff * (2**attempt))
 
-        raise ConnectionError(f"Failed to reach agent '{agent_id}' after {self._config.max_retries+1} attempts: {last_error}")
+        raise ConnectionError(
+            f"Failed to reach agent '{agent_id}' after {self._config.max_retries+1} attempts: {last_error}"
+        )
 
     async def stream_execute(
         self, agent_id: str, payload: str, timeout: float = 120.0
@@ -618,8 +636,8 @@ class GrpcClient:
     async def broadcast(
         self,
         payload: str,
-        capability_filter: Optional[str] = None,
-    ) -> Dict[str, GrpcTaskResponse]:
+        capability_filter: str | None = None,
+    ) -> dict[str, GrpcTaskResponse]:
         """Broadcast a task to all agents matching a capability."""
         if not self._registry:
             raise ValueError("Registry required for broadcast")
@@ -636,7 +654,7 @@ class GrpcClient:
         return results
 
     async def _call_one(
-        self, agent_id: str, payload: str, results: Dict[str, GrpcTaskResponse]
+        self, agent_id: str, payload: str, results: dict[str, GrpcTaskResponse]
     ) -> None:
         try:
             results[agent_id] = await self.submit_task(agent_id, payload)
@@ -662,15 +680,16 @@ class GrpcClient:
 # Default AgentService implementation
 # ---------------------------------------------------------------------------
 
+
 class DefaultAgentService(GrpcAgentService):
     """Default AgentService implementation with task queues and streaming."""
 
-    def __init__(self, agent_id: str = "", task_handler: Optional[Callable] = None):
+    def __init__(self, agent_id: str = "", task_handler: Callable | None = None):
         self.agent_id = agent_id or socket.gethostname()
         self._task_handler = task_handler or self._default_handler
         self._task_queue: asyncio.Queue = asyncio.Queue()
-        self._active_streams: Dict[str, asyncio.Queue] = {}
-        self._capabilities: List[str] = [
+        self._active_streams: dict[str, asyncio.Queue] = {}
+        self._capabilities: list[str] = [
             "text_generation",
             "code_analysis",
             "data_processing",
@@ -708,7 +727,7 @@ class DefaultAgentService(GrpcAgentService):
                 is_last = i + chunk_size >= len(chunks)
                 yield GrpcStreamChunk(
                     stream_id=request.task_id,
-                    chunk=chunks[i:i+chunk_size],
+                    chunk=chunks[i : i + chunk_size],
                     seq=i // chunk_size,
                     is_last=is_last,
                 )
@@ -727,7 +746,7 @@ class DefaultAgentService(GrpcAgentService):
                 is_last=msg.is_last,
             )
 
-    async def health_check(self) -> Dict[str, Any]:
+    async def health_check(self) -> dict[str, Any]:
         return {
             "agent_id": self.agent_id,
             "status": "healthy",
@@ -735,7 +754,7 @@ class DefaultAgentService(GrpcAgentService):
             "timestamp": time.time(),
         }
 
-    async def list_capabilities(self) -> List[str]:
+    async def list_capabilities(self) -> list[str]:
         return self._capabilities
 
     @staticmethod
@@ -747,25 +766,29 @@ class DefaultAgentService(GrpcAgentService):
 # TLS/mTLS helpers
 # ---------------------------------------------------------------------------
 
+
 def create_self_signed_cert(
     cert_file: str, key_file: str, common_name: str = "agentos.local"
 ) -> None:
     """Generate a self-signed certificate for testing gRPC TLS."""
+    import datetime
+
     from cryptography import x509
-    from cryptography.x509.oid import NameOID
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
-    import datetime
+    from cryptography.x509.oid import NameOID
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
-    subject = issuer = x509.Name([
-        x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
-        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "CA"),
-        x509.NameAttribute(NameOID.LOCALITY_NAME, "San Francisco"),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, "AgentOS"),
-        x509.NameAttribute(NameOID.COMMON_NAME, common_name),
-    ])
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "CA"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, "San Francisco"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "AgentOS"),
+            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
+        ]
+    )
 
     cert = (
         x509.CertificateBuilder()
@@ -783,11 +806,13 @@ def create_self_signed_cert(
     )
 
     with open(key_file, "wb") as f:
-        f.write(key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption(),
-        ))
+        f.write(
+            key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+        )
 
     with open(cert_file, "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))

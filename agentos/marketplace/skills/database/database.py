@@ -36,7 +36,11 @@ def run(action: str = "tables", db_path: str = ":memory:", query: str = "", **kw
                 "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
             ).fetchall()
             tables = [r[0] for r in rows]
-            return f"Tables ({len(tables)}): " + ", ".join(tables) if tables else "[database] No tables."
+            return (
+                f"Tables ({len(tables)}): " + ", ".join(tables)
+                if tables
+                else "[database] No tables."
+            )
 
         if action == "schema":
             if not query:

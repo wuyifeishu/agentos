@@ -7,7 +7,8 @@ v1.3.36: 首个纯 httpx 实现，支持同步/异步/流式/Function Calling。
 from __future__ import annotations
 
 import json
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import httpx
 
@@ -30,19 +31,21 @@ ANTHROPIC_VERSION = "2023-06-01"
 
 # USD per 1M tokens (Anthropic pricing as of 2026-07)
 _PRICING: dict[str, tuple[float, float]] = {
-    "claude-sonnet-5-20250630": (3.0, 15.0),       # Sonnet 5 — 性价比最高的 Agent 模型
-    "claude-sonnet-5-20250701": (3.0, 15.0),       # Sonnet 5 (alternate ID)
+    "claude-sonnet-5-20250630": (3.0, 15.0),  # Sonnet 5 — 性价比最高的 Agent 模型
+    "claude-sonnet-5-20250701": (3.0, 15.0),  # Sonnet 5 (alternate ID)
     "claude-sonnet-4-20250514": (3.0, 15.0),
     "claude-3-5-sonnet-20241022": (3.0, 15.0),
     "claude-3-5-haiku-20241022": (0.80, 4.0),
     "claude-3-opus-20240229": (15.0, 75.0),
     "claude-3-haiku-20240307": (0.25, 1.25),
-    "claude-opus-4-20250514": (15.0, 75.0),        # Opus 4
-    "claude-opus-4-5-20251101": (15.0, 75.0),      # Opus 4.5
+    "claude-opus-4-20250514": (15.0, 75.0),  # Opus 4
+    "claude-opus-4-5-20251101": (15.0, 75.0),  # Opus 4.5
 }
 
 # 5-series models identified by prefix
 _SONNET5_PREFIXES = ("claude-sonnet-5", "claude-sonnet5", "sonnet-5")
+
+
 def _is_sonnet5(model: str) -> bool:
     return any(model.startswith(p) for p in _SONNET5_PREFIXES) or "sonnet-5" in model
 
@@ -66,20 +69,24 @@ def _messages_to_anthropic(messages: list[Message]) -> tuple[str | None, list[di
             if m.content:
                 content_blocks.append({"type": "text", "text": m.content})
             for tc in m.tool_calls:
-                content_blocks.append({
-                    "type": "tool_use",
-                    "id": tc.id,
-                    "name": tc.name,
-                    "input": json.loads(tc.arguments),
-                })
+                content_blocks.append(
+                    {
+                        "type": "tool_use",
+                        "id": tc.id,
+                        "name": tc.name,
+                        "input": json.loads(tc.arguments),
+                    }
+                )
             entry["content"] = content_blocks
 
         if m.role == MessageRole.TOOL and m.tool_call_id:
-            entry["content"] = [{
-                "type": "tool_result",
-                "tool_use_id": m.tool_call_id,
-                "content": m.content,
-            }]
+            entry["content"] = [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": m.tool_call_id,
+                    "content": m.content,
+                }
+            ]
             del entry["role"]
         api_messages.append(entry)
 
@@ -101,15 +108,17 @@ def _tools_to_anthropic(tools: list[Tool] | None) -> list[dict[str, Any]] | None
     for t in tools:
         fn = t.function
         props = fn.parameters
-        result.append({
-            "name": fn.name,
-            "description": fn.description,
-            "input_schema": {
-                "type": "object",
-                "properties": {k: v.as_schema() for k, v in props.items()},
-                "required": fn.required or [k for k, v in props.items() if v.required],
-            },
-        })
+        result.append(
+            {
+                "name": fn.name,
+                "description": fn.description,
+                "input_schema": {
+                    "type": "object",
+                    "properties": {k: v.as_schema() for k, v in props.items()},
+                    "required": fn.required or [k for k, v in props.items() if v.required],
+                },
+            }
+        )
     return result
 
 
@@ -118,11 +127,13 @@ def _parse_anthropic_tool_calls(content_blocks: list[dict[str, Any]]) -> list[To
     result: list[ToolCall] = []
     for block in content_blocks:
         if block.get("type") == "tool_use":
-            result.append(ToolCall(
-                id=block["id"],
-                name=block["name"],
-                arguments=json.dumps(block.get("input", {})),
-            ))
+            result.append(
+                ToolCall(
+                    id=block["id"],
+                    name=block["name"],
+                    arguments=json.dumps(block.get("input", {})),
+                )
+            )
     return result
 
 
@@ -165,7 +176,10 @@ def _build_result(data: dict[str, Any], model: str) -> CompletionResult:
             6,
         )
     return CompletionResult(
-        id=data.get("id", ""), model=model, choices=[choice], usage=tokens,
+        id=data.get("id", ""),
+        model=model,
+        choices=[choice],
+        usage=tokens,
     )
 
 
@@ -180,7 +194,8 @@ class AnthropicProvider(LLMProvider):
         timeout: float = 120.0,
     ):
         super().__init__(
-            model=model, api_key=api_key,
+            model=model,
+            api_key=api_key,
             base_url=base_url or ANTHROPIC_API_BASE,
         )
         self._timeout = timeout

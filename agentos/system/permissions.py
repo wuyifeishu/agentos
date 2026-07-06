@@ -10,23 +10,24 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum
-from typing import Optional, Callable
 
 # ── 权限层级定义 ──────────────────────────────────────────────
 
 
 class PermissionTier(IntEnum):
     """权限层级，数值越大权限越高。"""
-    READ = 0              # 只读访问
-    WRITE_SANDBOX = 1     # 沙箱写入
-    WRITE_ALL = 2         # 全盘写入
-    SHELL_READONLY = 3    # 只读 Shell
-    SHELL_STANDARD = 4    # 标准 Shell（超时/目录限制）
-    SHELL_FULL = 5        # 全权限 Shell
-    BROWSER = 6           # 浏览器自动化
-    ADMIN = 7             # 系统管理
+
+    READ = 0  # 只读访问
+    WRITE_SANDBOX = 1  # 沙箱写入
+    WRITE_ALL = 2  # 全盘写入
+    SHELL_READONLY = 3  # 只读 Shell
+    SHELL_STANDARD = 4  # 标准 Shell（超时/目录限制）
+    SHELL_FULL = 5  # 全权限 Shell
+    BROWSER = 6  # 浏览器自动化
+    ADMIN = 7  # 系统管理
 
     @property
     def label(self) -> str:
@@ -46,11 +47,12 @@ class PermissionTier(IntEnum):
 @dataclass
 class SystemPermission:
     """单个系统权限定义。"""
+
     tier: PermissionTier
-    resource: str                          # 资源标识，如 "/home/user/*", "apt:install"
+    resource: str  # 资源标识，如 "/home/user/*", "apt:install"
     description: str = ""
-    requires_confirmation: bool = False    # 是否需要用户二次确认
-    rate_limit_per_minute: int = 0         # 0 表示不限
+    requires_confirmation: bool = False  # 是否需要用户二次确认
+    rate_limit_per_minute: int = 0  # 0 表示不限
 
 
 # ── 预设权限策略 ──────────────────────────────────────────────
@@ -59,7 +61,11 @@ class SystemPermission:
 SAFE_PERMISSIONS: list[SystemPermission] = [
     SystemPermission(PermissionTier.READ, "*", "读取任意文件"),
     SystemPermission(PermissionTier.WRITE_SANDBOX, "/tmp/agentos/**", "沙箱写入"),
-    SystemPermission(PermissionTier.SHELL_READONLY, "ls,cat,head,tail,find,ps,df,du,whoami,pwd,env,echo,date,wc,stat,file,which,uname", "只读 Shell 命令"),
+    SystemPermission(
+        PermissionTier.SHELL_READONLY,
+        "ls,cat,head,tail,find,ps,df,du,whoami,pwd,env,echo,date,wc,stat,file,which,uname",
+        "只读 Shell 命令",
+    ),
     SystemPermission(PermissionTier.BROWSER, "*", "浏览器自动化", requires_confirmation=True),
 ]
 
@@ -82,22 +88,28 @@ FULL_PERMISSIONS: list[SystemPermission] = [
 @dataclass
 class PermissionContext:
     """权限检查的上下文信息。"""
+
     session_id: str
     agent_id: str = ""
     user_id: str = ""
     tier: PermissionTier = PermissionTier.READ
-    granted_permissions: list[SystemPermission] = field(default_factory=lambda: SAFE_PERMISSIONS.copy())
+    granted_permissions: list[SystemPermission] = field(
+        default_factory=lambda: SAFE_PERMISSIONS.copy()
+    )
     # 回调：当需要用户确认时触发
-    on_confirm_needed: Optional[Callable[[SystemPermission, str], bool]] = None
+    on_confirm_needed: Callable[[SystemPermission, str], bool] | None = None
 
 
 class PermissionDenied(Exception):
     """权限拒绝异常。"""
+
     def __init__(self, required: PermissionTier, resource: str, detail: str = ""):
         self.required = required
         self.resource = resource
         self.detail = detail
-        super().__init__(f"权限不足: 需要 {required.name} 访问 {resource}{' — ' + detail if detail else ''}")
+        super().__init__(
+            f"权限不足: 需要 {required.name} 访问 {resource}{' — ' + detail if detail else ''}"
+        )
 
 
 # ── 权限管理器 ─────────────────────────────────────────────────
@@ -144,7 +156,9 @@ class SystemPermissionManager:
 
         # 检查是否有匹配的权限
         for perm in ctx.granted_permissions:
-            if self._tier_covers(perm.tier, required_tier) and self._resource_matches(perm.resource, resource):
+            if self._tier_covers(perm.tier, required_tier) and self._resource_matches(
+                perm.resource, resource
+            ):
                 # 需要确认则触发回调
                 if perm.requires_confirmation:
                     if ctx.on_confirm_needed and not ctx.on_confirm_needed(perm, resource):
@@ -156,9 +170,12 @@ class SystemPermissionManager:
         """要求权限，不满足则抛出 PermissionDenied。"""
         if not self.check(session_id, required_tier, resource):
             ctx = self.get_session(session_id)
-            current_max = max((p.tier for p in ctx.granted_permissions), default=PermissionTier.READ)
+            current_max = max(
+                (p.tier for p in ctx.granted_permissions), default=PermissionTier.READ
+            )
             raise PermissionDenied(
-                required_tier, resource,
+                required_tier,
+                resource,
                 f"当前最高权限: {current_max.name}，需要: {required_tier.name}",
             )
 
@@ -208,7 +225,8 @@ class SystemPermissionManager:
         """撤销某资源的临时提权。"""
         ctx = self.get_session(session_id)
         ctx.granted_permissions = [
-            p for p in ctx.granted_permissions
+            p
+            for p in ctx.granted_permissions
             if not (p.description.startswith("临时授权:") and p.resource == resource)
         ]
 
@@ -251,12 +269,21 @@ class SystemPermissionManager:
         # 支持 * 单层匹配
         if "*" in pattern:
             import fnmatch
+
             return fnmatch.fnmatch(resource, pattern)
         return resource == pattern or resource.startswith(pattern)
 
 
 # ── Auto-generated compat stubs ──
 
-class SAFE_PERMISSIONS: pass
-class DEV_PERMISSIONS: pass
-class FULL_PERMISSIONS: pass
+
+class SAFE_PERMISSIONS:
+    pass
+
+
+class DEV_PERMISSIONS:
+    pass
+
+
+class FULL_PERMISSIONS:
+    pass

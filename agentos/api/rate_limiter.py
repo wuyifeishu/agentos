@@ -19,16 +19,16 @@ Usage:
 
 from __future__ import annotations
 
-import time
 import threading
-from typing import Callable, Optional
+import time
+from collections.abc import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import Response, JSONResponse
-
+from starlette.responses import JSONResponse, Response
 
 # ── Limiters ────────────────────────────────────────────────────────────────
+
 
 class FixedWindowLimiter:
     """Fixed-window counter. 100 req/min → resets every 60s."""
@@ -75,8 +75,8 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self,
         app,
         limiter: FixedWindowLimiter,
-        key_func: Optional[Callable[[Request], str]] = None,
-        exempt_paths: Optional[list[str]] = None,
+        key_func: Callable[[Request], str] | None = None,
+        exempt_paths: list[str] | None = None,
     ):
         super().__init__(app)
         self.limiter = limiter
@@ -90,9 +90,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return xff.split(",")[0].strip()
         return request.client.host if request.client else "unknown"
 
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.url.path in self._exempt:
             return await call_next(request)
 
@@ -103,7 +101,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             return JSONResponse(
                 status_code=429,
                 content={"detail": "Too Many Requests", **info},
-                headers={k: str(info.get({"X-RateLimit-Limit": "limit"}[k], "")) for k in RATE_LIMIT_HEADERS},
+                headers={
+                    k: str(info.get({"X-RateLimit-Limit": "limit"}[k], ""))
+                    for k in RATE_LIMIT_HEADERS
+                },
             )
 
         response = await call_next(request)

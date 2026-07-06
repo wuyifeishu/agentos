@@ -6,11 +6,10 @@ OAuth 2.0 flow → Bolt App → Socket Mode / HTTP Webhook → ChannelMessage.
 
 from __future__ import annotations
 
-import json
-import hmac
 import hashlib
+import hmac
+import json
 import time
-from typing import Optional
 
 from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
 from agentos.channels.message import ChannelMessage, ChannelType, MessageType
@@ -46,17 +45,20 @@ class SlackAdapter(BaseChannelAdapter):
             return False
 
         sig_basestring = f"v0:{timestamp}:{body.decode()}"
-        computed = "v0=" + hmac.new(
-            self._signing_secret.encode(),
-            sig_basestring.encode(),
-            hashlib.sha256,
-        ).hexdigest()
+        computed = (
+            "v0="
+            + hmac.new(
+                self._signing_secret.encode(),
+                sig_basestring.encode(),
+                hashlib.sha256,
+            ).hexdigest()
+        )
 
         return hmac.compare_digest(computed, slack_sig)
 
     # ── Message parsing ──
 
-    async def parse_incoming(self, payload: dict) -> Optional[ChannelMessage]:
+    async def parse_incoming(self, payload: dict) -> ChannelMessage | None:
         """Parse a Slack event payload into ChannelMessage."""
         event_type = payload.get("type", "")
 
@@ -79,7 +81,7 @@ class SlackAdapter(BaseChannelAdapter):
 
         return None
 
-    def _parse_event(self, event: dict) -> Optional[ChannelMessage]:
+    def _parse_event(self, event: dict) -> ChannelMessage | None:
         """Parse a Slack event (message, app_mention, etc.)."""
         event_type = event.get("type", "")
         user = event.get("user", "")
@@ -108,6 +110,7 @@ class SlackAdapter(BaseChannelAdapter):
     def _strip_mention(self, text: str) -> str:
         """Remove <@BOT_ID> prefix from message text."""
         import re
+
         return re.sub(r"^<@U[A-Z0-9]+>\s*", "", text).strip()
 
     # ── Reply ──
@@ -130,6 +133,7 @@ class SlackAdapter(BaseChannelAdapter):
 
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, headers=headers, json=body) as resp:
                     data = await resp.json()
@@ -138,16 +142,13 @@ class SlackAdapter(BaseChannelAdapter):
                     return ReplyResult(success=False, error=data.get("error", "unknown"))
         except ImportError:
             import urllib.request
-            req = urllib.request.Request(
-                url, data=json.dumps(body).encode(), headers=headers
-            )
+
+            req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
             with urllib.request.urlopen(req) as resp:
                 data = json.loads(resp.read())
                 return ReplyResult(success=data.get("ok", False), message_id=data.get("ts", ""))
 
-    async def reply_blocks(
-        self, channel_id: str, blocks: list[dict], **kwargs
-    ) -> ReplyResult:
+    async def reply_blocks(self, channel_id: str, blocks: list[dict], **kwargs) -> ReplyResult:
         """Send Slack Block Kit message."""
         url = "https://slack.com/api/chat.postMessage"
         headers = {
@@ -158,15 +159,15 @@ class SlackAdapter(BaseChannelAdapter):
 
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, headers=headers, json=body) as resp:
                     data = await resp.json()
                     return ReplyResult(success=data.get("ok", False), message_id=data.get("ts", ""))
         except ImportError:
             import urllib.request
-            req = urllib.request.Request(
-                url, data=json.dumps(body).encode(), headers=headers
-            )
+
+            req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
             with urllib.request.urlopen(req) as resp:
                 data = json.loads(resp.read())
                 return ReplyResult(success=data.get("ok", False), message_id=data.get("ts", ""))

@@ -21,8 +21,8 @@ import logging
 import os
 import sys
 from contextvars import ContextVar
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 # ── Context propagation ──────────────────────────────────────────────────
 
@@ -31,15 +31,41 @@ _tenant_id: ContextVar[str] = ContextVar("tenant_id", default="")
 _session_id: ContextVar[str] = ContextVar("session_id", default="")
 
 STANDARD_FIELDS = {
-    "timestamp", "level", "logger", "module", "function", "line",
-    "message", "request_id", "tenant_id", "session_id", "pid",
+    "timestamp",
+    "level",
+    "logger",
+    "module",
+    "function",
+    "line",
+    "message",
+    "request_id",
+    "tenant_id",
+    "session_id",
+    "pid",
 }
 
 _INTERNAL_RECORD_FIELDS = {
-    "name", "msg", "args", "levelname", "levelno", "pathname",
-    "filename", "funcName", "exc_info", "exc_text", "stack_info",
-    "lineno", "created", "msecs", "relativeCreated", "thread",
-    "threadName", "processName", "process", "taskName", "extra",
+    "name",
+    "msg",
+    "args",
+    "levelname",
+    "levelno",
+    "pathname",
+    "filename",
+    "funcName",
+    "exc_info",
+    "exc_text",
+    "stack_info",
+    "lineno",
+    "created",
+    "msecs",
+    "relativeCreated",
+    "thread",
+    "threadName",
+    "processName",
+    "process",
+    "taskName",
+    "extra",
 }
 
 
@@ -57,9 +83,7 @@ class JsonFormatter(logging.Formatter):
 
     def format(self, record: logging.LogRecord) -> str:
         log_entry: dict[str, Any] = {
-            "timestamp": datetime.fromtimestamp(
-                record.created, tz=timezone.utc
-            ).isoformat(),
+            "timestamp": datetime.fromtimestamp(record.created, tz=UTC).isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "module": record.module,
@@ -107,7 +131,7 @@ class ContextLogger:
     def __init__(self, logger: logging.Logger):
         self._logger = logger
 
-    def _make_extra(self, extra: Optional[dict] = None) -> dict:
+    def _make_extra(self, extra: dict | None = None) -> dict:
         base = {
             "request_id": _request_id.get(""),
             "tenant_id": _tenant_id.get(""),
@@ -142,6 +166,7 @@ class ContextLogger:
 
 # ── Context management ────────────────────────────────────────────────────
 
+
 def set_request_id(rid: str) -> None:
     _request_id.set(rid)
 
@@ -168,9 +193,10 @@ def get_session_id() -> str:
 
 # ── Configuration ─────────────────────────────────────────────────────────
 
+
 def configure_logging(
     level: str = "INFO",
-    log_file: Optional[str] = None,
+    log_file: str | None = None,
     json_format: bool = True,
     include_extra: bool = True,
     root_logger_name: str = "agentos",
@@ -201,10 +227,12 @@ def configure_logging(
     if json_format:
         handler.setFormatter(JsonFormatter(include_extra=include_extra))
     else:
-        handler.setFormatter(logging.Formatter(
-            "[%(asctime)s] %(levelname)s %(name)s:%(lineno)d - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        ))
+        handler.setFormatter(
+            logging.Formatter(
+                "[%(asctime)s] %(levelname)s %(name)s:%(lineno)d - %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        )
 
     root.addHandler(handler)
 

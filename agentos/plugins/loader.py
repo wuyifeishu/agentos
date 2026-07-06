@@ -19,20 +19,26 @@ from pathlib import Path
 from typing import Any
 
 from agentos.plugins.registry import (
-    PluginRegistry, RegisteredPlugin, PluginManifest, PluginType, PluginStatus,
     DependencyCycleError,
+    PluginManifest,
+    PluginRegistry,
+    PluginStatus,
+    PluginType,
+    RegisteredPlugin,
 )
 
 
-
 class PluginLoadError(Exception):
-
     """插件加载错误。"""
 
-    def __init__(self, plugin_name, reason=''):
+    def __init__(self, plugin_name, reason=""):
         self.plugin_name = plugin_name
         self.reason = reason
-        super().__init__(f"Failed to load plugin '{plugin_name}': {reason}" if reason else f"Failed to load plugin '{plugin_name}'")
+        super().__init__(
+            f"Failed to load plugin '{plugin_name}': {reason}"
+            if reason
+            else f"Failed to load plugin '{plugin_name}'"
+        )
 
 
 DEFAULT_PLUGIN_DIRS = [
@@ -160,7 +166,7 @@ class PluginLoader:
         if not manifests:
             return self.registry
 
-        names = [m.name for m in manifests]
+        [m.name for m in manifests]
         order = self._topological_sort(manifests)
 
         for name in order:
@@ -222,6 +228,7 @@ class PluginLoader:
         if hasattr(old.instance, "stop"):
             try:
                 import asyncio
+
                 if asyncio.iscoroutinefunction(old.instance.stop):
                     asyncio.get_event_loop().run_until_complete(old.instance.stop())
                 else:

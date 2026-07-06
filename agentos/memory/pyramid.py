@@ -13,20 +13,22 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class MemoryType(str, Enum):
+class MemoryType(StrEnum):
     """Types of memory in the pyramid."""
-    WORKING = "working"       # Current task context
-    EPISODIC = "episodic"     # Past experiences
-    SEMANTIC = "semantic"     # Facts and knowledge
-    PROCEDURAL = "procedural" # Skills and procedures
+
+    WORKING = "working"  # Current task context
+    EPISODIC = "episodic"  # Past experiences
+    SEMANTIC = "semantic"  # Facts and knowledge
+    PROCEDURAL = "procedural"  # Skills and procedures
 
 
-class MemoryLayer(str, Enum):
+class MemoryLayer(StrEnum):
     """Memory layers (L1=fast, L2=persistent)."""
+
     L1 = "l1"  # Fast, in-memory
     L2 = "l2"  # Persistent, file-based
 
@@ -47,6 +49,7 @@ class MemoryItem:
         access_count: Number of accesses
         importance: Importance score (0-1)
     """
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     type: MemoryType = MemoryType.WORKING
     layer: MemoryLayer = MemoryLayer.L1
@@ -134,7 +137,7 @@ class MemoryPyramid:
         memory_type: MemoryType = MemoryType.WORKING,
         layer: MemoryLayer = MemoryLayer.L1,
         importance: float = 0.5,
-        **metadata
+        **metadata,
     ) -> MemoryItem:
         """
         Store a memory item.
@@ -175,7 +178,7 @@ class MemoryPyramid:
 
         return item
 
-    def recall(self, key: str) -> Optional[MemoryItem]:
+    def recall(self, key: str) -> MemoryItem | None:
         """
         Recall a memory item.
 
@@ -192,7 +195,7 @@ class MemoryPyramid:
 
     def search(
         self,
-        memory_type: Optional[MemoryType] = None,
+        memory_type: MemoryType | None = None,
         limit: int = 10,
     ) -> list[MemoryItem]:
         """
@@ -243,7 +246,7 @@ class MemoryPyramid:
         items.sort(key=lambda x: x.importance)
 
         # Remove bottom 20%
-        to_remove = items[:len(items) // 5 + 1]
+        to_remove = items[: len(items) // 5 + 1]
         for item in to_remove:
             self.forget(item.metadata.get("key", ""))
 
@@ -253,7 +256,7 @@ class MemoryPyramid:
         items.sort(key=lambda x: x.importance)
 
         # Remove bottom 20%
-        to_remove = items[:len(items) // 5 + 1]
+        to_remove = items[: len(items) // 5 + 1]
         for item in to_remove:
             self.forget(item.metadata.get("key", ""))
 
@@ -272,7 +275,7 @@ class MemoryPyramid:
             "total": sum(len(m) for m in self._memories.values()),
         }
 
-    def clear(self, memory_type: Optional[MemoryType] = None) -> None:
+    def clear(self, memory_type: MemoryType | None = None) -> None:
         """
         Clear memories.
 
@@ -299,9 +302,7 @@ class MemoryPyramid:
             "max_working": self.max_working,
             "max_episodic": self.max_episodic,
             "memories": {
-                mt.value: {
-                    key: item.to_dict() for key, item in mems.items()
-                }
+                mt.value: {key: item.to_dict() for key, item in mems.items()}
                 for mt, mems in self._memories.items()
             },
         }

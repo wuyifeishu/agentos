@@ -27,9 +27,8 @@ class VectorMemory:
         if self._chroma_client is None:
             try:
                 import chromadb
-                self._chroma_client = chromadb.PersistentClient(
-                    path="./.agentos/vector_db"
-                )
+
+                self._chroma_client = chromadb.PersistentClient(path="./.agentos/vector_db")
             except ImportError:
                 self._chroma_client = None
         return self._chroma_client
@@ -44,9 +43,7 @@ class VectorMemory:
         """
         if self._chroma_client:
             try:
-                collection = self._chroma_client.get_or_create_collection(
-                    self.collection_name
-                )
+                collection = self._chroma_client.get_or_create_collection(self.collection_name)
                 results = collection.query(query_texts=[query], n_results=limit)
                 ids = results.get("ids", [[]])[0]
                 return [self._items[int(i)] for i in ids if int(i) < len(self._items)]
@@ -54,11 +51,7 @@ class VectorMemory:
                 pass
 
         # 降级：关键词匹配
-        return [
-            item
-            for item in self._items[-limit:]
-            if query.lower() in item.content.lower()
-        ]
+        return [item for item in self._items[-limit:] if query.lower() in item.content.lower()]
 
     def clear(self):
         self._items.clear()

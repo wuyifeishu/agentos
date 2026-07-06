@@ -6,8 +6,6 @@ integration with the AgentOS tool system and permission model.
 
 from __future__ import annotations
 
-from typing import Dict, Optional
-
 from agentos.mcp import MCPClient, MCPToolInfo
 from agentos.tools.base import BaseTool, PermissionLevel, ToolResult
 
@@ -32,7 +30,7 @@ class MCPToolAdapter(BaseTool):
         client: MCPClient,
         tool_info: MCPToolInfo,
         permission_level: PermissionLevel = PermissionLevel.MODERATE,
-        tool_id: Optional[str] = None,
+        tool_id: str | None = None,
     ):
         """Initialize the adapter.
 
@@ -83,10 +81,14 @@ class MCPToolAdapter(BaseTool):
             "function": {
                 "name": self._id,
                 "description": self._tool_info.description or "",
-                "parameters": {
-                    **params,
-                    "title": params.get("title", self._id),
-                } if params else {"type": "object", "properties": {}},
+                "parameters": (
+                    {
+                        **params,
+                        "title": params.get("title", self._id),
+                    }
+                    if params
+                    else {"type": "object", "properties": {}}
+                ),
             },
         }
 
@@ -94,7 +96,8 @@ class MCPToolAdapter(BaseTool):
         return {
             "name": self._id,
             "description": self._tool_info.description or "",
-            "input_schema": self._tool_info.input_schema or {
+            "input_schema": self._tool_info.input_schema
+            or {
                 "type": "object",
                 "properties": {},
             },
@@ -113,7 +116,7 @@ class MCPToolAdapter(BaseTool):
     def is_read_operation(self, arguments: dict) -> bool:
         return not self.is_write_operation(arguments)
 
-    def extract_target_path(self, arguments: dict) -> Optional[str]:
+    def extract_target_path(self, arguments: dict) -> str | None:
         """Extract file path from common MCP tool arguments."""
         for key in ("path", "uri", "file_path", "filepath"):
             if key in arguments:
@@ -146,7 +149,7 @@ class MCPToolRegistry:
         """
         self._client = client
         self._default_permission = default_permission
-        self._adapters: Dict[str, MCPToolAdapter] = {}
+        self._adapters: dict[str, MCPToolAdapter] = {}
         self._build_adapters()
 
     def _build_adapters(self) -> None:
@@ -160,11 +163,11 @@ class MCPToolRegistry:
             )
             self._adapters[adapter.name] = adapter
 
-    def get_all_tools(self) -> Dict[str, BaseTool]:
+    def get_all_tools(self) -> dict[str, BaseTool]:
         """Return all adapted tools as name -> BaseTool mapping."""
         return dict(self._adapters)
 
-    def get_tool(self, name: str) -> Optional[BaseTool]:
+    def get_tool(self, name: str) -> BaseTool | None:
         """Get a single adapted tool by name."""
         return self._adapters.get(name)
 

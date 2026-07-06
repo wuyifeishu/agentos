@@ -15,14 +15,15 @@ from __future__ import annotations
 import random
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
-
+from typing import Any
 
 # ============================================================================
 # Backoff Strategy
 # ============================================================================
+
 
 class BackoffStrategy(Enum):
     EXPONENTIAL = "exponential"
@@ -34,14 +35,15 @@ class BackoffStrategy(Enum):
 # Job
 # ============================================================================
 
+
 @dataclass
 class RetryJob:
     id: str
     func: Callable[..., Any]
     args: tuple = ()
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
     attempts: int = 0
-    last_error: Optional[Exception] = None
+    last_error: Exception | None = None
     created_at: float = field(default_factory=time.time)
 
     def execute(self) -> Any:
@@ -51,6 +53,7 @@ class RetryJob:
 # ============================================================================
 # RetryQueue
 # ============================================================================
+
 
 class RetryQueue:
     """Asynchronous retry queue with exponential backoff.
@@ -89,21 +92,22 @@ class RetryQueue:
         self._max_delay = max_delay
         self._backoff = backoff
         self._jitter = jitter
-        self._dead_letters: List[tuple] = []
+        self._dead_letters: list[tuple] = []
         self._lock = threading.RLock()
         self._total_submitted: int = 0
         self._total_succeeded: int = 0
         self._total_failed: int = 0
         # Hooks
-        self._on_retry: List[Callable[[RetryJob, Exception, int], None]] = []
-        self._on_failure: List[Callable[[RetryJob, Exception], None]] = []
-        self._on_success: List[Callable[[RetryJob, Any], None]] = []
+        self._on_retry: list[Callable[[RetryJob, Exception, int], None]] = []
+        self._on_failure: list[Callable[[RetryJob, Exception], None]] = []
+        self._on_success: list[Callable[[RetryJob, Any], None]] = []
 
     # ---------- submit ----------
 
     def submit(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """Submit and execute a job with retry. Raises last error if all attempts fail."""
         import uuid
+
         job = RetryJob(
             id=str(uuid.uuid4())[:8],
             func=func,
@@ -189,7 +193,7 @@ class RetryQueue:
     # ---------- dead letters ----------
 
     @property
-    def dead_letters(self) -> List[tuple]:
+    def dead_letters(self) -> list[tuple]:
         with self._lock:
             return list(self._dead_letters)
 
@@ -210,7 +214,7 @@ class RetryQueue:
     # ---------- stats ----------
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "total_submitted": self._total_submitted,

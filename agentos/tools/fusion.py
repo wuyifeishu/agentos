@@ -11,16 +11,18 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class FusionMode(str, Enum):
+class FusionMode(StrEnum):
     """Tool fusion modes."""
+
     SEQUENTIAL = "sequential"  # Run tools one by one
-    PARALLEL = "parallel"      # Run tools in parallel
-    CHAIN = "chain"            # Output of one feeds into next
+    PARALLEL = "parallel"  # Run tools in parallel
+    CHAIN = "chain"  # Output of one feeds into next
 
 
 @dataclass
@@ -36,6 +38,7 @@ class ToolSpec:
         timeout: Execution timeout
         retry_count: Number of retries
     """
+
     name: str
     description: str = ""
     func: Callable[..., Any] = None
@@ -66,10 +69,11 @@ class ToolResult:
         error: Error message (if failed)
         duration: Execution duration
     """
+
     tool_name: str
     success: bool
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     duration: float = 0.0
 
 
@@ -86,6 +90,7 @@ class FusionResult:
         total_duration: Total execution duration
         success: Whether fusion succeeded
     """
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     mode: FusionMode = FusionMode.SEQUENTIAL
     results: list[ToolResult] = field(default_factory=list)
@@ -169,7 +174,7 @@ class FusionToolkit:
             return True
         return False
 
-    def get_tool(self, tool_name: str) -> Optional[ToolSpec]:
+    def get_tool(self, tool_name: str) -> ToolSpec | None:
         """
         Get a tool by name.
 
@@ -233,11 +238,13 @@ class FusionToolkit:
         for tool_name in tool_names:
             tool = self._tools.get(tool_name)
             if not tool:
-                result.results.append(ToolResult(
-                    tool_name=tool_name,
-                    success=False,
-                    error=f"Tool not found: {tool_name}",
-                ))
+                result.results.append(
+                    ToolResult(
+                        tool_name=tool_name,
+                        success=False,
+                        error=f"Tool not found: {tool_name}",
+                    )
+                )
                 result.success = False
                 continue
 
@@ -246,18 +253,22 @@ class FusionToolkit:
                 output = await self._execute_tool(tool, inputs)
                 duration = time.time() - tool_start
 
-                result.results.append(ToolResult(
-                    tool_name=tool_name,
-                    success=True,
-                    output=output,
-                    duration=duration,
-                ))
+                result.results.append(
+                    ToolResult(
+                        tool_name=tool_name,
+                        success=True,
+                        output=output,
+                        duration=duration,
+                    )
+                )
             except Exception as e:
-                result.results.append(ToolResult(
-                    tool_name=tool_name,
-                    success=False,
-                    error=str(e),
-                ))
+                result.results.append(
+                    ToolResult(
+                        tool_name=tool_name,
+                        success=False,
+                        error=str(e),
+                    )
+                )
                 result.success = False
 
         # Fuse outputs
@@ -279,22 +290,26 @@ class FusionToolkit:
             if tool:
                 tasks.append(self._execute_tool_with_result(tool, inputs))
             else:
-                result.results.append(ToolResult(
-                    tool_name=tool_name,
-                    success=False,
-                    error=f"Tool not found: {tool_name}",
-                ))
+                result.results.append(
+                    ToolResult(
+                        tool_name=tool_name,
+                        success=False,
+                        error=f"Tool not found: {tool_name}",
+                    )
+                )
 
         # Execute in parallel
         if tasks:
             tool_results = await asyncio.gather(*tasks, return_exceptions=True)
             for tr in tool_results:
                 if isinstance(tr, Exception):
-                    result.results.append(ToolResult(
-                        tool_name="unknown",
-                        success=False,
-                        error=str(tr),
-                    ))
+                    result.results.append(
+                        ToolResult(
+                            tool_name="unknown",
+                            success=False,
+                            error=str(tr),
+                        )
+                    )
                     result.success = False
                 else:
                     result.results.append(tr)
@@ -318,11 +333,13 @@ class FusionToolkit:
         for tool_name in tool_names:
             tool = self._tools.get(tool_name)
             if not tool:
-                result.results.append(ToolResult(
-                    tool_name=tool_name,
-                    success=False,
-                    error=f"Tool not found: {tool_name}",
-                ))
+                result.results.append(
+                    ToolResult(
+                        tool_name=tool_name,
+                        success=False,
+                        error=f"Tool not found: {tool_name}",
+                    )
+                )
                 result.success = False
                 break
 
@@ -331,21 +348,25 @@ class FusionToolkit:
                 output = await self._execute_tool(tool, current_input)
                 duration = time.time() - tool_start
 
-                result.results.append(ToolResult(
-                    tool_name=tool_name,
-                    success=True,
-                    output=output,
-                    duration=duration,
-                ))
+                result.results.append(
+                    ToolResult(
+                        tool_name=tool_name,
+                        success=True,
+                        output=output,
+                        duration=duration,
+                    )
+                )
 
                 # Feed output into next tool
                 current_input = {"input": output, **inputs}
             except Exception as e:
-                result.results.append(ToolResult(
-                    tool_name=tool_name,
-                    success=False,
-                    error=str(e),
-                ))
+                result.results.append(
+                    ToolResult(
+                        tool_name=tool_name,
+                        success=False,
+                        error=str(e),
+                    )
+                )
                 result.success = False
                 break
 
@@ -375,12 +396,10 @@ class FusionToolkit:
                 )
             else:
                 return await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(
-                        None, lambda: tool.func(**inputs)
-                    ),
+                    asyncio.get_event_loop().run_in_executor(None, lambda: tool.func(**inputs)),
                     timeout=tool.timeout or self._default_timeout,
                 )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise TimeoutError(f"Tool {tool.name} timed out")
 
     async def _execute_tool_with_result(

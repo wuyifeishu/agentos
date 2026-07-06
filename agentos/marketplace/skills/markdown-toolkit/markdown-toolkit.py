@@ -7,11 +7,12 @@ Category: utility
 
 def run(action: str, file_path: str = "", text: str = "", output_path: str = "") -> str:
     """Markdown 处理工具。action: toc/to_html/headings/stats。"""
-    import os, re
+    import os
+    import re
 
     def _read():
         if file_path and os.path.isfile(file_path):
-            with open(file_path,"r",encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 return f.read()
         return text or ""
 
@@ -55,7 +56,12 @@ def run(action: str, file_path: str = "", text: str = "", output_path: str = "")
             # Simple markdown-to-HTML converter (covers basics)
             html = content
             # Code blocks (```)
-            html = re.sub(r"```(\w*)\n(.*?)```", r"<pre><code class='\1'>\2</code></pre>", html, flags=re.DOTALL)
+            html = re.sub(
+                r"```(\w*)\n(.*?)```",
+                r"<pre><code class='\1'>\2</code></pre>",
+                html,
+                flags=re.DOTALL,
+            )
             # Inline code
             html = re.sub(r"`([^`]+)`", r"<code>\1</code>", html)
             # Headings
@@ -75,7 +81,8 @@ def run(action: str, file_path: str = "", text: str = "", output_path: str = "")
             html = re.sub(r"\n\n+", "</p><p>", html)
             html = f"<p>{html}</p>"
             if output_path:
-                with open(output_path,"w",encoding="utf-8") as f: f.write(html)
+                with open(output_path, "w", encoding="utf-8") as f:
+                    f.write(html)
                 return f"已转换并写入: {output_path}"
             # return first 2000 chars if too long
             if len(html) > 2000:

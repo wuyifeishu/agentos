@@ -12,9 +12,8 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
 
-from agentos.marketplace.manifest import SkillManifest, SkillFormat, ToolDef
+from agentos.marketplace.manifest import SkillFormat, SkillManifest, ToolDef
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +21,9 @@ logger = logging.getLogger(__name__)
 # ── Ecosystem Formats ───────────────────────────────────────────────
 
 
-class EcosystemFormat(str, enum.Enum):
+class EcosystemFormat(enum.StrEnum):
     """Supported external ecosystem formats."""
+
     CLAUDE_CODE = "claude-code"
     CURSOR = "cursor"
     CUSTOM_GPT = "custom-gpt"
@@ -36,23 +36,25 @@ class EcosystemFormat(str, enum.Enum):
 @dataclass
 class BridgeResult:
     """Result of bridging a single skill from an external ecosystem."""
+
     success: bool = False
     skill_name: str = ""
     source_format: str = ""
     source_uri: str = ""
-    manifest: Optional[SkillManifest] = None
+    manifest: SkillManifest | None = None
     error: str = ""
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 @dataclass
 class BridgeBatchResult:
     """Result of a batch bridge operation."""
+
     total: int = 0
     succeeded: int = 0
     failed: int = 0
-    results: List[BridgeResult] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+    results: list[BridgeResult] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 # ── Base Adapter ────────────────────────────────────────────────────
@@ -71,7 +73,7 @@ class BaseAdapter:
         """Bridge a single skill from external format to AgentOS."""
         raise NotImplementedError
 
-    def list_available(self) -> List[str]:
+    def list_available(self) -> list[str]:
         """List available skills in this ecosystem."""
         return []
 
@@ -92,7 +94,7 @@ class ClaudeCodeAdapter(BaseAdapter):
 
     format_name = EcosystemFormat.CLAUDE_CODE.value
 
-    def __init__(self, cache_dir: Optional[str] = None):
+    def __init__(self, cache_dir: str | None = None):
         self._cache_dir = cache_dir or os.path.join(
             tempfile.gettempdir(), "agentos", "claude_cache"
         )
@@ -106,7 +108,7 @@ class ClaudeCodeAdapter(BaseAdapter):
             or source.endswith(".tgz")
         )
 
-    def list_available(self) -> List[str]:
+    def list_available(self) -> list[str]:
         """Return known popular Claude Code extensions."""
         return [
             "@anthropic/claude-code-tools",
@@ -129,7 +131,7 @@ class ClaudeCodeAdapter(BaseAdapter):
         try:
             # Strip protocol prefix
             if source.startswith("claude://"):
-                source = source[len("claude://"):]
+                source = source[len("claude://") :]
 
             # Try to load extension manifest (simulated for now)
             manifest = self._convert_to_skill(source)
@@ -150,7 +152,7 @@ class ClaudeCodeAdapter(BaseAdapter):
 
         return result
 
-    def _convert_to_skill(self, source: str) -> Optional[SkillManifest]:
+    def _convert_to_skill(self, source: str) -> SkillManifest | None:
         """Convert a Claude Code extension identifier to a SkillManifest.
 
         In production, this would:
@@ -164,52 +166,76 @@ class ClaudeCodeAdapter(BaseAdapter):
         # Infer tools from package name
         tools = []
         if "filesystem" in source.lower():
-            tools.append(ToolDef(
-                name="read_file",
-                description="Read file contents from the filesystem",
-                parameters={"type": "object", "properties": {
-                    "path": {"type": "string"},
-                }},
-            ))
-            tools.append(ToolDef(
-                name="write_file",
-                description="Write content to a file",
-                parameters={"type": "object", "properties": {
-                    "path": {"type": "string"},
-                    "content": {"type": "string"},
-                }},
-            ))
+            tools.append(
+                ToolDef(
+                    name="read_file",
+                    description="Read file contents from the filesystem",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                        },
+                    },
+                )
+            )
+            tools.append(
+                ToolDef(
+                    name="write_file",
+                    description="Write content to a file",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "path": {"type": "string"},
+                            "content": {"type": "string"},
+                        },
+                    },
+                )
+            )
         elif "github" in source.lower():
-            tools.append(ToolDef(
-                name="github_get_file",
-                description="Get file contents from a GitHub repository",
-                parameters={"type": "object", "properties": {
-                    "owner": {"type": "string"},
-                    "repo": {"type": "string"},
-                    "path": {"type": "string"},
-                }},
-            ))
+            tools.append(
+                ToolDef(
+                    name="github_get_file",
+                    description="Get file contents from a GitHub repository",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "owner": {"type": "string"},
+                            "repo": {"type": "string"},
+                            "path": {"type": "string"},
+                        },
+                    },
+                )
+            )
         elif "database" in source.lower() or "postgres" in source.lower():
-            tools.append(ToolDef(
-                name="query_database",
-                description="Execute a SQL query against the database",
-                parameters={"type": "object", "properties": {
-                    "query": {"type": "string"},
-                }},
-            ))
+            tools.append(
+                ToolDef(
+                    name="query_database",
+                    description="Execute a SQL query against the database",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string"},
+                        },
+                    },
+                )
+            )
 
         return SkillManifest(
             name=name,
             version="1.0.0",
             description=f"Claude Code extension: {source}",
             format=SkillFormat.GENERIC,
-            tools=tools if tools else [
-                ToolDef(
-                    name=f"{name}_tool",
-                    description=f"Auto-converted tool from {source}",
-                    parameters={"type": "object", "properties": {}},
-                )
-            ],
+            tools=(
+                tools
+                if tools
+                else [
+                    ToolDef(
+                        name=f"{name}_tool",
+                        description=f"Auto-converted tool from {source}",
+                        parameters={"type": "object", "properties": {}},
+                    )
+                ]
+            ),
             author="Claude Code Ecosystem",
             tags=["claude-code", "bridge"],
         )
@@ -236,7 +262,7 @@ class CursorAdapter(BaseAdapter):
             or source.endswith(".mdc")
         )
 
-    def list_available(self) -> List[str]:
+    def list_available(self) -> list[str]:
         """Return common Cursor rule sources."""
         return [
             "cursor://rules/python-best-practices",
@@ -254,7 +280,7 @@ class CursorAdapter(BaseAdapter):
 
         try:
             if source.startswith("cursor://"):
-                rule_path = source[len("cursor://"):]
+                rule_path = source[len("cursor://") :]
             else:
                 rule_path = source
 
@@ -272,7 +298,7 @@ class CursorAdapter(BaseAdapter):
 
         return result
 
-    def _convert_rule(self, rule_path: str) -> Optional[SkillManifest]:
+    def _convert_rule(self, rule_path: str) -> SkillManifest | None:
         name = Path(rule_path).stem.replace(".cursorrules", "").replace(".", "-")
         if not name:
             name = rule_path.replace("/", "-")
@@ -303,12 +329,10 @@ class CustomGPTAdapter(BaseAdapter):
 
     def detect(self, source: str) -> bool:
         return (
-            source.startswith("gpt://")
-            or "chatgpt.com/g/" in source
-            or source.endswith(".gpt.md")
+            source.startswith("gpt://") or "chatgpt.com/g/" in source or source.endswith(".gpt.md")
         )
 
-    def list_available(self) -> List[str]:
+    def list_available(self) -> list[str]:
         return [
             "gpt://data-analyst",
             "gpt://creative-writer",
@@ -325,7 +349,7 @@ class CustomGPTAdapter(BaseAdapter):
 
         try:
             if source.startswith("gpt://"):
-                gpt_id = source[len("gpt://"):]
+                gpt_id = source[len("gpt://") :]
             else:
                 gpt_id = source
 
@@ -343,7 +367,7 @@ class CustomGPTAdapter(BaseAdapter):
 
         return result
 
-    def _convert_gpt(self, gpt_id: str) -> Optional[SkillManifest]:
+    def _convert_gpt(self, gpt_id: str) -> SkillManifest | None:
         name = gpt_id.replace("/", "-").replace(" ", "-")
         return SkillManifest(
             name=name,
@@ -430,12 +454,9 @@ class LangChainAdapter(BaseAdapter):
     }
 
     def detect(self, source: str) -> bool:
-        return (
-            source.startswith("langchain://")
-            or "langchain" in source.lower()
-        )
+        return source.startswith("langchain://") or "langchain" in source.lower()
 
-    def list_available(self) -> List[str]:
+    def list_available(self) -> list[str]:
         return [f"langchain://{name}" for name in self.KNOWN_TOOLS]
 
     def bridge(self, source: str) -> BridgeResult:
@@ -447,7 +468,7 @@ class LangChainAdapter(BaseAdapter):
 
         try:
             if source.startswith("langchain://"):
-                tool_name = source[len("langchain://"):]
+                tool_name = source[len("langchain://") :]
             else:
                 tool_name = source
 
@@ -464,7 +485,7 @@ class LangChainAdapter(BaseAdapter):
 
         return result
 
-    def _convert_tool(self, tool_name: str) -> Optional[SkillManifest]:
+    def _convert_tool(self, tool_name: str) -> SkillManifest | None:
         if tool_name not in self.KNOWN_TOOLS:
             return None
 
@@ -492,7 +513,7 @@ class LangChainAdapter(BaseAdapter):
 class AdapterFactory:
     """Factory for creating ecosystem adapters."""
 
-    _adapters: Dict[EcosystemFormat, type] = {}
+    _adapters: dict[EcosystemFormat, type] = {}
 
     @classmethod
     def register(cls, fmt: EcosystemFormat, adapter_cls: type):
@@ -506,7 +527,7 @@ class AdapterFactory:
         return cls._adapters[fmt](**kwargs)
 
     @classmethod
-    def detect_format(cls, source: str) -> Optional[EcosystemFormat]:
+    def detect_format(cls, source: str) -> EcosystemFormat | None:
         """Auto-detect ecosystem format from source string."""
         for fmt, adapter_cls in cls._adapters.items():
             adapter = adapter_cls()
@@ -515,7 +536,7 @@ class AdapterFactory:
         return None
 
     @classmethod
-    def list_supported_formats(cls) -> List[str]:
+    def list_supported_formats(cls) -> list[str]:
         return [f.value for f in cls._adapters]
 
 
@@ -546,14 +567,14 @@ class EcosystemBridge:
 
     def __init__(self, skill_registry=None):
         self._skill_registry = skill_registry
-        self._adapters: Dict[EcosystemFormat, BaseAdapter] = {}
+        self._adapters: dict[EcosystemFormat, BaseAdapter] = {}
 
     def _get_adapter(self, fmt: EcosystemFormat) -> BaseAdapter:
         if fmt not in self._adapters:
             self._adapters[fmt] = AdapterFactory.create(fmt)
         return self._adapters[fmt]
 
-    def bridge(self, source: str, fmt: Optional[EcosystemFormat] = None) -> BridgeResult:
+    def bridge(self, source: str, fmt: EcosystemFormat | None = None) -> BridgeResult:
         """Bridge a single skill from external ecosystem.
 
         Args:
@@ -602,7 +623,7 @@ class EcosystemBridge:
         batch.total = len(available)
         return batch
 
-    def batch_bridge(self, sources: List[str]) -> BridgeBatchResult:
+    def batch_bridge(self, sources: list[str]) -> BridgeBatchResult:
         """Bridge multiple sources, auto-detecting formats."""
         batch = BridgeBatchResult()
 
@@ -618,10 +639,10 @@ class EcosystemBridge:
         batch.total = len(sources)
         return batch
 
-    def list_available(self, fmt: EcosystemFormat) -> List[str]:
+    def list_available(self, fmt: EcosystemFormat) -> list[str]:
         """List available skills in an ecosystem."""
         adapter = self._get_adapter(fmt)
         return adapter.list_available()
 
-    def supported_formats(self) -> List[str]:
+    def supported_formats(self) -> list[str]:
         return AdapterFactory.list_supported_formats()

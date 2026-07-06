@@ -18,11 +18,11 @@ Key features:
 import asyncio
 import json
 import logging
-from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set, Type, Union
+from typing import Any, Optional
 
 import yaml
 
@@ -33,60 +33,64 @@ logger = logging.getLogger(__name__)
 # Enums
 # ---------------------------------------------------------------------------
 
+
 class StepType(Enum):
     """Types of workflow steps."""
-    TASK        = "task"        # Single agent task
-    SEQUENTIAL  = "sequential"  # Run children in sequence
-    PARALLEL    = "parallel"    # Run children in parallel
-    CONDITIONAL = "conditional" # Branch based on condition
-    LOOP        = "loop"        # Repeat children until condition
-    SUB_WORKFLOW = "sub"        # Nested workflow
-    JOIN        = "join"        # Wait for all branches to complete
-    SPLIT       = "split"       # Fan-out to multiple agents
+
+    TASK = "task"  # Single agent task
+    SEQUENTIAL = "sequential"  # Run children in sequence
+    PARALLEL = "parallel"  # Run children in parallel
+    CONDITIONAL = "conditional"  # Branch based on condition
+    LOOP = "loop"  # Repeat children until condition
+    SUB_WORKFLOW = "sub"  # Nested workflow
+    JOIN = "join"  # Wait for all branches to complete
+    SPLIT = "split"  # Fan-out to multiple agents
 
 
 class ExecutionStatus(Enum):
-    PENDING     = "pending"
-    RUNNING     = "running"
-    SUCCESS     = "success"
-    FAILED      = "failed"
-    SKIPPED     = "skipped"
-    CANCELLED   = "cancelled"
-    RETRYING    = "retrying"
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCESS = "success"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    CANCELLED = "cancelled"
+    RETRYING = "retrying"
 
 
 class ErrorStrategy(Enum):
-    RETRY     = "retry"      # Retry the step
-    FALLBACK  = "fallback"   # Execute fallback step
-    SKIP      = "skip"       # Skip and continue
-    ESCALATE  = "escalate"   # Fail the workflow
-    PAUSE     = "pause"      # Pause for human intervention
+    RETRY = "retry"  # Retry the step
+    FALLBACK = "fallback"  # Execute fallback step
+    SKIP = "skip"  # Skip and continue
+    ESCALATE = "escalate"  # Fail the workflow
+    PAUSE = "pause"  # Pause for human intervention
 
 
 class ConditionOperator(Enum):
-    EQUALS      = "eq"
-    NOT_EQUALS  = "neq"
-    CONTAINS    = "contains"
-    GREATER     = "gt"
-    LESS        = "lt"
-    IN          = "in"
-    MATCHES     = "matches"  # regex
-    EXISTS      = "exists"
-    EMPTY       = "empty"
+    EQUALS = "eq"
+    NOT_EQUALS = "neq"
+    CONTAINS = "contains"
+    GREATER = "gt"
+    LESS = "lt"
+    IN = "in"
+    MATCHES = "matches"  # regex
+    EXISTS = "exists"
+    EMPTY = "empty"
 
 
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class WorkflowContext:
     """Runtime context shared across workflow steps."""
-    variables: Dict[str, Any] = field(default_factory=dict)
-    history: List[Dict[str, Any]] = field(default_factory=list)
-    errors: List[Dict[str, Any]] = field(default_factory=list)
-    metrics: Dict[str, float] = field(default_factory=dict)
-    metadata: Dict[str, str] = field(default_factory=dict)
+
+    variables: dict[str, Any] = field(default_factory=dict)
+    history: list[dict[str, Any]] = field(default_factory=list)
+    errors: list[dict[str, Any]] = field(default_factory=list)
+    metrics: dict[str, float] = field(default_factory=dict)
+    metadata: dict[str, str] = field(default_factory=dict)
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get a variable, supporting dot-notation (e.g., 'result.output.text')."""
@@ -113,35 +117,37 @@ class WorkflowContext:
 @dataclass
 class StepResult:
     """Result of a workflow step execution."""
+
     step_id: str
     status: ExecutionStatus
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     duration: float = 0.0
     retries: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class WorkflowStep:
     """A single step in a workflow DAG."""
+
     id: str
     type: StepType
     name: str = ""
     description: str = ""
 
     # Execution
-    agent: Optional[str] = None         # agent_id to dispatch to
-    task: Optional[str] = None          # task payload template
-    children: List["WorkflowStep"] = field(default_factory=list)
+    agent: str | None = None  # agent_id to dispatch to
+    task: str | None = None  # task payload template
+    children: list["WorkflowStep"] = field(default_factory=list)
 
     # Conditional
-    condition: Optional[Dict[str, Any]] = None
-    branches: Dict[str, List["WorkflowStep"]] = field(default_factory=dict)
+    condition: dict[str, Any] | None = None
+    branches: dict[str, list["WorkflowStep"]] = field(default_factory=dict)
 
     # Loop
     max_iterations: int = 100
-    loop_condition: Optional[Dict[str, Any]] = None
+    loop_condition: dict[str, Any] | None = None
 
     # Error handling
     on_error: ErrorStrategy = ErrorStrategy.ESCALATE
@@ -151,42 +157,46 @@ class WorkflowStep:
 
     # Timing
     timeout: float = 300.0
-    depends_on: List[str] = field(default_factory=list)
+    depends_on: list[str] = field(default_factory=list)
 
     # Metadata
-    tags: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class WorkflowDefinition:
     """Top-level workflow definition."""
+
     name: str
     version: str = "1.0"
     description: str = ""
-    root: Optional[WorkflowStep] = None
-    variables: Dict[str, Any] = field(default_factory=dict)
+    root: WorkflowStep | None = None
+    variables: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def steps(self) -> List[WorkflowStep]:
+    def steps(self) -> list[WorkflowStep]:
         """Compatibility: return steps list from root tree."""
         if self.root is None:
             return []
         result = []
+
         def _collect(s):
             result.append(s)
             for c in s.children or []:
                 _collect(c)
+
         _collect(self.root)
         return result
-    agents: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    defaults: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def validate(self) -> List[str]:
+    agents: dict[str, dict[str, Any]] = field(default_factory=dict)
+    defaults: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def validate(self) -> list[str]:
         """Validate workflow structure and return a list of issues."""
         issues = []
-        step_ids: Set[str] = set()
+        step_ids: set[str] = set()
 
         def validate_step(step: WorkflowStep):
             if step.id in step_ids:
@@ -221,12 +231,17 @@ class WorkflowDefinition:
     def to_mermaid(self) -> str:
         """Export workflow as a Mermaid flowchart."""
         lines = ["graph TD"]
-        ids: Set[str] = set()
+        ids: set[str] = set()
 
-        def add_step(step: WorkflowStep, parent_id: Optional[str] = None):
-            prefix = {StepType.PARALLEL: "[||]", StepType.CONDITIONAL: "{?}",
-                      StepType.LOOP: "[/]", StepType.TASK: "[ ]",
-                      StepType.JOIN: "[+]", StepType.SPLIT: "[>]"}.get(step.type, "[ ]")
+        def add_step(step: WorkflowStep, parent_id: str | None = None):
+            prefix = {
+                StepType.PARALLEL: "[||]",
+                StepType.CONDITIONAL: "{?}",
+                StepType.LOOP: "[/]",
+                StepType.TASK: "[ ]",
+                StepType.JOIN: "[+]",
+                StepType.SPLIT: "[>]",
+            }.get(step.type, "[ ]")
             label = step.name or step.id
             lines.append(f"    {step.id}{prefix}{label}")
 
@@ -253,26 +268,21 @@ class WorkflowDefinition:
 # Condition evaluator
 # ---------------------------------------------------------------------------
 
+
 class ConditionEvaluator:
     """Evaluate conditions against the workflow context."""
 
     @staticmethod
-    def evaluate(condition: Dict[str, Any], ctx: WorkflowContext) -> bool:
+    def evaluate(condition: dict[str, Any], ctx: WorkflowContext) -> bool:
         """Evaluate a condition dict against context."""
         if not condition:
             return True
 
         # Support AND/OR combinators
         if "and" in condition:
-            return all(
-                ConditionEvaluator.evaluate(sub, ctx)
-                for sub in condition["and"]
-            )
+            return all(ConditionEvaluator.evaluate(sub, ctx) for sub in condition["and"])
         if "or" in condition:
-            return any(
-                ConditionEvaluator.evaluate(sub, ctx)
-                for sub in condition["or"]
-            )
+            return any(ConditionEvaluator.evaluate(sub, ctx) for sub in condition["or"])
         if "not" in condition:
             return not ConditionEvaluator.evaluate(condition["not"], ctx)
 
@@ -304,6 +314,7 @@ class ConditionEvaluator:
             return actual in value if isinstance(value, (list, tuple, set)) else False
         elif operator == ConditionOperator.MATCHES:
             import re
+
             try:
                 return bool(re.search(str(value), str(actual)))
             except re.error:
@@ -320,19 +331,20 @@ class ConditionEvaluator:
 # Workflow Engine
 # ---------------------------------------------------------------------------
 
+
 class WorkflowEngine:
     """Executes a WorkflowDefinition with real-time progress tracking."""
 
     def __init__(
         self,
-        agent_dispatcher: Optional[Callable] = None,
+        agent_dispatcher: Callable | None = None,
         max_parallelism: int = 10,
     ):
         self._dispatcher = agent_dispatcher or self._default_dispatcher
         self._max_parallelism = max_parallelism
-        self._ctx: Optional[WorkflowContext] = None
-        self._results: Dict[str, StepResult] = {}
-        self._progress_callbacks: List[Callable] = []
+        self._ctx: WorkflowContext | None = None
+        self._results: dict[str, StepResult] = {}
+        self._progress_callbacks: list[Callable] = []
         self._cancelled = False
         self._semaphore = asyncio.Semaphore(max_parallelism)
 
@@ -355,7 +367,7 @@ class WorkflowEngine:
 
         return self._ctx
 
-    async def dry_run(self, workflow: WorkflowDefinition) -> Dict[str, Any]:
+    async def dry_run(self, workflow: WorkflowDefinition) -> dict[str, Any]:
         """Validate a workflow without executing it."""
         issues = workflow.validate()
         return {
@@ -369,9 +381,7 @@ class WorkflowEngine:
         """Cancel the running workflow."""
         self._cancelled = True
 
-    async def _execute_step(
-        self, step: WorkflowStep, ctx: WorkflowContext
-    ) -> StepResult:
+    async def _execute_step(self, step: WorkflowStep, ctx: WorkflowContext) -> StepResult:
         if self._cancelled:
             return StepResult(step.id, ExecutionStatus.CANCELLED)
 
@@ -401,7 +411,7 @@ class WorkflowEngine:
             else:
                 result.status = ExecutionStatus.SUCCESS
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             result.status = ExecutionStatus.FAILED
             result.error = f"Step '{step.id}' timed out after {step.timeout}s"
         except Exception as e:
@@ -413,9 +423,15 @@ class WorkflowEngine:
             result = await self._handle_error(step, ctx, result)
 
         self._results[step.id] = result
-        ctx.history.append({"step_id": step.id, "status": result.status.value,
-                            "output": str(result.output)[:200] if result.output else None,
-                            "error": result.error, "duration": result.duration})
+        ctx.history.append(
+            {
+                "step_id": step.id,
+                "status": result.status.value,
+                "output": str(result.output)[:200] if result.output else None,
+                "error": result.error,
+                "duration": result.duration,
+            }
+        )
 
         for cb in self._progress_callbacks:
             try:
@@ -428,6 +444,7 @@ class WorkflowEngine:
     async def _run_task(self, step: WorkflowStep, ctx: WorkflowContext) -> StepResult:
         """Execute a single agent task."""
         import time
+
         t0 = time.time()
 
         # Resolve template variables in task payload
@@ -442,28 +459,29 @@ class WorkflowEngine:
             )
             ctx.set(f"steps.{step.id}.output", output)
             return StepResult(
-                step.id, ExecutionStatus.SUCCESS,
+                step.id,
+                ExecutionStatus.SUCCESS,
                 output=output,
                 duration=time.time() - t0,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
 
-    async def _run_sequential(
-        self, step: WorkflowStep, ctx: WorkflowContext
-    ) -> StepResult:
+    async def _run_sequential(self, step: WorkflowStep, ctx: WorkflowContext) -> StepResult:
         """Run children in sequence."""
         for child in step.children:
             result = await self._execute_step(child, ctx)
             if result.status == ExecutionStatus.FAILED and step.on_error == ErrorStrategy.ESCALATE:
-                return StepResult(step.id, ExecutionStatus.FAILED,
-                                  error=f"Child '{child.id}' failed: {result.error}")
+                return StepResult(
+                    step.id,
+                    ExecutionStatus.FAILED,
+                    error=f"Child '{child.id}' failed: {result.error}",
+                )
         return StepResult(step.id, ExecutionStatus.SUCCESS)
 
-    async def _run_parallel(
-        self, step: WorkflowStep, ctx: WorkflowContext
-    ) -> StepResult:
+    async def _run_parallel(self, step: WorkflowStep, ctx: WorkflowContext) -> StepResult:
         """Run children in parallel with semaphore control."""
+
         async def bounded_execute(child):
             async with self._semaphore:
                 return await self._execute_step(child, ctx)
@@ -481,13 +499,10 @@ class WorkflowEngine:
         ctx.set(f"steps.{step.id}.outputs", outputs)
         return StepResult(step.id, ExecutionStatus.SUCCESS, output=outputs)
 
-    async def _run_conditional(
-        self, step: WorkflowStep, ctx: WorkflowContext
-    ) -> StepResult:
+    async def _run_conditional(self, step: WorkflowStep, ctx: WorkflowContext) -> StepResult:
         """Evaluate condition and execute the matching branch."""
         if not step.condition:
-            return StepResult(step.id, ExecutionStatus.SKIPPED,
-                              error="No condition defined")
+            return StepResult(step.id, ExecutionStatus.SKIPPED, error="No condition defined")
 
         matched = ConditionEvaluator.evaluate(step.condition, ctx)
         branch_key = "true" if matched else "false"
@@ -499,11 +514,13 @@ class WorkflowEngine:
         for child in branch_steps:
             result = await self._execute_step(child, ctx)
             if result.status == ExecutionStatus.FAILED:
-                return StepResult(step.id, ExecutionStatus.FAILED,
-                                  error=f"Branch child '{child.id}' failed: {result.error}")
+                return StepResult(
+                    step.id,
+                    ExecutionStatus.FAILED,
+                    error=f"Branch child '{child.id}' failed: {result.error}",
+                )
 
-        return StepResult(step.id, ExecutionStatus.SUCCESS,
-                          output={"branch": branch_key})
+        return StepResult(step.id, ExecutionStatus.SUCCESS, output={"branch": branch_key})
 
     async def _run_loop(self, step: WorkflowStep, ctx: WorkflowContext) -> StepResult:
         """Execute children in a loop until condition is false."""
@@ -515,8 +532,11 @@ class WorkflowEngine:
             for child in step.children:
                 result = await self._execute_step(child, ctx)
                 if result.status == ExecutionStatus.FAILED:
-                    return StepResult(step.id, ExecutionStatus.FAILED,
-                                      error=f"Loop iteration {iteration}: child '{child.id}' failed")
+                    return StepResult(
+                        step.id,
+                        ExecutionStatus.FAILED,
+                        error=f"Loop iteration {iteration}: child '{child.id}' failed",
+                    )
 
             ctx.set(f"steps.{step.id}.iteration", iteration)
             iteration += 1
@@ -526,8 +546,7 @@ class WorkflowEngine:
                 if not ConditionEvaluator.evaluate(step.loop_condition, ctx):
                     break
 
-        return StepResult(step.id, ExecutionStatus.SUCCESS,
-                          output={"iterations": iteration})
+        return StepResult(step.id, ExecutionStatus.SUCCESS, output={"iterations": iteration})
 
     async def _run_sub_workflow(self, step: WorkflowStep, ctx: WorkflowContext) -> StepResult:
         """Execute a nested sub-workflow."""
@@ -535,8 +554,9 @@ class WorkflowEngine:
         for child in step.children:
             result = await self._execute_step(child, ctx)
             if result.status == ExecutionStatus.FAILED:
-                return StepResult(step.id, ExecutionStatus.FAILED,
-                                  error=f"Sub-workflow child '{child.id}' failed")
+                return StepResult(
+                    step.id, ExecutionStatus.FAILED, error=f"Sub-workflow child '{child.id}' failed"
+                )
         return StepResult(step.id, ExecutionStatus.SUCCESS)
 
     async def _run_join(self, step: WorkflowStep, ctx: WorkflowContext) -> StepResult:
@@ -556,8 +576,10 @@ class WorkflowEngine:
         ctx.errors.append({"step_id": step.id, "error": result.error})
 
         if step.on_error == ErrorStrategy.RETRY and result.retries < step.max_retries:
-            logger.info(f"[Workflow] Retrying step '{step.id}' ({result.retries+1}/{step.max_retries})")
-            await asyncio.sleep(step.retry_delay * (2 ** result.retries))
+            logger.info(
+                f"[Workflow] Retrying step '{step.id}' ({result.retries+1}/{step.max_retries})"
+            )
+            await asyncio.sleep(step.retry_delay * (2**result.retries))
             result.retries += 1
             return await self._execute_step(step, ctx)
 
@@ -587,13 +609,15 @@ class WorkflowEngine:
     def _resolve_template(template: str, ctx: WorkflowContext) -> str:
         """Resolve {{ variable }} placeholders in a template string."""
         import re
+
         def replacer(match):
             key = match.group(1).strip()
             return str(ctx.get(key, f"<{key} not found>"))
+
         return re.sub(r"\{\{\s*(.*?)\s*\}\}", replacer, template)
 
     @staticmethod
-    def _count_steps(step: Optional[WorkflowStep]) -> int:
+    def _count_steps(step: WorkflowStep | None) -> int:
         if step is None:
             return 0
         count = 1
@@ -611,14 +635,15 @@ class WorkflowEngine:
 # Workflow YAML/JSON Parser
 # ---------------------------------------------------------------------------
 
+
 class WorkflowParser:
     """Parse YAML/JSON files into WorkflowDefinition objects."""
 
     @staticmethod
-    def parse_file(filepath: Union[str, Path]) -> WorkflowDefinition:
+    def parse_file(filepath: str | Path) -> WorkflowDefinition:
         """Parse a .yaml/.yml/.json file into a WorkflowDefinition."""
         path = Path(filepath)
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             if path.suffix in (".json",):
                 data = json.load(f)
             else:
@@ -635,7 +660,7 @@ class WorkflowParser:
         return WorkflowParser.parse_dict(data)
 
     @staticmethod
-    def parse_dict(data: Dict[str, Any]) -> WorkflowDefinition:
+    def parse_dict(data: dict[str, Any]) -> WorkflowDefinition:
         """Parse a dict into a WorkflowDefinition."""
         wf = WorkflowDefinition(
             name=data.get("name", "unnamed"),
@@ -653,7 +678,7 @@ class WorkflowParser:
         return wf
 
     @staticmethod
-    def _parse_steps(steps: List[Dict[str, Any]]) -> WorkflowStep:
+    def _parse_steps(steps: list[dict[str, Any]]) -> WorkflowStep:
         """Parse a list of step dicts into a tree. First step is root."""
         if not steps:
             raise ValueError("No steps defined")
@@ -668,7 +693,7 @@ class WorkflowParser:
         return parsed[0]
 
     @staticmethod
-    def _parse_step(data: Dict[str, Any]) -> WorkflowStep:
+    def _parse_step(data: dict[str, Any]) -> WorkflowStep:
         """Parse a single step dict."""
         step = WorkflowStep(
             id=data.get("id", ""),
@@ -688,9 +713,7 @@ class WorkflowParser:
 
         if "branches" in data:
             for branch_name, branch_steps in data["branches"].items():
-                step.branches[branch_name] = [
-                    WorkflowParser._parse_step(s) for s in branch_steps
-                ]
+                step.branches[branch_name] = [WorkflowParser._parse_step(s) for s in branch_steps]
 
         if "children" in data:
             step.children = [WorkflowParser._parse_step(c) for c in data["children"]]
@@ -722,7 +745,7 @@ class WorkflowParser:
         return json.dumps(WorkflowParser._to_dict(workflow), indent=2)
 
     @staticmethod
-    def _to_dict(wf: WorkflowDefinition) -> Dict[str, Any]:
+    def _to_dict(wf: WorkflowDefinition) -> dict[str, Any]:
         data = {
             "name": wf.name,
             "version": wf.version,
@@ -737,7 +760,7 @@ class WorkflowParser:
         return data
 
     @staticmethod
-    def _step_to_dict(step: WorkflowStep) -> Dict[str, Any]:
+    def _step_to_dict(step: WorkflowStep) -> dict[str, Any]:
         d = {
             "id": step.id,
             "type": step.type.value,
@@ -754,8 +777,7 @@ class WorkflowParser:
             d["condition"] = step.condition
         if step.branches:
             d["branches"] = {
-                k: [WorkflowParser._step_to_dict(s) for s in v]
-                for k, v in step.branches.items()
+                k: [WorkflowParser._step_to_dict(s) for s in v] for k, v in step.branches.items()
             }
         if step.children:
             d["children"] = [WorkflowParser._step_to_dict(c) for c in step.children]
@@ -778,11 +800,12 @@ class WorkflowParser:
 # Pre-built workflow templates
 # ---------------------------------------------------------------------------
 
+
 class WorkflowTemplates:
     """Library of common workflow patterns."""
 
     @staticmethod
-    def sequential(name: str, agent_ids: List[str], task_template: str) -> WorkflowDefinition:
+    def sequential(name: str, agent_ids: list[str], task_template: str) -> WorkflowDefinition:
         """Create a sequential pipeline: Agent1 → Agent2 → Agent3."""
         root = None
         prev = None
@@ -804,7 +827,7 @@ class WorkflowTemplates:
 
     @staticmethod
     def parallel_broadcast(
-        name: str, agent_ids: List[str], task_template: str
+        name: str, agent_ids: list[str], task_template: str
     ) -> WorkflowDefinition:
         """Create a parallel broadcast: all agents run simultaneously."""
         children = [
@@ -828,7 +851,7 @@ class WorkflowTemplates:
     @staticmethod
     def map_reduce(
         name: str,
-        mapper_agents: List[str],
+        mapper_agents: list[str],
         reducer_agent: str,
         map_task: str,
         reduce_task: str,
@@ -894,9 +917,7 @@ class WorkflowTemplates:
         return WorkflowDefinition(name=name, root=root)
 
     @staticmethod
-    def retry_loop(
-        name: str, agent_id: str, task: str, max_retries: int = 3
-    ) -> WorkflowDefinition:
+    def retry_loop(name: str, agent_id: str, task: str, max_retries: int = 3) -> WorkflowDefinition:
         """Task with automatic retry on failure."""
         step = WorkflowStep(
             id="retry_task",

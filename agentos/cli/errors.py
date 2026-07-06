@@ -153,6 +153,7 @@ def tool_execution_failed(tool_name: str, error: str):
 def welcome():
     """打印欢迎信息。"""
     from agentos import __version__
+
     print(f"  {_cyan('Nexus AgentOS')} v{__version__}")
     if os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY"):
         print(f"  {_green('●')} 已配置 API Key，可以直接使用。")

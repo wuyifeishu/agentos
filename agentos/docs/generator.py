@@ -12,6 +12,7 @@ from pathlib import Path
 @dataclass
 class DocConfig:
     """文档生成配置。"""
+
     output_dir: str = "docs/api"
     include_private: bool = False
     include_dunders: bool = False
@@ -91,16 +92,22 @@ class DocGenerator:
                 mod_name = rel[:-3].replace(os.sep, ".")
 
                 try:
-                    with open(full, "r") as f:
+                    with open(full) as f:
                         source = f.read()
                     tree = ast.parse(source)
                     doc = _get_docstring(tree)
                     classes, funcs = self._extract_top_level(tree, mod_name)
                     sub = self._find_submodules(tree, mod_name)
-                    results.append(_ModuleDoc(
-                        name=mod_name, path=rel, doc=doc,
-                        classes=classes, functions=funcs, submodules=sub,
-                    ))
+                    results.append(
+                        _ModuleDoc(
+                            name=mod_name,
+                            path=rel,
+                            doc=doc,
+                            classes=classes,
+                            functions=funcs,
+                            submodules=sub,
+                        )
+                    )
                 except Exception:
                     pass
         return results
@@ -123,38 +130,46 @@ class DocGenerator:
                 )
                 for body in node.body:
                     if isinstance(body, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                        if not self.config.include_private and body.name.startswith("_") and not body.name.startswith("__"):
+                        if (
+                            not self.config.include_private
+                            and body.name.startswith("_")
+                            and not body.name.startswith("__")
+                        ):
                             continue
                         if body.name.startswith("__") and not self.config.include_dunders:
                             if body.name not in ("__init__", "__str__", "__repr__", "__call__"):
                                 continue
-                        cd.methods.append(_FuncDoc(
-                            name=body.name,
-                            qualname=f"{mod_name}.{node.name}.{body.name}",
-                            doc=_get_docstring(body),
-                            signature=_parse_signature(body),
-                            is_async=isinstance(body, ast.AsyncFunctionDef),
-                            is_static=any(
-                                isinstance(d, ast.Name) and d.id == "staticmethod"
-                                for d in body.decorator_list
-                            ),
-                            is_classmethod=any(
-                                isinstance(d, ast.Name) and d.id == "classmethod"
-                                for d in body.decorator_list
-                            ),
-                        ))
+                        cd.methods.append(
+                            _FuncDoc(
+                                name=body.name,
+                                qualname=f"{mod_name}.{node.name}.{body.name}",
+                                doc=_get_docstring(body),
+                                signature=_parse_signature(body),
+                                is_async=isinstance(body, ast.AsyncFunctionDef),
+                                is_static=any(
+                                    isinstance(d, ast.Name) and d.id == "staticmethod"
+                                    for d in body.decorator_list
+                                ),
+                                is_classmethod=any(
+                                    isinstance(d, ast.Name) and d.id == "classmethod"
+                                    for d in body.decorator_list
+                                ),
+                            )
+                        )
                 classes.append(cd)
 
             elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if not self.config.include_private and node.name.startswith("_"):
                     continue
-                funcs.append(_FuncDoc(
-                    name=node.name,
-                    qualname=f"{mod_name}.{node.name}",
-                    doc=_get_docstring(node),
-                    signature=_parse_signature(node),
-                    is_async=isinstance(node, ast.AsyncFunctionDef),
-                ))
+                funcs.append(
+                    _FuncDoc(
+                        name=node.name,
+                        qualname=f"{mod_name}.{node.name}",
+                        doc=_get_docstring(node),
+                        signature=_parse_signature(node),
+                        is_async=isinstance(node, ast.AsyncFunctionDef),
+                    )
+                )
 
         return classes, funcs
 
@@ -204,7 +219,7 @@ class DocGenerator:
                         lines.append("| 方法 | 签名 |")
                         lines.append("|------|------|")
                         for meth in c.methods:
-                            sig = meth.signature[:self.config.max_signature_width]
+                            sig = meth.signature[: self.config.max_signature_width]
                             prefix = ""
                             if meth.is_classmethod:
                                 prefix = "@classmethod "
@@ -219,7 +234,7 @@ class DocGenerator:
                 lines.append("| 函数 | 签名 |")
                 lines.append("|------|------|")
                 for f in m.functions:
-                    sig = f.signature[:self.config.max_signature_width]
+                    sig = f.signature[: self.config.max_signature_width]
                     prefix = "async " if f.is_async else ""
                     lines.append(f"| `{prefix}{f.name}` | `{sig}` |")
                 lines.append("")
@@ -238,6 +253,7 @@ class DocGenerator:
         try:
             sys.path.insert(0, os.path.dirname(root))
             import agentos
+
             return getattr(agentos, "__version__", "?.?.?")
         except Exception:
             return "?.?.?"

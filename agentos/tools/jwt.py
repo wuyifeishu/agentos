@@ -17,12 +17,11 @@ import hashlib
 import hmac
 import json
 import time
-from typing import List, Optional, Union
-
 
 # ============================================================================
 # JWTError
 # ============================================================================
+
 
 class JWTError(Exception):
     pass
@@ -39,6 +38,7 @@ class InvalidTokenError(JWTError):
 # ============================================================================
 # Helpers
 # ============================================================================
+
 
 def _b64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
@@ -60,7 +60,9 @@ def _json_b64_decode(s: str) -> dict:
 # JWT
 # ============================================================================
 
-ALGORITHMS = frozenset({"HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "ES256", "ES384", "ES512"})
+ALGORITHMS = frozenset(
+    {"HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "ES256", "ES384", "ES512"}
+)
 
 
 class JWT:
@@ -81,9 +83,9 @@ class JWT:
 
     def __init__(
         self,
-        secret: Optional[str] = None,
-        private_key: Optional[str] = None,
-        public_key: Optional[str] = None,
+        secret: str | None = None,
+        private_key: str | None = None,
+        public_key: str | None = None,
         algorithm: str = "HS256",
     ):
         if algorithm not in ALGORITHMS:
@@ -111,8 +113,8 @@ class JWT:
     def encode(
         self,
         payload: dict,
-        ttl: Optional[int] = None,
-        headers_extra: Optional[dict] = None,
+        ttl: int | None = None,
+        headers_extra: dict | None = None,
     ) -> str:
         """Encode a JWT token.
 
@@ -147,8 +149,8 @@ class JWT:
         self,
         token: str,
         verify: bool = True,
-        audience: Optional[Union[str, List[str]]] = None,
-        issuer: Optional[str] = None,
+        audience: str | list[str] | None = None,
+        issuer: str | None = None,
     ) -> dict:
         """Decode and optionally verify a JWT token.
 
@@ -212,17 +214,23 @@ class JWT:
 
     def _sign(self, data: str) -> str:
         if self._algorithm.startswith("HS"):
-            d = hmac.new(self._secret, data.encode("utf-8"), self._hash_func[self._algorithm]).digest()
+            d = hmac.new(
+                self._secret, data.encode("utf-8"), self._hash_func[self._algorithm]
+            ).digest()
             return _b64url_encode(d)
         else:
-            raise NotImplementedError(f"Signing with {self._algorithm} requires cryptographic libraries (cryptography)")
+            raise NotImplementedError(
+                f"Signing with {self._algorithm} requires cryptographic libraries (cryptography)"
+            )
 
     def _verify(self, data: str, signature_b64: str) -> bool:
         if self._algorithm.startswith("HS"):
             expected = self._sign(data)
             return hmac.compare_digest(expected, signature_b64)
         else:
-            raise NotImplementedError(f"Verification with {self._algorithm} requires cryptographic libraries (cryptography)")
+            raise NotImplementedError(
+                f"Verification with {self._algorithm} requires cryptographic libraries (cryptography)"
+            )
 
     # ---------- Static helpers ----------
 

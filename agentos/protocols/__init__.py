@@ -6,24 +6,24 @@ Modules:
 - grpc.py: gRPC-based A2A protocol with streaming and TLS/mTLS
 """
 
-from agentos.protocols.registry import AgentRegistry, AgentInfo
 from agentos.protocols.grpc import (
-    GrpcTaskRequest,
-    GrpcTaskResponse,
-    GrpcHeartbeat,
-    GrpcStreamChunk,
-    TaskStatus,
-    GrpcStatusCode,
-    GrpcAgentService,
+    SERVICE_NAME,
     DefaultAgentService,
-    GrpcServer,
-    GrpcServerConfig,
+    GrpcAgentService,
     GrpcClient,
     GrpcClientConfig,
     GrpcFrameCodec,
-    SERVICE_NAME,
+    GrpcHeartbeat,
+    GrpcServer,
+    GrpcServerConfig,
+    GrpcStatusCode,
+    GrpcStreamChunk,
+    GrpcTaskRequest,
+    GrpcTaskResponse,
+    TaskStatus,
     create_self_signed_cert,
 )
+from agentos.protocols.registry import AgentRegistry
 
 __all__ = [
     # Registry
@@ -50,11 +50,10 @@ __all__ = [
 # ── Compatibility exports (required by agentos/__init__.py) ──
 
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any
+from enum import StrEnum
 
 
-class CapabilityDomain(str, Enum):
+class CapabilityDomain(StrEnum):
     TEXT = "text"
     CODE = "code"
     MULTIMODAL = "multimodal"
@@ -62,7 +61,7 @@ class CapabilityDomain(str, Enum):
     SAFETY = "safety"
 
 
-class QoSLevel(str, Enum):
+class QoSLevel(StrEnum):
     BEST_EFFORT = "best_effort"
     AT_LEAST_ONCE = "at_least_once"
     EXACTLY_ONCE = "exactly_once"
@@ -89,7 +88,7 @@ class AgentContract:
         return {
             "name": self.name,
             "version": self.version,
-            "capabilities": [c.name if hasattr(c, 'name') else str(c) for c in self.capabilities],
+            "capabilities": [c.name if hasattr(c, "name") else str(c) for c in self.capabilities],
             "qos": self.qos.value,
             "endpoint": self.endpoint,
         }
@@ -120,7 +119,6 @@ class CapabilityMatcher:
 
 
 class ContractRegistry:
-
     """Agent 合约注册中心。"""
 
     def __init__(self):

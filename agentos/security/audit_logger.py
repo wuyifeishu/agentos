@@ -7,13 +7,12 @@ Supports session grouping, severity filtering, and stats aggregation.
 from __future__ import annotations
 
 import json
-import time
 import os
-from dataclasses import dataclass, field, asdict
+import time
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
-
+from typing import Any
 
 __all__ = [
     "AuditSeverity",
@@ -25,8 +24,10 @@ __all__ = [
 
 # ── Enums ─────────────────────────────────────────────────────────
 
+
 class AuditSeverity(Enum):
     """Severity level for audit events."""
+
     DEBUG = "debug"
     INFO = "info"
     WARNING = "warning"
@@ -36,6 +37,7 @@ class AuditSeverity(Enum):
 
 class AuditActionCategory(Enum):
     """Category of the audited action."""
+
     TOOL_CALL = "tool_call"
     AGENT_INVOKE = "agent_invoke"
     MODEL_ROUTE = "model_route"
@@ -46,6 +48,7 @@ class AuditActionCategory(Enum):
 
 
 # ── Audit Event ───────────────────────────────────────────────────
+
 
 @dataclass
 class AuditEvent:
@@ -64,6 +67,7 @@ class AuditEvent:
         error_message: Error message if result is "failure".
         details: Arbitrary structured metadata.
     """
+
     agent: str
     action: str
     target: str = ""
@@ -87,6 +91,7 @@ class AuditEvent:
 
 
 # ── Audit Logger ──────────────────────────────────────────────────
+
 
 class AuditLogger:
     """Immutable append-only audit logger.
@@ -195,8 +200,8 @@ class AuditLogger:
     def query(
         self,
         session_id: str = "",
-        category: Optional[AuditActionCategory] = None,
-        severity: Optional[AuditSeverity] = None,
+        category: AuditActionCategory | None = None,
+        severity: AuditSeverity | None = None,
         agent: str = "",
         limit: int = 100,
     ) -> list[AuditEvent]:
@@ -247,7 +252,9 @@ class AuditLogger:
 
     def export(self, session_id: str = "", fmt: str = "jsonl") -> str:
         """Export audit events for a session or all events."""
-        events = self.query(session_id=session_id, limit=999999) if session_id else list(self._events)
+        events = (
+            self.query(session_id=session_id, limit=999999) if session_id else list(self._events)
+        )
         if fmt == "json":
             return json.dumps([e.to_dict() for e in events], indent=2, default=str)
         # jsonl
@@ -269,8 +276,8 @@ class AuditLogger:
         self,
         evt: AuditEvent,
         session_id: str,
-        category: Optional[AuditActionCategory],
-        severity: Optional[AuditSeverity],
+        category: AuditActionCategory | None,
+        severity: AuditSeverity | None,
         agent: str,
     ) -> bool:
         if session_id and evt.session_id != session_id:
@@ -300,6 +307,7 @@ class AuditLogger:
 
 
 # ── Internal Stats Tracker ───────────────────────────────────────
+
 
 class _AuditStats:
     """Tracks aggregate statistics for audit events."""
@@ -339,11 +347,7 @@ class _AuditStats:
             self.last_event_ts = event.timestamp
 
     def summary(self) -> dict:
-        error_rate = (
-            self.failure_count / self.total_events
-            if self.total_events > 0
-            else 0.0
-        )
+        error_rate = self.failure_count / self.total_events if self.total_events > 0 else 0.0
         return {
             "total_events": self.total_events,
             "success": self.success_count,

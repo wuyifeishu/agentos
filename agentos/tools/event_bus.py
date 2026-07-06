@@ -9,17 +9,19 @@ import fnmatch
 import threading
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
-
+from typing import Any
 
 # ============================================================================
 # Event
 # ============================================================================
 
+
 @dataclass
 class Event:
     """A published event with topic, payload, and metadata."""
+
     topic: str
     data: Any = None
     timestamp: float = field(default_factory=time.time)
@@ -34,6 +36,7 @@ UnsubscribeHandle = Callable[[], None]
 # EventBus
 # ============================================================================
 
+
 class EventBus:
     """Thread-safe in-process pub/sub event bus.
 
@@ -42,9 +45,9 @@ class EventBus:
     """
 
     def __init__(self):
-        self._subscribers: Dict[str, List[Subscriber]] = defaultdict(list)
+        self._subscribers: dict[str, list[Subscriber]] = defaultdict(list)
         self._lock = threading.RLock()
-        self._history: List[Event] = []
+        self._history: list[Event] = []
         self._max_history: int = 1000
         self._total_published: int = 0
         self._total_delivered: int = 0
@@ -79,7 +82,7 @@ class EventBus:
         with self._lock:
             self._history.append(event)
             if len(self._history) > self._max_history:
-                self._history = self._history[-self._max_history:]
+                self._history = self._history[-self._max_history :]
             self._total_published += 1
 
             if not self._running:
@@ -99,7 +102,7 @@ class EventBus:
         - `*` matches a single level (dot-delimited).
         - `**` matches zero or more levels.
         """
-        if '**' in pattern or '*' in pattern:
+        if "**" in pattern or "*" in pattern:
             return self._wildcard_match(pattern, topic)
         return pattern == topic
 
@@ -107,7 +110,7 @@ class EventBus:
         """fnmatch-style glob matching on dot-delimited topic paths."""
         return fnmatch.fnmatch(topic, pattern)
 
-    def get_history(self, limit: int = 100) -> List[Event]:
+    def get_history(self, limit: int = 100) -> list[Event]:
         """Get recent published events."""
         with self._lock:
             return list(self._history[-limit:])
@@ -125,7 +128,7 @@ class EventBus:
         with self._lock:
             self._running = True
 
-    def subscriber_count(self, topic: Optional[str] = None) -> int:
+    def subscriber_count(self, topic: str | None = None) -> int:
         """Count subscribers. If topic given, counts for that pattern only."""
         with self._lock:
             if topic:
@@ -133,7 +136,7 @@ class EventBus:
             return sum(len(v) for v in self._subscribers.values())
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "total_published": self._total_published,
@@ -148,11 +151,12 @@ class EventBus:
 # TopicFilter
 # ============================================================================
 
+
 class TopicFilter:
     """Pre-compiled topic filter chain for high-throughput event routing."""
 
     def __init__(self):
-        self._filters: Dict[str, Callable[[Event], bool]] = {}
+        self._filters: dict[str, Callable[[Event], bool]] = {}
         self._lock = threading.Lock()
 
     def add(self, name: str, predicate: Callable[[Event], bool]) -> None:
@@ -163,7 +167,7 @@ class TopicFilter:
         with self._lock:
             return self._filters.pop(name, None) is not None
 
-    def evaluate(self, event: Event) -> List[str]:
+    def evaluate(self, event: Event) -> list[str]:
         """Return names of all matching filters for this event."""
         matches = []
         with self._lock:
@@ -180,7 +184,7 @@ class TopicFilter:
 # Global singleton
 # ============================================================================
 
-_default_bus: Optional[EventBus] = None
+_default_bus: EventBus | None = None
 _default_lock = threading.Lock()
 
 

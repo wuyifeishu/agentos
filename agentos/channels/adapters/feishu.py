@@ -55,7 +55,9 @@ class FeishuAdapter(BaseChannelAdapter):
         computed = base64.b64encode(hashlib.sha256(raw.encode()).digest()).decode()
         return signature == computed
 
-    def parse_webhook(self, raw_body: bytes, headers: dict) -> ChannelMessage | list[ChannelMessage]:
+    def parse_webhook(
+        self, raw_body: bytes, headers: dict
+    ) -> ChannelMessage | list[ChannelMessage]:
         data = json.loads(raw_body.decode("utf-8"))
         # 飞书事件格式: {"schema": "2.0", "header": {...}, "event": {...}}
         event = data.get("event", data)
@@ -74,9 +76,12 @@ class FeishuAdapter(BaseChannelAdapter):
 
         msg_type_str = event.get("message", {}).get("message_type", "text")
         msg_type_map = {
-            "text": MessageType.TEXT, "image": MessageType.IMAGE,
-            "audio": MessageType.VOICE, "media": MessageType.FILE,
-            "file": MessageType.FILE, "post": MessageType.TEXT,
+            "text": MessageType.TEXT,
+            "image": MessageType.IMAGE,
+            "audio": MessageType.VOICE,
+            "media": MessageType.FILE,
+            "file": MessageType.FILE,
+            "post": MessageType.TEXT,
         }
         msg_type = msg_type_map.get(msg_type_str, MessageType.TEXT)
 
@@ -111,10 +116,12 @@ class FeishuAdapter(BaseChannelAdapter):
         )
 
     def build_reply(self, msg: ChannelMessage, reply_text: str) -> str:
-        return json.dumps({
-            "msg_type": "text",
-            "content": json.dumps({"text": reply_text}),
-        })
+        return json.dumps(
+            {
+                "msg_type": "text",
+                "content": json.dumps({"text": reply_text}),
+            }
+        )
 
     # ── 主动推送 ──
 
@@ -128,11 +135,19 @@ class FeishuAdapter(BaseChannelAdapter):
         }
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, params={"receive_id_type": "open_id"}, json=payload, headers=headers, timeout=10)
+            resp = await client.post(
+                url,
+                params={"receive_id_type": "open_id"},
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
             data = resp.json()
             if data.get("code") == 0:
                 return ReplyResult(success=True, msg_id=data.get("data", {}).get("message_id", ""))
-            return ReplyResult(success=False, error=f"feishu error {data.get('code')}: {data.get('msg')}")
+            return ReplyResult(
+                success=False, error=f"feishu error {data.get('code')}: {data.get('msg')}"
+            )
 
     async def send_image(self, user_id: str, image_url: str) -> ReplyResult:
         token = await self.get_access_token()
@@ -144,7 +159,13 @@ class FeishuAdapter(BaseChannelAdapter):
         }
         headers = {"Authorization": f"Bearer {token}"}
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, params={"receive_id_type": "open_id"}, json=payload, headers=headers, timeout=10)
+            resp = await client.post(
+                url,
+                params={"receive_id_type": "open_id"},
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
             return ReplyResult(success=resp.json().get("code") == 0)
 
     async def send_file(self, user_id: str, file_url: str, filename: str) -> ReplyResult:
@@ -157,7 +178,13 @@ class FeishuAdapter(BaseChannelAdapter):
         }
         headers = {"Authorization": f"Bearer {token}"}
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, params={"receive_id_type": "open_id"}, json=payload, headers=headers, timeout=10)
+            resp = await client.post(
+                url,
+                params={"receive_id_type": "open_id"},
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
             return ReplyResult(success=resp.json().get("code") == 0)
 
     # ── Token ──

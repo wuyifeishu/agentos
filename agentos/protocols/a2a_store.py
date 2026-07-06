@@ -11,8 +11,9 @@ import sqlite3
 import threading
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator, Optional
+from typing import Any
 
 from agentos.protocols.a2a import A2ATask, TaskState
 
@@ -26,7 +27,7 @@ class A2ATaskStore(ABC):
         ...
 
     @abstractmethod
-    def get_task(self, task_id: str) -> Optional[A2ATask]:
+    def get_task(self, task_id: str) -> A2ATask | None:
         """Retrieve a task by ID."""
         ...
 
@@ -71,7 +72,7 @@ class InMemoryTaskStore(A2ATaskStore):
         with self._lock:
             self._tasks[task.task_id] = task
 
-    def get_task(self, task_id: str) -> Optional[A2ATask]:
+    def get_task(self, task_id: str) -> A2ATask | None:
         with self._lock:
             return self._tasks.get(task_id)
 
@@ -177,11 +178,9 @@ class SqliteTaskStore(A2ATaskStore):
             )
             conn.commit()
 
-    def get_task(self, task_id: str) -> Optional[A2ATask]:
+    def get_task(self, task_id: str) -> A2ATask | None:
         with self._conn() as conn:
-            row = conn.execute(
-                "SELECT * FROM a2a_tasks WHERE task_id = ?", (task_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM a2a_tasks WHERE task_id = ?", (task_id,)).fetchone()
         if row is None:
             return None
         return self._row_to_task(row)
@@ -236,7 +235,7 @@ class SqliteTaskStore(A2ATaskStore):
             return conn.execute(query, params).fetchone()[0]
 
     def _row_to_task(self, row) -> A2ATask:
-        from agentos.protocols.a2a import A2AMessage, A2AArtifact
+        from agentos.protocols.a2a import A2AArtifact, A2AMessage
 
         task = A2ATask(
             task_id=row["task_id"],
@@ -251,7 +250,6 @@ class SqliteTaskStore(A2ATaskStore):
         if row["output_json"]:
             task.output = A2AMessage.from_dict(json.loads(row["output_json"]))
         task.artifacts = [
-            A2AArtifact.from_dict(a)
-            for a in json.loads(row["artifacts_json"] or "[]")
+            A2AArtifact.from_dict(a) for a in json.loads(row["artifacts_json"] or "[]")
         ]
         return task

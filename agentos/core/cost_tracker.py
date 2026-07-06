@@ -21,10 +21,10 @@ from __future__ import annotations
 import json
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
-
+from enum import StrEnum
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Pricing Registry
@@ -34,11 +34,12 @@ from typing import Any, Callable, Dict, List, Optional
 @dataclass
 class ModelPricing:
     """Pricing for a specific model (per 1M tokens, USD)."""
+
     model_id: str
     provider: str
     input_price_per_1m: float
     output_price_per_1m: float
-    cached_input_price_per_1m: Optional[float] = None  # For Anthropic prompt caching
+    cached_input_price_per_1m: float | None = None  # For Anthropic prompt caching
 
     def cost(self, input_tokens: int, output_tokens: int, cached_input_tokens: int = 0) -> float:
         input_cost = (input_tokens / 1_000_000) * self.input_price_per_1m
@@ -57,7 +58,7 @@ class PricingRegistry:
     Prices in USD per 1M tokens. Updated as of 2026-07.
     """
 
-    DEFAULT_PRICES: Dict[str, ModelPricing] = {
+    DEFAULT_PRICES: dict[str, ModelPricing] = {
         # ── OpenAI ───────────────────────────────────────────────
         "gpt-4o": ModelPricing("gpt-4o", "openai", 2.50, 10.00, 1.25),
         "gpt-4o-mini": ModelPricing("gpt-4o-mini", "openai", 0.15, 0.60, 0.075),
@@ -66,23 +67,25 @@ class PricingRegistry:
         "gpt-3.5-turbo": ModelPricing("gpt-3.5-turbo", "openai", 0.50, 1.50),
         "o3-mini": ModelPricing("o3-mini", "openai", 1.10, 4.40),
         "o1": ModelPricing("o1", "openai", 15.00, 60.00),
-
         # ── Anthropic ────────────────────────────────────────────
-        "claude-sonnet-5-20250630": ModelPricing("claude-sonnet-5-20250630", "anthropic", 3.00, 15.00, 0.30),
-        "claude-sonnet-4-20250514": ModelPricing("claude-sonnet-4-20250514", "anthropic", 3.00, 15.00, 0.30),
-        "claude-opus-4-20250514": ModelPricing("claude-opus-4-20250514", "anthropic", 15.00, 75.00, 1.50),
+        "claude-sonnet-5-20250630": ModelPricing(
+            "claude-sonnet-5-20250630", "anthropic", 3.00, 15.00, 0.30
+        ),
+        "claude-sonnet-4-20250514": ModelPricing(
+            "claude-sonnet-4-20250514", "anthropic", 3.00, 15.00, 0.30
+        ),
+        "claude-opus-4-20250514": ModelPricing(
+            "claude-opus-4-20250514", "anthropic", 15.00, 75.00, 1.50
+        ),
         "claude-opus-4.5": ModelPricing("claude-opus-4.5", "anthropic", 15.00, 75.00, 1.50),
         "claude-haiku-3.5": ModelPricing("claude-haiku-3.5", "anthropic", 0.80, 4.00),
-
         # ── DeepSeek ─────────────────────────────────────────────
         "deepseek-chat": ModelPricing("deepseek-chat", "deepseek", 0.14, 0.28),
         "deepseek-reasoner": ModelPricing("deepseek-reasoner", "deepseek", 0.55, 2.19),
-
         # ── Google ───────────────────────────────────────────────
         "gemini-2.5-pro": ModelPricing("gemini-2.5-pro", "google", 1.25, 10.00),
         "gemini-2.5-flash": ModelPricing("gemini-2.5-flash", "google", 0.15, 0.60),
         "gemini-2.0-flash": ModelPricing("gemini-2.0-flash", "google", 0.10, 0.40),
-
         # ── Groq / Mistral / Others ──────────────────────────────
         "llama-3.1-70b": ModelPricing("llama-3.1-70b", "groq", 0.59, 0.79),
         "mixtral-8x7b": ModelPricing("mixtral-8x7b", "groq", 0.27, 0.27),
@@ -90,7 +93,7 @@ class PricingRegistry:
     }
 
     # Alias mapping for common shorthand names
-    ALIASES: Dict[str, str] = {
+    ALIASES: dict[str, str] = {
         "gpt4o": "gpt-4o",
         "gpt4o-mini": "gpt-4o-mini",
         "sonnet5": "claude-sonnet-5-20250630",
@@ -102,7 +105,7 @@ class PricingRegistry:
     }
 
     @classmethod
-    def get(cls, model_id: str) -> Optional[ModelPricing]:
+    def get(cls, model_id: str) -> ModelPricing | None:
         """Get pricing for a model, resolving aliases."""
         resolved = cls.ALIASES.get(model_id, model_id)
         return cls.DEFAULT_PRICES.get(resolved)
@@ -113,15 +116,13 @@ class PricingRegistry:
         cls.DEFAULT_PRICES[pricing.model_id] = pricing
 
     @classmethod
-    def list_providers(cls) -> List[str]:
+    def list_providers(cls) -> list[str]:
         return sorted(set(p.provider for p in cls.DEFAULT_PRICES.values()))
 
     @classmethod
-    def list_models(cls, provider: Optional[str] = None) -> List[str]:
+    def list_models(cls, provider: str | None = None) -> list[str]:
         if provider:
-            return sorted(
-                k for k, v in cls.DEFAULT_PRICES.items() if v.provider == provider
-            )
+            return sorted(k for k, v in cls.DEFAULT_PRICES.items() if v.provider == provider)
         return sorted(cls.DEFAULT_PRICES.keys())
 
 
@@ -130,22 +131,24 @@ class PricingRegistry:
 # ---------------------------------------------------------------------------
 
 
-class BudgetAction(str, Enum):
+class BudgetAction(StrEnum):
     """Action when budget is exceeded."""
-    BLOCK = "block"           # Reject further requests
-    WARN = "warn"             # Allow but send alert
-    THROTTLE = "throttle"     # Reduce throughput
+
+    BLOCK = "block"  # Reject further requests
+    WARN = "warn"  # Allow but send alert
+    THROTTLE = "throttle"  # Reduce throughput
 
 
 @dataclass
 class BudgetLimit:
     """Budget limit configuration."""
+
     name: str
     max_usd: float
     period_seconds: int = 2592000  # Default: 30 days
     action: BudgetAction = BudgetAction.WARN
-    alert_thresholds: List[float] = field(default_factory=lambda: [0.5, 0.75, 0.9, 1.0])
-    alert_callback: Optional[Callable] = None
+    alert_thresholds: list[float] = field(default_factory=lambda: [0.5, 0.75, 0.9, 1.0])
+    alert_callback: Callable | None = None
     # Internal state
     _spent: float = 0.0
     _period_start: float = field(default_factory=time.time)
@@ -189,19 +192,21 @@ class BudgetLimit:
 # Cost Tracker
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class UsageRecord:
     """A single LLM usage record."""
+
     model: str
     input_tokens: int
     output_tokens: int
     cached_input_tokens: int = 0
     cost_usd: float = 0.0
-    user_id: Optional[str] = None
-    tenant_id: Optional[str] = None
-    request_id: Optional[str] = None
+    user_id: str | None = None
+    tenant_id: str | None = None
+    request_id: str | None = None
     timestamp: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class CostTracker:
@@ -230,7 +235,7 @@ class CostTracker:
     total_tokens: int = 0
 
     @classmethod
-    def noop(cls) -> "CostTracker":
+    def noop(cls) -> CostTracker:
         """Return a minimal no-op tracker that does not record anything."""
         # Monkey-patch record to be a no-op returning True (budget allows)
         inst = cls.__new__(cls)
@@ -245,17 +250,17 @@ class CostTracker:
         inst.record = lambda *a, **kw: True
         return inst
 
-    def __init__(self, pricing_registry: Optional[PricingRegistry] = None):
+    def __init__(self, pricing_registry: PricingRegistry | None = None):
         self._pricing = pricing_registry or PricingRegistry
-        self._usage_log: List[UsageRecord] = []
-        self._budgets: Dict[str, BudgetLimit] = {}
+        self._usage_log: list[UsageRecord] = []
+        self._budgets: dict[str, BudgetLimit] = {}
 
         # Aggregate counters
         self._total_cost: float = 0.0
         self._total_tokens: int = 0
-        self._model_costs: Dict[str, float] = defaultdict(float)
-        self._user_costs: Dict[str, float] = defaultdict(float)
-        self._tenant_costs: Dict[str, float] = defaultdict(float)
+        self._model_costs: dict[str, float] = defaultdict(float)
+        self._user_costs: dict[str, float] = defaultdict(float)
+        self._tenant_costs: dict[str, float] = defaultdict(float)
 
     # ── Budget Management ──────────────────────────────────────────────
 
@@ -266,10 +271,10 @@ class CostTracker:
     def remove_budget(self, name: str) -> None:
         self._budgets.pop(name, None)
 
-    def get_budget(self, name: str) -> Optional[BudgetLimit]:
+    def get_budget(self, name: str) -> BudgetLimit | None:
         return self._budgets.get(name)
 
-    def list_budgets(self) -> Dict[str, BudgetLimit]:
+    def list_budgets(self) -> dict[str, BudgetLimit]:
         return dict(self._budgets)
 
     # ── Usage Recording ────────────────────────────────────────────────
@@ -279,11 +284,11 @@ class CostTracker:
         model: str,
         input_tokens: int,
         output_tokens: int,
-        user_id: Optional[str] = None,
-        tenant_id: Optional[str] = None,
-        request_id: Optional[str] = None,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+        request_id: str | None = None,
         cached_input_tokens: int = 0,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """
         Record LLM usage. Returns True if within all budget limits.
@@ -335,19 +340,19 @@ class CostTracker:
     def total_tokens(self) -> int:
         return self._total_tokens
 
-    def get_model_costs(self) -> Dict[str, float]:
+    def get_model_costs(self) -> dict[str, float]:
         return {k: round(v, 6) for k, v in self._model_costs.items()}
 
-    def get_user_costs(self) -> Dict[str, float]:
+    def get_user_costs(self) -> dict[str, float]:
         return {k: round(v, 6) for k, v in self._user_costs.items()}
 
-    def get_tenant_costs(self) -> Dict[str, float]:
+    def get_tenant_costs(self) -> dict[str, float]:
         return {k: round(v, 6) for k, v in self._tenant_costs.items()}
 
-    def get_recent_usage(self, limit: int = 100) -> List[UsageRecord]:
+    def get_recent_usage(self, limit: int = 100) -> list[UsageRecord]:
         return self._usage_log[-limit:]
 
-    def get_usage_summary(self) -> Dict[str, Any]:
+    def get_usage_summary(self) -> dict[str, Any]:
         """Get a comprehensive usage summary."""
         return {
             "total_cost_usd": self.total_cost,
@@ -371,25 +376,30 @@ class CostTracker:
 
     def export_json(self) -> str:
         """Export all usage data as JSON."""
-        return json.dumps({
-            "summary": self.get_usage_summary(),
-            "records": [
-                {
-                    "model": r.model,
-                    "input_tokens": r.input_tokens,
-                    "output_tokens": r.output_tokens,
-                    "cost_usd": r.cost_usd,
-                    "user_id": r.user_id,
-                    "tenant_id": r.tenant_id,
-                    "timestamp": r.timestamp,
-                }
-                for r in self._usage_log
-            ],
-        }, indent=2)
+        return json.dumps(
+            {
+                "summary": self.get_usage_summary(),
+                "records": [
+                    {
+                        "model": r.model,
+                        "input_tokens": r.input_tokens,
+                        "output_tokens": r.output_tokens,
+                        "cost_usd": r.cost_usd,
+                        "user_id": r.user_id,
+                        "tenant_id": r.tenant_id,
+                        "timestamp": r.timestamp,
+                    }
+                    for r in self._usage_log
+                ],
+            },
+            indent=2,
+        )
 
     def export_csv(self) -> str:
         """Export usage records as CSV."""
-        lines = ["model,input_tokens,output_tokens,cached_input_tokens,cost_usd,user_id,tenant_id,timestamp"]
+        lines = [
+            "model,input_tokens,output_tokens,cached_input_tokens,cost_usd,user_id,tenant_id,timestamp"
+        ]
         for r in self._usage_log:
             lines.append(
                 f"{r.model},{r.input_tokens},{r.output_tokens},{r.cached_input_tokens},"
@@ -414,6 +424,7 @@ class CostTracker:
 # Exception
 # ---------------------------------------------------------------------------
 
+
 class BudgetExceededError(Exception):
     """Raised when a budget limit is exceeded."""
 
@@ -421,6 +432,4 @@ class BudgetExceededError(Exception):
         self.budget_name = budget_name
         self.spent = spent
         self.limit = limit
-        super().__init__(
-            f"Budget '{budget_name}' exceeded: ${spent:.4f} / ${limit:.2f}"
-        )
+        super().__init__(f"Budget '{budget_name}' exceeded: ${spent:.4f} / ${limit:.2f}")

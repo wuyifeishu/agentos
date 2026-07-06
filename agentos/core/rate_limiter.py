@@ -15,7 +15,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
-from typing import Dict, Optional, TypeVar
+from typing import TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ T = TypeVar("T")
 # ============================================================================
 # Core limiters
 # ============================================================================
+
 
 class TokenBucket:
     """Classic token bucket for rate limiting with burst support.
@@ -64,9 +65,7 @@ class TokenBucket:
                 return True
             return False
 
-    async def wait_and_acquire(
-        self, tokens: int = 1, timeout: Optional[float] = None
-    ) -> bool:
+    async def wait_and_acquire(self, tokens: int = 1, timeout: float | None = None) -> bool:
         """Wait until tokens are available or timeout expires."""
         deadline = (time.monotonic() + timeout) if timeout is not None else None
 
@@ -196,9 +195,10 @@ class CompositeLimiter:
 # Rate limit decorator / context manager
 # ============================================================================
 
+
 class RateLimitError(Exception):
     """Raised when rate limit is exceeded."""
-    pass
+
 
 
 class RateLimiter:
@@ -223,22 +223,18 @@ class RateLimiter:
             self.strategy.release()
 
     @classmethod
-    def token_bucket(cls, name: str, rate: float, capacity: int) -> "RateLimiter":
+    def token_bucket(cls, name: str, rate: float, capacity: int) -> RateLimiter:
         return cls(name=name, strategy=TokenBucket(rate=rate, capacity=capacity))
 
     @classmethod
-    def sliding_window(
-        cls, name: str, max_requests: int, window_seconds: float
-    ) -> "RateLimiter":
+    def sliding_window(cls, name: str, max_requests: int, window_seconds: float) -> RateLimiter:
         return cls(
             name=name,
-            strategy=SlidingWindow(
-                max_requests=max_requests, window_seconds=window_seconds
-            ),
+            strategy=SlidingWindow(max_requests=max_requests, window_seconds=window_seconds),
         )
 
     @classmethod
-    def concurrent(cls, name: str, max_concurrent: int) -> "RateLimiter":
+    def concurrent(cls, name: str, max_concurrent: int) -> RateLimiter:
         return cls(name=name, strategy=ConcurrentLimiter(max_concurrent=max_concurrent))
 
 
@@ -246,14 +242,15 @@ class RateLimiter:
 # Endpoint-level registry
 # ============================================================================
 
+
 @dataclass
 class EndpointRateLimit:
     """Per-endpoint rate limit configuration."""
 
     endpoint: str
-    requests_per_second: Optional[float] = None
-    requests_per_minute: Optional[int] = None
-    concurrent: Optional[int] = None
+    requests_per_second: float | None = None
+    requests_per_minute: int | None = None
+    concurrent: int | None = None
     burst: int = 1
 
 
@@ -261,7 +258,7 @@ class RateLimitRegistry:
     """Manage per-endpoint rate limiters."""
 
     def __init__(self):
-        self._limiters: Dict[str, RateLimiter] = {}
+        self._limiters: dict[str, RateLimiter] = {}
         self._lock = asyncio.Lock()
 
     async def configure(self, spec: EndpointRateLimit) -> RateLimiter:
@@ -288,16 +285,16 @@ class RateLimitRegistry:
                 limiters.append(ConcurrentLimiter(max_concurrent=spec.concurrent))
 
             strategy = (
-                CompositeLimiter(limiters) if len(limiters) > 1
-                else limiters[0] if limiters
-                else None
+                CompositeLimiter(limiters)
+                if len(limiters) > 1
+                else limiters[0] if limiters else None
             )
 
             limiter = RateLimiter(name=spec.endpoint, strategy=strategy)
             self._limiters[spec.endpoint] = limiter
             return limiter
 
-    async def get(self, endpoint: str) -> Optional[RateLimiter]:
+    async def get(self, endpoint: str) -> RateLimiter | None:
         return self._limiters.get(endpoint)
 
     async def acquire(self, endpoint: str) -> bool:

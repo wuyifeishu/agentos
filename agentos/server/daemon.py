@@ -37,13 +37,14 @@ import os
 import signal
 import sys
 import time
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Any
+from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, APIRouter
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from agentos.memory.persistence import MemoryPersistenceManager
@@ -77,7 +78,7 @@ class DaemonConfig:
     persist_memory: bool = True
 
     @classmethod
-    def from_env(cls) -> "DaemonConfig":
+    def from_env(cls) -> DaemonConfig:
         """Load config from environment variables."""
         return cls(
             host=os.getenv("AGENTOS_DAEMON_HOST", "0.0.0.0"),
@@ -157,9 +158,7 @@ class TaskQueue:
         return self._tasks.get(task_id)
 
     def list_tasks(self, limit: int = 50) -> list[BackgroundTask]:
-        items = sorted(
-            self._tasks.values(), key=lambda t: t.created_at, reverse=True
-        )
+        items = sorted(self._tasks.values(), key=lambda t: t.created_at, reverse=True)
         return items[:limit]
 
     def active_count(self) -> int:
@@ -187,7 +186,7 @@ class TaskQueue:
                 asyncio.gather(*self._asyncio_tasks.values(), return_exceptions=True),
                 timeout=timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
 
 
@@ -452,9 +451,7 @@ class ServerDaemon:
             os.close(devnull)
 
         self._started_at = time.time()
-        self._logger.info(
-            f"Daemon starting on http://{self.config.host}:{self.config.port}"
-        )
+        self._logger.info(f"Daemon starting on http://{self.config.host}:{self.config.port}")
         self._run_server()
         return 0
 
@@ -576,9 +573,7 @@ class ServerDaemon:
             if hasattr(router, "routes")
         )
         # Also check top-level routes
-        has_healthz = has_healthz or any(
-            getattr(r, "path", "") == "/healthz" for r in app.routes
-        )
+        has_healthz = has_healthz or any(getattr(r, "path", "") == "/healthz" for r in app.routes)
 
         if not has_healthz:
             health_router = _make_health_router(self, self.task_queue)

@@ -22,73 +22,80 @@ Key Features:
 
 from __future__ import annotations
 
-import re
 import json
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Pattern
+from enum import StrEnum
+from re import Pattern
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Enums & Data Classes
 # ---------------------------------------------------------------------------
 
 
-class ViolationSeverity(str, Enum):
+class ViolationSeverity(StrEnum):
     """Severity level of a guardrail violation."""
-    CRITICAL = "critical"      # Immediate block, alert ops
-    HIGH = "high"               # Block the request
-    MEDIUM = "medium"           # Warn but allow (with redaction)
-    LOW = "low"                 # Log only
+
+    CRITICAL = "critical"  # Immediate block, alert ops
+    HIGH = "high"  # Block the request
+    MEDIUM = "medium"  # Warn but allow (with redaction)
+    LOW = "low"  # Log only
 
 
-class GuardAction(str, Enum):
+class GuardAction(StrEnum):
     """Action to take when a guardrail is triggered."""
-    BLOCK = "block"             # Reject the request entirely
-    WARN = "warn"               # Allow but flag with warning
-    REDACT = "redact"          # Remove offending content, allow rest
-    LOG = "log"                 # Log only, no user-visible effect
+
+    BLOCK = "block"  # Reject the request entirely
+    WARN = "warn"  # Allow but flag with warning
+    REDACT = "redact"  # Remove offending content, allow rest
+    LOG = "log"  # Log only, no user-visible effect
 
 
-class Category(str, Enum):
+class Category(StrEnum):
     """Standard content safety categories."""
-    PII = "pii"                          # Personally Identifiable Information
-    TOXICITY = "toxicity"                # Hate speech, harassment
-    SELF_HARM = "self_harm"             # Suicide, self-injury
-    VIOLENCE = "violence"               # Graphic violence
-    SEXUAL = "sexual"                   # Explicit sexual content
-    JAILBREAK = "jailbreak"             # Prompt injection / jailbreak attempts
-    DATA_LEAK = "data_leak"             # Attempting to leak system prompts / internals
-    MALICIOUS_CODE = "malicious_code"    # Code injection, reverse shell, etc.
-    OFF_TOPIC = "off_topic"             # Outside defined scope
-    CUSTOM = "custom"                   # User-defined category
+
+    PII = "pii"  # Personally Identifiable Information
+    TOXICITY = "toxicity"  # Hate speech, harassment
+    SELF_HARM = "self_harm"  # Suicide, self-injury
+    VIOLENCE = "violence"  # Graphic violence
+    SEXUAL = "sexual"  # Explicit sexual content
+    JAILBREAK = "jailbreak"  # Prompt injection / jailbreak attempts
+    DATA_LEAK = "data_leak"  # Attempting to leak system prompts / internals
+    MALICIOUS_CODE = "malicious_code"  # Code injection, reverse shell, etc.
+    OFF_TOPIC = "off_topic"  # Outside defined scope
+    CUSTOM = "custom"  # User-defined category
 
 
 @dataclass
 class GuardViolation:
     """A single guardrail violation detected."""
+
     category: Category
     severity: ViolationSeverity
     action: GuardAction
     message: str
-    matched_pattern: Optional[str] = None
-    matched_text: Optional[str] = None
-    rule_id: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    matched_pattern: str | None = None
+    matched_text: str | None = None
+    rule_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class GuardResult:
     """Result of running guardrails on content."""
+
     passed: bool = True
-    violations: List[GuardViolation] = field(default_factory=list)
-    redacted_content: Optional[str] = None
-    warnings: List[str] = field(default_factory=list)
+    violations: list[GuardViolation] = field(default_factory=list)
+    redacted_content: str | None = None
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def blocked(self) -> bool:
         return any(v.action == GuardAction.BLOCK for v in self.violations)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "passed": self.passed,
             "blocked": self.blocked,
@@ -110,14 +117,17 @@ class GuardResult:
 # PII Detection Patterns
 # ---------------------------------------------------------------------------
 
-PII_PATTERNS: Dict[str, Pattern[str]] = {
+PII_PATTERNS: dict[str, Pattern[str]] = {
     "email": re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"),
     "phone_cn": re.compile(r"1[3-9]\d{9}"),
     "phone_us": re.compile(r"\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}"),
     "ssn": re.compile(r"\d{3}-\d{2}-\d{4}"),
     "credit_card": re.compile(r"\b(?:\d{4}[ -]?){3}\d{4}\b"),
     "ip_address": re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
-    "api_key": re.compile(r"(?:api[_-]?key|apikey|token|secret|password)\s*[:=]\s*['\"]?[\w-]{20,}['\"]?", re.IGNORECASE),
+    "api_key": re.compile(
+        r"(?:api[_-]?key|apikey|token|secret|password)\s*[:=]\s*['\"]?[\w-]{20,}['\"]?",
+        re.IGNORECASE,
+    ),
 }
 
 
@@ -125,9 +135,11 @@ PII_PATTERNS: Dict[str, Pattern[str]] = {
 # Regex-based Fast-Path Rules
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RegexRule:
     """A regex-based guardrail rule for fast-path matching."""
+
     rule_id: str
     category: Category
     severity: ViolationSeverity
@@ -136,37 +148,99 @@ class RegexRule:
     message: str
 
 
-DEFAULT_RULES: List[RegexRule] = [
+DEFAULT_RULES: list[RegexRule] = [
     # PII Rules
-    RegexRule("pii-email", Category.PII, ViolationSeverity.HIGH, GuardAction.REDACT,
-              PII_PATTERNS["email"], "Email address detected"),
-    RegexRule("pii-phone-cn", Category.PII, ViolationSeverity.MEDIUM, GuardAction.REDACT,
-              PII_PATTERNS["phone_cn"], "Chinese phone number detected"),
-    RegexRule("pii-ssn", Category.PII, ViolationSeverity.CRITICAL, GuardAction.BLOCK,
-              PII_PATTERNS["ssn"], "SSN detected"),
-    RegexRule("pii-cc", Category.PII, ViolationSeverity.CRITICAL, GuardAction.BLOCK,
-              PII_PATTERNS["credit_card"], "Credit card number detected"),
-    RegexRule("pii-apikey", Category.PII, ViolationSeverity.CRITICAL, GuardAction.BLOCK,
-              PII_PATTERNS["api_key"], "Potential API key in text"),
-
+    RegexRule(
+        "pii-email",
+        Category.PII,
+        ViolationSeverity.HIGH,
+        GuardAction.REDACT,
+        PII_PATTERNS["email"],
+        "Email address detected",
+    ),
+    RegexRule(
+        "pii-phone-cn",
+        Category.PII,
+        ViolationSeverity.MEDIUM,
+        GuardAction.REDACT,
+        PII_PATTERNS["phone_cn"],
+        "Chinese phone number detected",
+    ),
+    RegexRule(
+        "pii-ssn",
+        Category.PII,
+        ViolationSeverity.CRITICAL,
+        GuardAction.BLOCK,
+        PII_PATTERNS["ssn"],
+        "SSN detected",
+    ),
+    RegexRule(
+        "pii-cc",
+        Category.PII,
+        ViolationSeverity.CRITICAL,
+        GuardAction.BLOCK,
+        PII_PATTERNS["credit_card"],
+        "Credit card number detected",
+    ),
+    RegexRule(
+        "pii-apikey",
+        Category.PII,
+        ViolationSeverity.CRITICAL,
+        GuardAction.BLOCK,
+        PII_PATTERNS["api_key"],
+        "Potential API key in text",
+    ),
     # Jailbreak patterns
-    RegexRule("jb-ignore", Category.JAILBREAK, ViolationSeverity.CRITICAL, GuardAction.BLOCK,
-              re.compile(r"(?:ignore|forget|disregard)\s+(?:all\s+)?(?:previous|above|prior)\s+(?:instructions?|prompts?|rules?)", re.IGNORECASE),
-              "Jailbreak attempt: ignore instructions"),
-    RegexRule("jb-dan", Category.JAILBREAK, ViolationSeverity.CRITICAL, GuardAction.BLOCK,
-              re.compile(r"\bDAN\s*(?:mode|jailbreak)?\b", re.IGNORECASE),
-              "Jailbreak attempt: DAN mode"),
-    RegexRule("jb-roleplay", Category.JAILBREAK, ViolationSeverity.HIGH, GuardAction.BLOCK,
-              re.compile(r"(?:pretend|act\s+as\s+if|imagine)\s+you\s+(?:are|were)\s+(?:an?\s+)?(?:unfiltered|unrestricted|evil|dark|malicious)", re.IGNORECASE),
-              "Jailbreak attempt: roleplay escalation"),
-
+    RegexRule(
+        "jb-ignore",
+        Category.JAILBREAK,
+        ViolationSeverity.CRITICAL,
+        GuardAction.BLOCK,
+        re.compile(
+            r"(?:ignore|forget|disregard)\s+(?:all\s+)?(?:previous|above|prior)\s+(?:instructions?|prompts?|rules?)",
+            re.IGNORECASE,
+        ),
+        "Jailbreak attempt: ignore instructions",
+    ),
+    RegexRule(
+        "jb-dan",
+        Category.JAILBREAK,
+        ViolationSeverity.CRITICAL,
+        GuardAction.BLOCK,
+        re.compile(r"\bDAN\s*(?:mode|jailbreak)?\b", re.IGNORECASE),
+        "Jailbreak attempt: DAN mode",
+    ),
+    RegexRule(
+        "jb-roleplay",
+        Category.JAILBREAK,
+        ViolationSeverity.HIGH,
+        GuardAction.BLOCK,
+        re.compile(
+            r"(?:pretend|act\s+as\s+if|imagine)\s+you\s+(?:are|were)\s+(?:an?\s+)?(?:unfiltered|unrestricted|evil|dark|malicious)",
+            re.IGNORECASE,
+        ),
+        "Jailbreak attempt: roleplay escalation",
+    ),
     # Malicious code
-    RegexRule("mc-reverse-shell", Category.MALICIOUS_CODE, ViolationSeverity.CRITICAL, GuardAction.BLOCK,
-              re.compile(r"(?:bash|sh|nc|netcat|ncat)\s+.*(?:>&?\s*/dev/(?:tcp|udp)|-e\s+/bin/(?:bash|sh))", re.IGNORECASE),
-              "Reverse shell attempt detected"),
-    RegexRule("mc-rm-rf", Category.MALICIOUS_CODE, ViolationSeverity.HIGH, GuardAction.BLOCK,
-              re.compile(r"(?:rm\s+-rf|del\s+/[fsq])\s+(?:/|~|\*)", re.IGNORECASE),
-              "Destructive file operation detected"),
+    RegexRule(
+        "mc-reverse-shell",
+        Category.MALICIOUS_CODE,
+        ViolationSeverity.CRITICAL,
+        GuardAction.BLOCK,
+        re.compile(
+            r"(?:bash|sh|nc|netcat|ncat)\s+.*(?:>&?\s*/dev/(?:tcp|udp)|-e\s+/bin/(?:bash|sh))",
+            re.IGNORECASE,
+        ),
+        "Reverse shell attempt detected",
+    ),
+    RegexRule(
+        "mc-rm-rf",
+        Category.MALICIOUS_CODE,
+        ViolationSeverity.HIGH,
+        GuardAction.BLOCK,
+        re.compile(r"(?:rm\s+-rf|del\s+/[fsq])\s+(?:/|~|\*)", re.IGNORECASE),
+        "Destructive file operation detected",
+    ),
 ]
 
 
@@ -174,12 +248,13 @@ DEFAULT_RULES: List[RegexRule] = [
 # Guardrail Engine
 # ---------------------------------------------------------------------------
 
+
 class RegexGuard:
     """Fast-path regex-based guard for common patterns."""
 
-    def __init__(self, rules: Optional[List[RegexRule]] = None):
-        self._rules: Dict[str, RegexRule] = {}
-        for rule in (rules or DEFAULT_RULES):
+    def __init__(self, rules: list[RegexRule] | None = None):
+        self._rules: dict[str, RegexRule] = {}
+        for rule in rules or DEFAULT_RULES:
             self._rules[rule.rule_id] = rule
 
     def add_rule(self, rule: RegexRule) -> None:
@@ -188,22 +263,24 @@ class RegexGuard:
     def remove_rule(self, rule_id: str) -> None:
         self._rules.pop(rule_id, None)
 
-    def scan(self, content: str) -> List[GuardViolation]:
-        violations: List[GuardViolation] = []
+    def scan(self, content: str) -> list[GuardViolation]:
+        violations: list[GuardViolation] = []
         for rule in self._rules.values():
             for match in rule.pattern.finditer(content):
-                violations.append(GuardViolation(
-                    category=rule.category,
-                    severity=rule.severity,
-                    action=rule.action,
-                    message=rule.message,
-                    matched_pattern=rule.pattern.pattern,
-                    matched_text=match.group(),
-                    rule_id=rule.rule_id,
-                ))
+                violations.append(
+                    GuardViolation(
+                        category=rule.category,
+                        severity=rule.severity,
+                        action=rule.action,
+                        message=rule.message,
+                        matched_pattern=rule.pattern.pattern,
+                        matched_text=match.group(),
+                        rule_id=rule.rule_id,
+                    )
+                )
         return violations
 
-    def redact(self, content: str, violations: List[GuardViolation]) -> str:
+    def redact(self, content: str, violations: list[GuardViolation]) -> str:
         """Redact PII from content based on matched violations."""
         result = content
         for v in violations:
@@ -236,10 +313,10 @@ Content to assess:
 {content}
 ---"""
 
-    def __init__(self, llm_call: Optional[Callable] = None):
+    def __init__(self, llm_call: Callable | None = None):
         self._llm_call = llm_call
 
-    async def assess(self, content: str) -> List[GuardViolation]:
+    async def assess(self, content: str) -> list[GuardViolation]:
         if self._llm_call is None:
             return []  # No LLM backend configured, skip
 
@@ -267,13 +344,17 @@ Content to assess:
             except ValueError:
                 cat_enum = Category.CUSTOM
 
-            violations.append(GuardViolation(
-                category=cat_enum,
-                severity=severity_map.get(cat.get("severity", "medium"), ViolationSeverity.MEDIUM),
-                action=GuardAction.BLOCK,
-                message=cat.get("reason", f"Content safety violation: {cat_name}"),
-                metadata={"llm_assessment": cat},
-            ))
+            violations.append(
+                GuardViolation(
+                    category=cat_enum,
+                    severity=severity_map.get(
+                        cat.get("severity", "medium"), ViolationSeverity.MEDIUM
+                    ),
+                    action=GuardAction.BLOCK,
+                    message=cat.get("reason", f"Content safety violation: {cat_name}"),
+                    metadata={"llm_assessment": cat},
+                )
+            )
 
         return violations
 
@@ -281,6 +362,7 @@ Content to assess:
 # ---------------------------------------------------------------------------
 # Guardrails Pipeline
 # ---------------------------------------------------------------------------
+
 
 class GuardrailsPipeline:
     """
@@ -302,8 +384,8 @@ class GuardrailsPipeline:
 
     def __init__(
         self,
-        regex_guard: Optional[RegexGuard] = None,
-        safety_guard: Optional[ContentSafetyGuard] = None,
+        regex_guard: RegexGuard | None = None,
+        safety_guard: ContentSafetyGuard | None = None,
         enable_regex: bool = True,
         enable_safety: bool = True,
     ):
@@ -311,7 +393,7 @@ class GuardrailsPipeline:
         self._safety = safety_guard or ContentSafetyGuard()
         self._enable_regex = enable_regex
         self._enable_safety = enable_safety
-        self._audit_log: List[GuardResult] = []
+        self._audit_log: list[GuardResult] = []
 
     def add_regex_rule(self, rule: RegexRule) -> None:
         self._regex.add_rule(rule)
@@ -327,13 +409,13 @@ class GuardrailsPipeline:
         """Validate agent output before returning to user."""
         return await self._check(content, stage="output")
 
-    async def check_tool_call(self, tool_name: str, arguments: Dict[str, Any]) -> GuardResult:
+    async def check_tool_call(self, tool_name: str, arguments: dict[str, Any]) -> GuardResult:
         """Validate tool calls for safety."""
         content = f"Tool: {tool_name}\nArgs: {json.dumps(arguments)}"
         return await self._check(content, stage="tool_call")
 
     async def _check(self, content: str, stage: str = "unknown") -> GuardResult:
-        violations: List[GuardViolation] = []
+        violations: list[GuardViolation] = []
 
         # Fast-path: regex scanning
         if self._enable_regex:
@@ -348,9 +430,11 @@ class GuardrailsPipeline:
         if not violations:
             result = GuardResult(passed=True)
         else:
-            redacted = self._regex.redact(content, violations) if any(
-                v.action == GuardAction.REDACT for v in violations
-            ) else None
+            redacted = (
+                self._regex.redact(content, violations)
+                if any(v.action == GuardAction.REDACT for v in violations)
+                else None
+            )
 
             result = GuardResult(
                 passed=not any(v.action == GuardAction.BLOCK for v in violations),
@@ -362,10 +446,10 @@ class GuardrailsPipeline:
         self._audit_log.append(result)
         return result
 
-    def get_audit_log(self) -> List[Dict[str, Any]]:
+    def get_audit_log(self) -> list[dict[str, Any]]:
         return [r.to_dict() for r in self._audit_log]
 
-    def get_statistics(self) -> Dict[str, int]:
+    def get_statistics(self) -> dict[str, int]:
         total = len(self._audit_log)
         blocked = sum(1 for r in self._audit_log if r.blocked)
         passed = sum(1 for r in self._audit_log if r.passed and not r.violations)
@@ -382,6 +466,7 @@ class GuardrailsPipeline:
 # Exception
 # ---------------------------------------------------------------------------
 
+
 class GuardViolationError(Exception):
     """Raised when guardrails block a request."""
 
@@ -396,6 +481,7 @@ class GuardViolationError(Exception):
 # ---------------------------------------------------------------------------
 # Convenience: Pre-built Pipeline
 # ---------------------------------------------------------------------------
+
 
 def create_default_pipeline() -> GuardrailsPipeline:
     """Create a GuardrailsPipeline with sensible defaults."""

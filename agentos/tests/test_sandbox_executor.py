@@ -2,7 +2,8 @@
 
 import os
 import tempfile
-from agentos.security.sandbox import SandboxExecutor, SandboxConfig, SandboxMode
+
+from agentos.security.sandbox import SandboxConfig, SandboxExecutor, SandboxMode
 
 
 class TestProcessSandbox:

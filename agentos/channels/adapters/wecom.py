@@ -43,14 +43,19 @@ class WeComAdapter(BaseChannelAdapter):
         signature = self.make_signature(self.config.verify_token, timestamp, nonce, "")
         return msg_signature == signature
 
-    def parse_webhook(self, raw_body: bytes, headers: dict) -> ChannelMessage | list[ChannelMessage]:
+    def parse_webhook(
+        self, raw_body: bytes, headers: dict
+    ) -> ChannelMessage | list[ChannelMessage]:
         text = raw_body.decode("utf-8")
         data = json.loads(text) if text.strip().startswith("{") else self._parse_xml(text)
         msg_type_str = data.get("MsgType", data.get("msgtype", "text"))
         msg_type_map = {
-            "text": MessageType.TEXT, "image": MessageType.IMAGE,
-            "voice": MessageType.VOICE, "video": MessageType.VIDEO,
-            "file": MessageType.FILE, "event": MessageType.EVENT,
+            "text": MessageType.TEXT,
+            "image": MessageType.IMAGE,
+            "voice": MessageType.VOICE,
+            "video": MessageType.VIDEO,
+            "file": MessageType.FILE,
+            "event": MessageType.EVENT,
         }
         msg_type = msg_type_map.get(msg_type_str, MessageType.TEXT)
         content = ""
@@ -101,10 +106,14 @@ class WeComAdapter(BaseChannelAdapter):
         webhook_url = self.config.extra.get("webhook_url", "")
         if webhook_url:
             async with httpx.AsyncClient() as client:
-                resp = await client.post(webhook_url, json={
-                    "msgtype": "text",
-                    "text": {"content": content},
-                }, timeout=10)
+                resp = await client.post(
+                    webhook_url,
+                    json={
+                        "msgtype": "text",
+                        "text": {"content": content},
+                    },
+                    timeout=10,
+                )
                 return ReplyResult(success=resp.status_code == 200)
 
         token = await self.get_access_token()
@@ -120,7 +129,9 @@ class WeComAdapter(BaseChannelAdapter):
             data = resp.json()
             if data.get("errcode") == 0:
                 return ReplyResult(success=True, msg_id=data.get("msgid", ""))
-            return ReplyResult(success=False, error=f"wecom error {data.get('errcode')}: {data.get('errmsg')}")
+            return ReplyResult(
+                success=False, error=f"wecom error {data.get('errcode')}: {data.get('errmsg')}"
+            )
 
     async def send_image(self, user_id: str, image_url: str) -> ReplyResult:
         token = await self.get_access_token()

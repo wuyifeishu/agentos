@@ -7,20 +7,19 @@ Agent Builder — 一键构建生产级 ToolAgent。
 
 from __future__ import annotations
 
-import os
 import importlib
 import inspect
+import os
 import pkgutil
-from typing import Optional
 
-from agentos.tools.base import BaseTool
-from agentos.tools.registry import ToolRegistry
-from agentos.tools.bridge import bridge_registry_to_executor
-from agentos.agent.tool_agent import ToolAgent, ToolExecutor, AgentConfig
+from agentos.agent.tool_agent import AgentConfig, ToolAgent, ToolExecutor
 from agentos.llm.base import LLMProvider
-
+from agentos.tools.base import BaseTool
+from agentos.tools.bridge import bridge_registry_to_executor
+from agentos.tools.registry import ToolRegistry
 
 # ── Tool Discovery ──
+
 
 def discover_tools(package_path: str = "agentos.tools") -> list[BaseTool]:
     """自动发现 agentos.tools 包下所有 BaseTool 子类并实例化。
@@ -61,6 +60,7 @@ def discover_tools(package_path: str = "agentos.tools") -> list[BaseTool]:
 
 # ── Provider Auto-Detection ──
 
+
 def create_provider() -> LLMProvider:
     """自动探测可用的 LLM Provider。
 
@@ -69,20 +69,24 @@ def create_provider() -> LLMProvider:
     # DeepSeek
     if os.getenv("DEEPSEEK_API_KEY"):
         from agentos.llm.providers.deepseek import DeepSeekProvider
+
         return DeepSeekProvider(model="deepseek-chat")
 
     # OpenAI
     if os.getenv("OPENAI_API_KEY"):
         from agentos.llm.providers.openai import OpenAIProvider
+
         return OpenAIProvider(model="gpt-4o-mini")
 
     # Anthropic
     if os.getenv("ANTHROPIC_API_KEY"):
         from agentos.llm.providers.anthropic import AnthropicProvider
+
         return AnthropicProvider(model="claude-3-5-sonnet-20241022")
 
     # Mock (dev fallback)
     from agentos.agent.agent_builder import _MockProvider
+
     return _MockProvider()
 
 
@@ -102,15 +106,21 @@ class _MockProvider(LLMProvider):
 
     def _make(self, content):
         from agentos.llm.base import (
-            CompletionResult, CompletionChoice, CompletionUsage,
-            Message, MessageRole,
+            CompletionChoice,
+            CompletionResult,
+            CompletionUsage,
+            Message,
+            MessageRole,
         )
+
         return CompletionResult(
-            choices=[CompletionChoice(
-                index=0,
-                message=Message(role=MessageRole.ASSISTANT, content=content),
-                finish_reason="stop",
-            )],
+            choices=[
+                CompletionChoice(
+                    index=0,
+                    message=Message(role=MessageRole.ASSISTANT, content=content),
+                    finish_reason="stop",
+                )
+            ],
             usage=CompletionUsage(prompt_tokens=0, completion_tokens=0, total_tokens=0),
             model="mock",
         )
@@ -118,11 +128,12 @@ class _MockProvider(LLMProvider):
 
 # ── Builder ──
 
+
 def build_agent(
     *,
-    tools: Optional[list[BaseTool]] = None,
-    provider: Optional[LLMProvider] = None,
-    system_prompt: Optional[str] = None,
+    tools: list[BaseTool] | None = None,
+    provider: LLMProvider | None = None,
+    system_prompt: str | None = None,
     max_steps: int = 10,
     verbose: bool = False,
     discover_all: bool = True,
@@ -153,6 +164,7 @@ def build_agent(
     if include_skills:
         try:
             from agentos.tools.skill_tool import discover_skills
+
             skill_tools = discover_skills()
             if tools is None:
                 tools = list(skill_tools)

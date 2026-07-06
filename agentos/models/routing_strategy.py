@@ -4,11 +4,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 
-class Complexity(str, Enum):
-
+class Complexity(StrEnum):
     """复杂度评估结果。"""
 
     SIMPLE = "simple"
@@ -18,8 +17,7 @@ class Complexity(str, Enum):
     CRITICAL = "critical"
 
 
-class Budget(str, Enum):
-
+class Budget(StrEnum):
     """成本预算配置。"""
 
     UNLIMITED = "unlimited"
@@ -47,7 +45,15 @@ ROUTING_TABLE: dict[tuple[Complexity, Budget], str] = {
 
 # 简单启发式的复杂度与预算判定规则
 SIMPLE_KEYWORDS = ["list", "show", "display", "read", "what is", "how to", "print"]
-COMPLEX_KEYWORDS = ["analyze", "debug", "optimize", "refactor", "design", "architecture", "research"]
+COMPLEX_KEYWORDS = [
+    "analyze",
+    "debug",
+    "optimize",
+    "refactor",
+    "design",
+    "architecture",
+    "research",
+]
 LARGE_KEYWORDS = ["entire codebase", "all files", "monorepo", "whole project"]
 CRITICAL_KEYWORDS = ["production", "critical", "must not fail", "urgent"]
 

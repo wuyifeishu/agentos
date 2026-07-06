@@ -14,33 +14,31 @@ AgentOS v0.70 — Agent能力契约与发现协议。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
-
 
 # ── Capability Types ────────────────────────────
 
-class CapabilityDomain(str, Enum):
 
+class CapabilityDomain(StrEnum):
     """能力域枚举。"""
 
-    REASONING = "reasoning"         # 推理分析
-    CODING = "coding"               # 代码生成
-    SEARCH = "search"               # 信息检索
-    EXECUTION = "execution"         # 命令执行
-    CREATIVE = "creative"           # 创意生成
-    ANALYSIS = "analysis"           # 数据分析
-    COORDINATION = "coordination"   # 协调调度
+    REASONING = "reasoning"  # 推理分析
+    CODING = "coding"  # 代码生成
+    SEARCH = "search"  # 信息检索
+    EXECUTION = "execution"  # 命令执行
+    CREATIVE = "creative"  # 创意生成
+    ANALYSIS = "analysis"  # 数据分析
+    COORDINATION = "coordination"  # 协调调度
 
 
-class QoSLevel(str, Enum):
-
+class QoSLevel(StrEnum):
     """服务质量等级。"""
 
-    BEST_EFFORT = "best_effort"     # 尽力而为
-    HIGH_AVAILABILITY = "ha"        # 高可用
-    LOW_LATENCY = "low_latency"    # 低延迟
-    HIGH_ACCURACY = "high_accuracy" # 高准确
+    BEST_EFFORT = "best_effort"  # 尽力而为
+    HIGH_AVAILABILITY = "ha"  # 高可用
+    LOW_LATENCY = "low_latency"  # 低延迟
+    HIGH_ACCURACY = "high_accuracy"  # 高准确
 
 
 @dataclass
@@ -70,7 +68,7 @@ class AgentContract:
     description: str = ""
     capabilities: list[AgentCapability] = field(default_factory=list)
     qos_level: QoSLevel = QoSLevel.BEST_EFFORT
-    rate_limit_rpm: int = 60          # 每分钟最大请求数
+    rate_limit_rpm: int = 60  # 每分钟最大请求数
     max_context_tokens: int = 128000
     supported_languages: list[str] = field(default_factory=list)
     endpoints: list[str] = field(default_factory=list)
@@ -110,13 +108,14 @@ class AgentContract:
 
 # ── Capability Matcher ──────────────────────────
 
+
 @dataclass
 class MatchScore:
     """匹配评分结果。"""
 
     contract: AgentContract
     capability: AgentCapability
-    score: float          # 0.0 - 1.0
+    score: float  # 0.0 - 1.0
     match_details: dict[str, float] = field(default_factory=dict)
     rank: int = 0
 
@@ -158,16 +157,18 @@ class CapabilityMatcher:
 
                 score = self._compute_match(query, cap, contract)
                 if score >= min_score:
-                    results.append(MatchScore(
-                        contract=contract,
-                        capability=cap,
-                        score=score,
-                        match_details={
-                            "text_similarity": self._text_sim(query, cap),
-                            "domain_match": 1.0 if domain and cap.domain == domain else 0.5,
-                            "tag_overlap": self._tag_overlap(query, cap.tags),
-                        },
-                    ))
+                    results.append(
+                        MatchScore(
+                            contract=contract,
+                            capability=cap,
+                            score=score,
+                            match_details={
+                                "text_similarity": self._text_sim(query, cap),
+                                "domain_match": 1.0 if domain and cap.domain == domain else 0.5,
+                                "tag_overlap": self._tag_overlap(query, cap.tags),
+                            },
+                        )
+                    )
 
         # Sort by score desc
         results.sort(key=lambda x: x.score, reverse=True)
@@ -185,8 +186,7 @@ class CapabilityMatcher:
     def find_by_tag(self, tag: str) -> list[AgentContract]:
         """按标签查找。"""
         return [
-            c for c in self._contracts.values()
-            if any(tag in cap.tags for cap in c.capabilities)
+            c for c in self._contracts.values() if any(tag in cap.tags for cap in c.capabilities)
         ]
 
     def recommend_for_task(self, task_description: str) -> list[MatchScore]:
@@ -276,6 +276,7 @@ class CapabilityMatcher:
 
 # ── Contract Registry ───────────────────────────
 
+
 class ContractRegistry:
     """
     契约注册中心 — 分布式Agent能力发现。
@@ -289,12 +290,14 @@ class ContractRegistry:
 
     def register(self, contract: AgentContract):
         import time
+
         self._contracts[contract.agent_id] = contract
         self._heartbeats[contract.agent_id] = time.time()
         self._matcher.register(contract)
 
     def heartbeat(self, agent_id: str):
         import time
+
         if agent_id in self._contracts:
             self._heartbeats[agent_id] = time.time()
 
@@ -306,11 +309,9 @@ class ContractRegistry:
     def prune_stale(self, max_idle_seconds: float = 300.0):
         """移除超时未心跳的Agent。"""
         import time
+
         now = time.time()
-        stale = [
-            aid for aid, ts in self._heartbeats.items()
-            if now - ts > max_idle_seconds
-        ]
+        stale = [aid for aid, ts in self._heartbeats.items() if now - ts > max_idle_seconds]
         for aid in stale:
             self.unregister(aid)
         return stale

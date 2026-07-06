@@ -9,19 +9,19 @@ import time
 import types
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
-
+from typing import Any
 
 # ============================================================================
 # LazyLoader
 # ============================================================================
+
 
 class _LazyModule:
     """Proxy that defers module import until an attribute is accessed."""
 
     def __init__(self, module_name: str):
         self._module_name = module_name
-        self._module: Optional[types.ModuleType] = None
+        self._module: types.ModuleType | None = None
 
     def _load(self) -> types.ModuleType:
         if self._module is None:
@@ -41,8 +41,8 @@ class LazyLoader:
     """Registry for lazy-loaded modules with batch loading and dependency tracking."""
 
     def __init__(self):
-        self._proxies: Dict[str, _LazyModule] = {}
-        self._load_times: Dict[str, float] = {}
+        self._proxies: dict[str, _LazyModule] = {}
+        self._load_times: dict[str, float] = {}
         self._lock = threading.Lock()
 
     def register(self, module_name: str) -> _LazyModule:
@@ -62,9 +62,9 @@ class LazyLoader:
             self._load_times[module_name] = elapsed
             return result
 
-    def load_all(self) -> List[Tuple[str, float]]:
+    def load_all(self) -> list[tuple[str, float]]:
         """Eagerly load all registered modules. Returns load times."""
-        results: List[Tuple[str, float]] = []
+        results: list[tuple[str, float]] = []
         for name in list(self._proxies.keys()):
             start = time.perf_counter()
             self._proxies[name]._load()
@@ -73,11 +73,11 @@ class LazyLoader:
             results.append((name, elapsed))
         return results
 
-    def preload(self, module_names: List[str]) -> List[Tuple[str, float]]:
+    def preload(self, module_names: list[str]) -> list[tuple[str, float]]:
         """Register and load a batch of modules."""
         for name in module_names:
             self.register(name)
-        results: List[Tuple[str, float]] = []
+        results: list[tuple[str, float]] = []
         for name in module_names:
             start = time.perf_counter()
             self._proxies[name]._load()
@@ -87,7 +87,7 @@ class LazyLoader:
         return results
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             loaded = {k: v for k, v in self._proxies.items() if v._module is not None}
             return {
@@ -106,18 +106,19 @@ class LazyLoader:
 # ModulePreloader
 # ============================================================================
 
+
 class ModulePreloader:
     """Pre-compile and cache frequently used modules for fast startup."""
 
     def __init__(self, max_concurrent: int = 4):
-        self._cache: Dict[str, types.ModuleType] = {}
+        self._cache: dict[str, types.ModuleType] = {}
         self._max_concurrent = max_concurrent
         self._lock = threading.Lock()
-        self._preload_times: Dict[str, float] = {}
+        self._preload_times: dict[str, float] = {}
 
-    def precompile(self, module_names: List[str], parallel: bool = True) -> Dict[str, float]:
+    def precompile(self, module_names: list[str], parallel: bool = True) -> dict[str, float]:
         """Pre-compile a list of modules, optionally in parallel."""
-        results: Dict[str, float] = {}
+        results: dict[str, float] = {}
 
         if parallel and len(module_names) > 1:
             results = self._precompile_parallel(module_names)
@@ -131,9 +132,9 @@ class ModulePreloader:
         self._preload_times.update(results)
         return results
 
-    def _precompile_parallel(self, module_names: List[str]) -> Dict[str, float]:
-        results: Dict[str, float] = {}
-        errors: List[str] = []
+    def _precompile_parallel(self, module_names: list[str]) -> dict[str, float]:
+        results: dict[str, float] = {}
+        errors: list[str] = []
 
         def _worker(name: str) -> None:
             try:
@@ -148,7 +149,7 @@ class ModulePreloader:
 
         # Batch into groups
         for i in range(0, len(module_names), self._max_concurrent):
-            batch = module_names[i:i + self._max_concurrent]
+            batch = module_names[i : i + self._max_concurrent]
             threads = [threading.Thread(target=_worker, args=(name,)) for name in batch]
             for t in threads:
                 t.start()
@@ -157,10 +158,10 @@ class ModulePreloader:
 
         return results
 
-    def get(self, module_name: str) -> Optional[types.ModuleType]:
+    def get(self, module_name: str) -> types.ModuleType | None:
         return self._cache.get(module_name)
 
-    def warm_cache(self, hot_modules: List[str]) -> int:
+    def warm_cache(self, hot_modules: list[str]) -> int:
         """Preload hot modules into cache. Returns number newly cached."""
         count = 0
         for name in hot_modules:
@@ -177,7 +178,7 @@ class ModulePreloader:
             self._cache.clear()
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "cached_modules": len(self._cache),
@@ -190,12 +191,13 @@ class ModulePreloader:
 # StartupOptimizer
 # ============================================================================
 
+
 @dataclass
 class _StartupPhase:
     name: str
     start_time: float = 0.0
     end_time: float = 0.0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def duration(self) -> float:
@@ -221,7 +223,7 @@ class StartupOptimizer:
             phase = _StartupPhase(name=name, start_time=time.perf_counter(), metadata=metadata)
             self._phases[name] = phase
 
-    def end_phase(self, name: str) -> Optional[float]:
+    def end_phase(self, name: str) -> float | None:
         """End profiling a startup phase. Returns duration."""
         with self._lock:
             phase = self._phases.get(name)
@@ -234,16 +236,18 @@ class StartupOptimizer:
         """Mark the end of the startup sequence."""
         self._total_end = time.perf_counter()
 
-    def report(self) -> Dict[str, Any]:
+    def report(self) -> dict[str, Any]:
         """Generate a startup performance report."""
         phases = []
         for name, phase in self._phases.items():
-            phases.append({
-                "name": name,
-                "duration_ms": round(phase.duration * 1000, 2),
-                "pct_of_total": 0.0,
-                **phase.metadata,
-            })
+            phases.append(
+                {
+                    "name": name,
+                    "duration_ms": round(phase.duration * 1000, 2),
+                    "pct_of_total": 0.0,
+                    **phase.metadata,
+                }
+            )
 
         total_duration = self._total_end - self._total_start
         total_ms = round(total_duration * 1000, 2)
@@ -268,6 +272,7 @@ class StartupOptimizer:
 # Convenience Functions
 # ============================================================================
 
+
 def create_lazy_loader() -> LazyLoader:
     """Create a lazy module loader."""
     return LazyLoader()
@@ -284,10 +289,10 @@ def create_startup_optimizer() -> StartupOptimizer:
 
 
 def quick_start(
-    essential_modules: List[str],
-    lazy_modules: List[str],
-    hot_modules: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    essential_modules: list[str],
+    lazy_modules: list[str],
+    hot_modules: list[str] | None = None,
+) -> dict[str, Any]:
     """One-shot startup optimization: preload essentials, lazy-load the rest."""
     preloader = ModulePreloader()
     loader = LazyLoader()

@@ -9,20 +9,21 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass
 class FeedbackSignal:
     """A signal derived from evaluation that triggers self-healing."""
 
-    source: str           # Which scorer produced this
-    metric: str           # metric name (e.g. "rouge_l", "bleu", "judge")
-    score: float          # raw score
-    threshold: float      # expected threshold
-    passed: bool          # did it meet threshold?
-    detail: str = ""      # human-readable detail
+    source: str  # Which scorer produced this
+    metric: str  # metric name (e.g. "rouge_l", "bleu", "judge")
+    score: float  # raw score
+    threshold: float  # expected threshold
+    passed: bool  # did it meet threshold?
+    detail: str = ""  # human-readable detail
     suggestion: str = ""  # what to improve
 
 
@@ -31,10 +32,10 @@ class RetryConfig:
     """Configuration for the retry loop."""
 
     max_retries: int = 3
-    backoff_base: float = 1.0     # seconds
+    backoff_base: float = 1.0  # seconds
     backoff_multiplier: float = 2.0
     score_improvement_min: float = 0.05  # min score gain to consider improvement
-    timeout: float = 60.0                 # total loop timeout (seconds)
+    timeout: float = 60.0  # total loop timeout (seconds)
 
 
 @dataclass
@@ -62,7 +63,7 @@ class EvalFeedbackLoop:
 
     def __init__(
         self,
-        scorer: Any = None,   # CompositeScorer / CompositeScorerV2
+        scorer: Any = None,  # CompositeScorer / CompositeScorerV2
         config: RetryConfig | None = None,
         reflection_prompt: str | None = None,
     ):
@@ -121,8 +122,7 @@ class EvalFeedbackLoop:
             # Emit feedback signal
             signals = self._signals_from_scores(scores, strategy)
             attempt_trace["signals"] = [
-                {"metric": s.metric, "score": s.score, "passed": s.passed}
-                for s in signals
+                {"metric": s.metric, "score": s.score, "passed": s.passed} for s in signals
             ]
 
             # Check convergence
@@ -159,9 +159,7 @@ class EvalFeedbackLoop:
         result.duration = time.time() - start
         return result
 
-    def _score(
-        self, output: str, expected: str, strategy: str
-    ) -> dict[str, Any]:
+    def _score(self, output: str, expected: str, strategy: str) -> dict[str, Any]:
         """Score output against expected using CompositeScorer."""
         if not self._scorer or not expected:
             # Heuristic scoring when no scorer/reference available
@@ -200,9 +198,7 @@ class EvalFeedbackLoop:
         contains = 1.0 if expected.lower() in str(output).lower() else 0.0
         return {"weighted": contains * 0.5, "passed": contains > 0, "details": "contains_heuristic"}
 
-    def _signals_from_scores(
-        self, scores: dict, strategy: str
-    ) -> list[FeedbackSignal]:
+    def _signals_from_scores(self, scores: dict, strategy: str) -> list[FeedbackSignal]:
         """Convert score dict to FeedbackSignal list."""
         raw = scores.get("raw_scores", {})
         thresholds = {
@@ -221,15 +217,17 @@ class EvalFeedbackLoop:
             suggestion = ""
             if not passed:
                 suggestion = self._suggestion_for_metric(metric, score, threshold)
-            signals.append(FeedbackSignal(
-                source=strategy,
-                metric=metric,
-                score=score,
-                threshold=threshold,
-                passed=passed,
-                detail=detail,
-                suggestion=suggestion,
-            ))
+            signals.append(
+                FeedbackSignal(
+                    source=strategy,
+                    metric=metric,
+                    score=score,
+                    threshold=threshold,
+                    passed=passed,
+                    detail=detail,
+                    suggestion=suggestion,
+                )
+            )
         return signals
 
     def _suggestion_for_metric(self, metric: str, score: float, threshold: float) -> str:
@@ -257,9 +255,7 @@ class EvalFeedbackLoop:
         if not weak:
             return task
 
-        weak_metrics = ", ".join(
-            f"{s.metric}({s.score:.2f} < {s.threshold:.2f})" for s in weak
-        )
+        weak_metrics = ", ".join(f"{s.metric}({s.score:.2f} < {s.threshold:.2f})" for s in weak)
         suggestions = "; ".join(s.suggestion for s in weak)
 
         reflection = (

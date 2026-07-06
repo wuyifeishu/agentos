@@ -8,12 +8,13 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 
 @dataclass
 class HybridConfig:
     """Configuration for hybrid search."""
+
     dense_weight: float = 0.6  # weight for dense scores
     sparse_weight: float = 0.4  # weight for BM25 scores
     fusion_method: str = "weighted"  # "weighted" | "rrf"
@@ -33,25 +34,26 @@ class BM25Retriever:
         self,
         k1: float = 1.5,
         b: float = 0.75,
-        stop_words: Optional[List[str]] = None,
+        stop_words: list[str] | None = None,
     ):
         self.k1 = k1
         self.b = b
         self.stop_words = set(stop_words or _DEFAULT_STOP_WORDS)
-        self._docs: List[str] = []
-        self._doc_lens: List[int] = []
+        self._docs: list[str] = []
+        self._doc_lens: list[int] = []
         self._avgdl: float = 0.0
-        self._df: Dict[str, int] = {}  # term -> document frequency
-        self._term_freqs: List[Dict[str, int]] = []  # per-doc term freqs
+        self._df: dict[str, int] = {}  # term -> document frequency
+        self._term_freqs: list[dict[str, int]] = []  # per-doc term freqs
         self._built = False
 
-    def _tokenize(self, text: str) -> List[str]:
+    def _tokenize(self, text: str) -> list[str]:
         """Simple whitespace + punctuation tokenization."""
         import re
-        tokens = re.findall(r'\w+', text.lower())
+
+        tokens = re.findall(r"\w+", text.lower())
         return [t for t in tokens if t not in self.stop_words and len(t) > 1]
 
-    def index(self, documents: List[str]):
+    def index(self, documents: list[str]):
         """Build BM25 index from documents."""
         self._docs = documents
         self._doc_lens = [len(d) for d in documents]
@@ -70,7 +72,7 @@ class BM25Retriever:
 
         self._built = True
 
-    def search(self, query: str, top_k: int = 10) -> List[Tuple[int, float]]:
+    def search(self, query: str, top_k: int = 10) -> list[tuple[int, float]]:
         """Search and return (doc_index, score) sorted by score descending."""
         if not self._built:
             return []
@@ -115,14 +117,14 @@ class HybridRetriever:
     def __init__(
         self,
         dense_fn,
-        bm25: Optional[BM25Retriever] = None,
-        config: Optional[HybridConfig] = None,
+        bm25: BM25Retriever | None = None,
+        config: HybridConfig | None = None,
     ):
         self.dense_fn = dense_fn
         self.bm25 = bm25 or BM25Retriever()
         self.config = config or HybridConfig()
 
-    def index_documents(self, documents: List[str]):
+    def index_documents(self, documents: list[str]):
         """Index documents for BM25 sparse retrieval."""
         self.bm25.index(documents)
 
@@ -130,7 +132,7 @@ class HybridRetriever:
         self,
         query: str,
         top_k: int = 5,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Hybrid search combining dense and sparse scores.
 
         Returns list of dicts with 'text', 'score', 'dense_score',
@@ -150,12 +152,12 @@ class HybridRetriever:
 
     def _fuse_scores(
         self,
-        dense_results: List[Dict[str, Any]],
-        bm25_pairs: List[Tuple[int, float]],
-    ) -> List[Dict[str, Any]]:
+        dense_results: list[dict[str, Any]],
+        bm25_pairs: list[tuple[int, float]],
+    ) -> list[dict[str, Any]]:
         """Fuse dense and sparse scores using configured method."""
         # Build lookup: doc_index -> result
-        index_map: Dict[int, Dict[str, Any]] = {}
+        index_map: dict[int, dict[str, Any]] = {}
         for i, r in enumerate(dense_results):
             idx = r.get("index", i)
             index_map[idx] = {
@@ -191,10 +193,9 @@ class HybridRetriever:
                 sr = entry["sparse_rank"] or (self.config.top_k_per_source + 1)
                 entry["score"] = 1.0 / (self.config.rrf_k + dr) + 1.0 / (self.config.rrf_k + sr)
             else:
-                entry["score"] = (
-                    self.config.dense_weight * entry["dense_score"]
-                    + self.config.sparse_weight * self._normalize_bm25(entry["sparse_score"])
-                )
+                entry["score"] = self.config.dense_weight * entry[
+                    "dense_score"
+                ] + self.config.sparse_weight * self._normalize_bm25(entry["sparse_score"])
 
         return list(index_map.values())
 
@@ -206,13 +207,88 @@ class HybridRetriever:
 
 
 _DEFAULT_STOP_WORDS = {
-    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
-    "being", "have", "has", "had", "do", "does", "did", "will", "would",
-    "could", "should", "may", "might", "can", "shall", "it", "its", "this",
-    "that", "these", "those", "i", "you", "he", "she", "they", "we", "my",
-    "your", "his", "her", "our", "their", "not", "no", "if", "so", "as",
-    "than", "then", "just", "about", "also", "very", "too", "into", "over",
-    "after", "before", "between", "under", "more", "up", "out", "some",
-    "such", "only", "other", "each", "all", "both", "few", "most",
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "but",
+    "in",
+    "on",
+    "at",
+    "to",
+    "for",
+    "of",
+    "with",
+    "by",
+    "from",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "could",
+    "should",
+    "may",
+    "might",
+    "can",
+    "shall",
+    "it",
+    "its",
+    "this",
+    "that",
+    "these",
+    "those",
+    "i",
+    "you",
+    "he",
+    "she",
+    "they",
+    "we",
+    "my",
+    "your",
+    "his",
+    "her",
+    "our",
+    "their",
+    "not",
+    "no",
+    "if",
+    "so",
+    "as",
+    "than",
+    "then",
+    "just",
+    "about",
+    "also",
+    "very",
+    "too",
+    "into",
+    "over",
+    "after",
+    "before",
+    "between",
+    "under",
+    "more",
+    "up",
+    "out",
+    "some",
+    "such",
+    "only",
+    "other",
+    "each",
+    "all",
+    "both",
+    "few",
+    "most",
 }

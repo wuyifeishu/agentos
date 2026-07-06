@@ -8,23 +8,23 @@ from unittest.mock import patch
 import pytest
 
 from agentos.llm import (
-    create_provider,
-    OpenAIProvider,
-    DeepSeekProvider,
     AnthropicProvider,
-    LLMProvider,
     CompletionUsage,
-    TokenUsage,
+    DeepSeekProvider,
+    LLMProvider,
     Message,
     MessageRole,
+    OpenAIProvider,
     StreamChunk,
+    TokenUsage,
     Tool,
     ToolCall,
     ToolParameter,
+    create_provider,
 )
 
-
 # ── Base Types ───────────────────────────────────────────────────
+
 
 class TestTokenUsage:
     def test_defaults(self):
@@ -67,6 +67,7 @@ class TestMessage:
 
 # ── Tool / Function Calling ───────────────────────────────────────
 
+
 class TestToolParameter:
     def test_basic_schema(self):
         p = ToolParameter(type="string", description="City name", required=True)
@@ -99,9 +100,13 @@ class TestTool:
         assert "city" in fn["parameters"]["properties"]
 
     def test_to_openai_format(self):
-        t = Tool.from_function("search", "Web search", {
-            "query": ToolParameter(type="string", description="Query", required=True),
-        })
+        t = Tool.from_function(
+            "search",
+            "Web search",
+            {
+                "query": ToolParameter(type="string", description="Query", required=True),
+            },
+        )
         schema = t.as_schema()
         assert schema["function"]["name"] == "search"
         props = schema["function"]["parameters"]["properties"]
@@ -122,6 +127,7 @@ class TestToolCall:
 
 # ── StreamChunk ────────────────────────────────────────────────────
 
+
 class TestStreamChunk:
     def test_defaults(self):
         c = StreamChunk()
@@ -134,6 +140,7 @@ class TestStreamChunk:
 
 
 # ── Factory ────────────────────────────────────────────────────────
+
 
 class TestCreateProvider:
     def test_openai_default(self):
@@ -172,6 +179,7 @@ class TestCreateProvider:
 
 # ── DeepSeek Provider ──────────────────────────────────────────────
 
+
 class TestDeepSeekProvider:
     def test_is_openai_subclass(self):
         p = DeepSeekProvider(api_key="sk-ds")
@@ -203,6 +211,7 @@ class TestDeepSeekProvider:
 
 # ── Anthropic Provider ─────────────────────────────────────────────
 
+
 class TestAnthropicProvider:
     def test_provider_name(self):
         p = AnthropicProvider(api_key="sk-ant")
@@ -227,13 +236,18 @@ class TestAnthropicProvider:
         assert h["anthropic-version"] == "2023-06-01"
 
     def test_tools_conversion(self):
-        p = AnthropicProvider(api_key="sk-ant")
+        AnthropicProvider(api_key="sk-ant")
         tools = [
-            Tool.from_function("get_weather", "Get weather", {
-                "city": ToolParameter(type="string", description="City", required=True),
-            }),
+            Tool.from_function(
+                "get_weather",
+                "Get weather",
+                {
+                    "city": ToolParameter(type="string", description="City", required=True),
+                },
+            ),
         ]
         from agentos.llm.anthropic_provider import _tools_to_anthropic
+
         result = _tools_to_anthropic(tools)
         assert len(result) == 1
         assert result[0]["name"] == "get_weather"
@@ -241,6 +255,7 @@ class TestAnthropicProvider:
 
     def test_message_conversion_simple(self):
         from agentos.llm.anthropic_provider import _messages_to_anthropic
+
         msgs = [Message(role=MessageRole.USER, content="Hello")]
         system, api_msgs = _messages_to_anthropic(msgs)
         assert system is None
@@ -250,6 +265,7 @@ class TestAnthropicProvider:
 
     def test_message_conversion_with_system(self):
         from agentos.llm.anthropic_provider import _messages_to_anthropic
+
         msgs = [
             Message(role=MessageRole.SYSTEM, content="You are helpful."),
             Message(role=MessageRole.USER, content="Hi"),
@@ -261,13 +277,23 @@ class TestAnthropicProvider:
 
     def test_build_body_includes_tools(self):
         p = AnthropicProvider(api_key="sk-ant")
-        tools = [Tool.from_function("search", "search the web", {
-            "q": ToolParameter(type="string", description="query", required=True),
-        })]
+        tools = [
+            Tool.from_function(
+                "search",
+                "search the web",
+                {
+                    "q": ToolParameter(type="string", description="query", required=True),
+                },
+            )
+        ]
         body = p._build_body(
             [Message(role=MessageRole.USER, content="test")],
-            temperature=0.5, max_tokens=100, top_p=0.9,
-            stop=None, tools=tools, tool_choice="auto",
+            temperature=0.5,
+            max_tokens=100,
+            top_p=0.9,
+            stop=None,
+            tools=tools,
+            tool_choice="auto",
         )
         assert body["model"] == "claude-sonnet-4-20250514"
         assert "tools" in body

@@ -5,15 +5,14 @@ v1.3.36: +Function Calling / Tool Use 支持。
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 try:
     from openai import AsyncOpenAI, OpenAI
     from openai.types.chat import ChatCompletionMessageParam
 except ImportError as e:
-    raise ImportError(
-        "openai SDK not installed. Run: pip install 'nexus-agentos[openai]'"
-    ) from e
+    raise ImportError("openai SDK not installed. Run: pip install 'nexus-agentos[openai]'") from e
 
 from agentos.llm.base import (
     CompletionChoice,
@@ -84,11 +83,13 @@ def _extract_tool_calls(message_obj) -> list[ToolCall]:
     result: list[ToolCall] = []
     for tc in raw:
         fn = getattr(tc, "function", None)
-        result.append(ToolCall(
-            id=tc.id,
-            name=fn.name if fn else "",
-            arguments=fn.arguments if fn else "{}",
-        ))
+        result.append(
+            ToolCall(
+                id=tc.id,
+                name=fn.name if fn else "",
+                arguments=fn.arguments if fn else "{}",
+            )
+        )
     return result
 
 
@@ -100,7 +101,8 @@ def _build_result(raw, model: str | None = None) -> CompletionResult:
     choice = CompletionChoice(
         index=raw.choices[0].index,
         message=Message(
-            role=role, content=m.content or "",
+            role=role,
+            content=m.content or "",
             tool_calls=tool_calls if tool_calls else None,
         ),
         finish_reason=raw.choices[0].finish_reason or "stop",

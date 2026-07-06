@@ -10,18 +10,18 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
+from agentos.agent.model_router import ModelRouter
 from agentos.agent.production import ProductionAgent, ProductionConfig
 from agentos.agent.tool_agent import ToolExecutor
 from agentos.llm.base import LLMProvider
 from agentos.llm.smart_cache import SmartCache
-from agentos.agent.model_router import ModelRouter
 
 __all__ = [
     "AgentAPI",
@@ -37,8 +37,12 @@ __all__ = [
 
 class AgentAPIRequest(BaseModel):
     task: str = Field(..., description="The task string to execute.")
-    session_id: str | None = Field(default=None, description="Session identifier for audit log grouping.")
-    budget_usd: float | None = Field(default=None, description="Override daily budget (default from config).")
+    session_id: str | None = Field(
+        default=None, description="Session identifier for audit log grouping."
+    )
+    budget_usd: float | None = Field(
+        default=None, description="Override daily budget (default from config)."
+    )
     enable_audit: bool = Field(default=True)
     enable_cache: bool = Field(default=True)
 
@@ -155,13 +159,13 @@ class AgentAPI:
                 if result.final_answer:
                     last_text = str(result.final_answer)
                 elif result.steps:
-                    last_text = str(result.steps[-1].final_answer
-                                    if hasattr(result.steps[-1], "final_answer")
-                                    else "")
+                    last_text = str(
+                        result.steps[-1].final_answer
+                        if hasattr(result.steps[-1], "final_answer")
+                        else ""
+                    )
 
-                cache_hit = (
-                    agent.cache_hit_rate > 0 and result.success
-                )
+                cache_hit = agent.cache_hit_rate > 0 and result.success
 
                 return AgentAPIResponse(
                     success=result.success,
@@ -197,6 +201,7 @@ class AgentAPI:
                     for step in agent.run_stream(req.task):
                         if hasattr(step, "to_dict"):
                             import json
+
                             yield f"data: {json.dumps(step.to_dict())}\n\n"
                         else:
                             yield f"data: {str(step)}\n\n"
@@ -225,9 +230,7 @@ class AgentAPI:
         @app.get("/agent/stats", response_model=AgentAPIStats)
         async def agent_stats():
             total = self_app._total_requests
-            avg_lat = (
-                self_app._total_latency_ms / total if total > 0 else 0.0
-            )
+            avg_lat = self_app._total_latency_ms / total if total > 0 else 0.0
 
             # build a temp agent to get latest budget cache stats
             agent = _build_agent()
@@ -235,7 +238,9 @@ class AgentAPI:
             savings = agent.cache_savings
             budget = agent._router.daily_budget_remaining if agent._router else 0.0
 
-            total_cost = agent._router._total_spent if hasattr(agent._router, "_total_spent") else 0.0
+            total_cost = (
+                agent._router._total_spent if hasattr(agent._router, "_total_spent") else 0.0
+            )
 
             return AgentAPIStats(
                 uptime_seconds=round(time.time() - self_app._start_time, 2),
@@ -259,9 +264,11 @@ class AgentAPI:
                 "remaining_usd": round(remaining, 4),
                 "spent_usd": round(total_spent, 6),
                 "usage_pct": round(
-                    (total_spent / self_app.config.budget_usd * 100)
-                    if self_app.config.budget_usd > 0
-                    else 0,
+                    (
+                        (total_spent / self_app.config.budget_usd * 100)
+                        if self_app.config.budget_usd > 0
+                        else 0
+                    ),
                     2,
                 ),
             }

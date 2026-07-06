@@ -6,7 +6,6 @@ Source: wttr.in
 """
 
 
-
 def run(city: str = "Beijing", format_str: str = "3") -> str:
     """查询指定城市的天气。
 
@@ -17,8 +16,8 @@ def run(city: str = "Beijing", format_str: str = "3") -> str:
     Returns:
         天气信息字符串
     """
-    import urllib.request
     import urllib.parse
+    import urllib.request
 
     encoded = urllib.parse.quote(city)
     url = f"https://wttr.in/{encoded}?format={format_str}&lang=zh"

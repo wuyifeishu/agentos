@@ -44,13 +44,18 @@ class GrepTool(BaseTool):
 
         results = []
         for root, dirs, files in os.walk(os.path.abspath(directory)):
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "__pycache__", "dist", "build", ".git")]
+            dirs[:] = [
+                d
+                for d in dirs
+                if not d.startswith(".")
+                and d not in ("node_modules", "__pycache__", "dist", "build", ".git")
+            ]
             for filename in files:
                 if not fnmatch.fnmatch(filename, file_pattern):
                     continue
                 filepath = os.path.join(root, filename)
                 try:
-                    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    with open(filepath, encoding="utf-8", errors="ignore") as f:
                         for lineno, line in enumerate(f, 1):
                             if regex.search(line):
                                 results.append(f"{filepath}:{lineno}: {line.strip()[:200]}")
@@ -59,7 +64,9 @@ class GrepTool(BaseTool):
                 except (PermissionError, IsADirectoryError, UnicodeDecodeError):
                     continue
 
-        return ToolResult.ok(call_id="", output="\n".join(results) if results else "No matches found")
+        return ToolResult.ok(
+            call_id="", output="\n".join(results) if results else "No matches found"
+        )
 
 
 class FileSearchTool(BaseTool):
@@ -73,7 +80,10 @@ class FileSearchTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "pattern": {"type": "string", "description": "文件名匹配模式，如 *.py, report*.pdf"},
+                "pattern": {
+                    "type": "string",
+                    "description": "文件名匹配模式，如 *.py, report*.pdf",
+                },
                 "directory": {"type": "string", "description": "搜索目录，默认当前目录"},
                 "max_results": {"type": "integer", "description": "最大结果数，默认 100"},
             },
@@ -87,7 +97,12 @@ class FileSearchTool(BaseTool):
 
         results = []
         for root, dirs, files in os.walk(os.path.abspath(directory)):
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "__pycache__", "dist", "build", ".git")]
+            dirs[:] = [
+                d
+                for d in dirs
+                if not d.startswith(".")
+                and d not in ("node_modules", "__pycache__", "dist", "build", ".git")
+            ]
             for filename in files:
                 if fnmatch.fnmatch(filename, pattern):
                     results.append(os.path.join(root, filename))
@@ -110,7 +125,10 @@ class CodeSearchTool(BaseTool):
             "properties": {
                 "query": {"type": "string", "description": "搜索的函数名或类名"},
                 "directory": {"type": "string", "description": "代码目录，默认当前目录"},
-                "symbol_type": {"type": "string", "description": "符号类型：function/class/import/all，默认 all"},
+                "symbol_type": {
+                    "type": "string",
+                    "description": "符号类型：function/class/import/all，默认 all",
+                },
                 "max_results": {"type": "integer", "description": "最大结果数，默认 30"},
             },
             "required": ["query"],
@@ -126,13 +144,18 @@ class CodeSearchTool(BaseTool):
 
         results = []
         for root, dirs, files in os.walk(os.path.abspath(directory)):
-            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ("node_modules", "__pycache__", "dist", "build", ".git")]
+            dirs[:] = [
+                d
+                for d in dirs
+                if not d.startswith(".")
+                and d not in ("node_modules", "__pycache__", "dist", "build", ".git")
+            ]
             for filename in files:
                 if not filename.endswith(".py"):
                     continue
                 filepath = os.path.join(root, filename)
                 try:
-                    with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    with open(filepath, encoding="utf-8", errors="ignore") as f:
                         source = f.read()
                     tree = ast.parse(source, filename=filepath)
                     for node in ast.walk(tree):
@@ -142,7 +165,10 @@ class CodeSearchTool(BaseTool):
                         stype = None
                         if isinstance(node, ast.FunctionDef) and symbol_type in ("function", "all"):
                             name, stype = node.name, "function"
-                        elif isinstance(node, ast.AsyncFunctionDef) and symbol_type in ("function", "all"):
+                        elif isinstance(node, ast.AsyncFunctionDef) and symbol_type in (
+                            "function",
+                            "all",
+                        ):
                             name, stype = node.name, "async_function"
                         elif isinstance(node, ast.ClassDef) and symbol_type in ("class", "all"):
                             name, stype = node.name, "class"
@@ -152,11 +178,15 @@ class CodeSearchTool(BaseTool):
                                     results.append(f"{filepath}:{node.lineno}: import {alias.name}")
                         elif isinstance(node, ast.ImportFrom) and symbol_type in ("import", "all"):
                             if query.lower() in (node.module or "").lower():
-                                results.append(f"{filepath}:{node.lineno}: from {node.module} import ...")
+                                results.append(
+                                    f"{filepath}:{node.lineno}: from {node.module} import ..."
+                                )
 
                         if name and stype and query.lower() in name.lower():
                             results.append(f"{filepath}:{node.lineno}: [{stype}] {name}")
                 except (SyntaxError, UnicodeDecodeError, PermissionError):
                     continue
 
-        return ToolResult.ok(call_id="", output="\n".join(results) if results else "No symbols found")
+        return ToolResult.ok(
+            call_id="", output="\n".join(results) if results else "No symbols found"
+        )

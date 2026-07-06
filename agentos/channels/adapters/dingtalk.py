@@ -43,13 +43,18 @@ class DingTalkAdapter(BaseChannelAdapter):
         computed = self.hmac_sha256(timestamp, self.config.app_secret)
         return computed == sign
 
-    def parse_webhook(self, raw_body: bytes, headers: dict) -> ChannelMessage | list[ChannelMessage]:
+    def parse_webhook(
+        self, raw_body: bytes, headers: dict
+    ) -> ChannelMessage | list[ChannelMessage]:
         data = json.loads(raw_body.decode("utf-8"))
         msg_type_str = data.get("msgtype", "text")
         msg_type_map = {
-            "text": MessageType.TEXT, "image": MessageType.IMAGE,
-            "voice": MessageType.VOICE, "video": MessageType.VIDEO,
-            "file": MessageType.FILE, "link": MessageType.LINK,
+            "text": MessageType.TEXT,
+            "image": MessageType.IMAGE,
+            "voice": MessageType.VOICE,
+            "video": MessageType.VIDEO,
+            "file": MessageType.FILE,
+            "link": MessageType.LINK,
         }
         msg_type = msg_type_map.get(msg_type_str, MessageType.TEXT)
 

@@ -22,26 +22,27 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
+from enum import StrEnum
+from typing import Any
 
 from agentos.core.cost_tracker import CostTracker
-
 
 # ---------------------------------------------------------------------------
 # Task Complexity
 # ---------------------------------------------------------------------------
 
 
-class TaskComplexity(str, Enum):
+class TaskComplexity(StrEnum):
     """Estimated complexity of a user task."""
-    SIMPLE = "simple"      # Single-step, well-defined (translate, summarize)
-    MEDIUM = "medium"      # Multi-step reasoning (analysis, code review)
-    COMPLEX = "complex"    # Multi-agent orchestration, long-form generation
+
+    SIMPLE = "simple"  # Single-step, well-defined (translate, summarize)
+    MEDIUM = "medium"  # Multi-step reasoning (analysis, code review)
+    COMPLEX = "complex"  # Multi-agent orchestration, long-form generation
 
 
-class TaskCategory(str, Enum):
+class TaskCategory(StrEnum):
     """Semantic category of the task."""
+
     CHAT = "chat"
     CODE = "code"
     REASONING = "reasoning"
@@ -60,6 +61,7 @@ class TaskCategory(str, Enum):
 @dataclass
 class ModelSpec:
     """Specification of a model's capabilities and routing profile."""
+
     model_id: str
     provider: str
     tier: str  # "premium" / "standard" / "budget" / "fallback"
@@ -74,7 +76,7 @@ class ModelSpec:
     supports_function_calling: bool = False
 
     # Routing weights (higher = more likely to be selected for that category)
-    category_weights: Dict[TaskCategory, float] = field(default_factory=dict)
+    category_weights: dict[TaskCategory, float] = field(default_factory=dict)
 
     # Quality bar: tasks of this complexity must use this model or better
     min_complexity: TaskComplexity = TaskComplexity.SIMPLE
@@ -83,11 +85,11 @@ class ModelSpec:
     cost_multiplier: float = 1.0
 
     # Excluded task categories
-    excluded_categories: Set[TaskCategory] = field(default_factory=set)
+    excluded_categories: set[TaskCategory] = field(default_factory=set)
 
 
 # Default model registry
-DEFAULT_MODEL_SPECS: List[ModelSpec] = [
+DEFAULT_MODEL_SPECS: list[ModelSpec] = [
     ModelSpec(
         model_id="gpt-4o",
         provider="openai",
@@ -224,7 +226,9 @@ class TaskClassifier:
     ]
 
     AGENT_PATTERNS = [
-        re.compile(r"\b(plan|orchestrate|coordinate|multi.agent|dispatch|delegate)\b", re.IGNORECASE),
+        re.compile(
+            r"\b(plan|orchestrate|coordinate|multi.agent|dispatch|delegate)\b", re.IGNORECASE
+        ),
     ]
 
     CODE_PATTERNS = [
@@ -243,8 +247,8 @@ class TaskClassifier:
     def classify(
         self,
         prompt: str,
-        available_tools: Optional[List[str]] = None,
-    ) -> Tuple[TaskComplexity, List[TaskCategory]]:
+        available_tools: list[str] | None = None,
+    ) -> tuple[TaskComplexity, list[TaskCategory]]:
         """
         Classify a task from its prompt.
 
@@ -254,7 +258,7 @@ class TaskClassifier:
         estimated_tokens = max(1, int(len(words) * self.TOKENS_PER_WORD))
 
         # Determine categories
-        categories: Set[TaskCategory] = set()
+        categories: set[TaskCategory] = set()
         categories.add(TaskCategory.CHAT)  # Default
 
         if self._match_any(self.CODE_PATTERNS, prompt):
@@ -273,7 +277,9 @@ class TaskClassifier:
 
         if estimated_tokens > self.COMPLEX_THRESHOLD_TOKENS or is_agent:
             complexity = TaskComplexity.COMPLEX
-        elif estimated_tokens > self.SIMPLE_THRESHOLD_TOKENS or is_multi_step or len(categories) > 2:
+        elif (
+            estimated_tokens > self.SIMPLE_THRESHOLD_TOKENS or is_multi_step or len(categories) > 2
+        ):
             complexity = TaskComplexity.MEDIUM
         else:
             complexity = TaskComplexity.SIMPLE
@@ -281,7 +287,7 @@ class TaskClassifier:
         return complexity, list(categories)
 
     @staticmethod
-    def _match_any(patterns: List[re.Pattern], text: str) -> bool:
+    def _match_any(patterns: list[re.Pattern], text: str) -> bool:
         """Check if any pattern matches the text."""
         return any(p.search(text) for p in patterns)
 
@@ -294,16 +300,17 @@ class TaskClassifier:
 @dataclass(frozen=True)
 class RouteDecision:
     """Immutable routing decision."""
+
     selected_model: str
     provider: str
     complexity: TaskComplexity
-    categories: List[TaskCategory]
-    fallback_models: List[str]
+    categories: list[TaskCategory]
+    fallback_models: list[str]
     reasoning: str
     latency_ms: float = 0.0
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "selected_model": self.selected_model,
             "provider": self.provider,
@@ -334,16 +341,16 @@ class TaskRouter:
 
     def __init__(
         self,
-        model_specs: Optional[List[ModelSpec]] = None,
-        cost_tracker: Optional[CostTracker] = None,
+        model_specs: list[ModelSpec] | None = None,
+        cost_tracker: CostTracker | None = None,
     ):
         self._models = model_specs or DEFAULT_MODEL_SPECS
         self._classifier = TaskClassifier()
         self._cost_tracker = cost_tracker
-        self._decision_log: List[RouteDecision] = []
+        self._decision_log: list[RouteDecision] = []
 
     @property
-    def models(self) -> List[ModelSpec]:
+    def models(self) -> list[ModelSpec]:
         return list(self._models)
 
     def register_model(self, spec: ModelSpec) -> None:
@@ -354,9 +361,9 @@ class TaskRouter:
         self,
         prompt: str,
         *,
-        required_capabilities: Optional[Set[str]] = None,
-        latency_budget_ms: Optional[int] = None,
-        available_tools: Optional[List[str]] = None,
+        required_capabilities: set[str] | None = None,
+        latency_budget_ms: int | None = None,
+        available_tools: list[str] | None = None,
     ) -> RouteDecision:
         """
         Route a task to the best model.
@@ -379,7 +386,9 @@ class TaskRouter:
 
         if not candidates:
             # Fallback: drop min_complexity constraint
-            candidates = self._filter_candidates(complexity, categories, required_capabilities, relax_complexity=True)
+            candidates = self._filter_candidates(
+                complexity, categories, required_capabilities, relax_complexity=True
+            )
 
         if not candidates:
             # Ultimate fallback: cheapest model
@@ -406,13 +415,13 @@ class TaskRouter:
     def _filter_candidates(
         self,
         complexity: TaskComplexity,
-        categories: List[TaskCategory],
-        required_capabilities: Optional[Set[str]] = None,
+        categories: list[TaskCategory],
+        required_capabilities: set[str] | None = None,
         relax_complexity: bool = False,
-    ) -> List[ModelSpec]:
+    ) -> list[ModelSpec]:
         """Filter models by complexity bar, category exclusion, and capabilities."""
         caps = required_capabilities or set()
-        candidates: List[ModelSpec] = []
+        candidates: list[ModelSpec] = []
 
         for model in self._models:
             # Complexity bar (can relax if no candidates)
@@ -445,18 +454,18 @@ class TaskRouter:
 
     def _rank_candidates(
         self,
-        candidates: List[ModelSpec],
-        categories: List[TaskCategory],
-        latency_budget_ms: Optional[int] = None,
-    ) -> List[ModelSpec]:
+        candidates: list[ModelSpec],
+        categories: list[TaskCategory],
+        latency_budget_ms: int | None = None,
+    ) -> list[ModelSpec]:
         """Score and rank candidates by category weight / cost."""
         LATENCY_SCORES = {"fast": 1.2, "medium": 1.0, "slow": 0.7}
 
         def score(model: ModelSpec) -> float:
             # Category affinity
-            cat_score = sum(
-                model.category_weights.get(cat, 0.0) for cat in categories
-            ) / max(1, len(categories))
+            cat_score = sum(model.category_weights.get(cat, 0.0) for cat in categories) / max(
+                1, len(categories)
+            )
 
             # Cost efficiency (inverse)
             cost_score = 1.0 / max(0.01, model.cost_multiplier)
@@ -481,7 +490,7 @@ class TaskRouter:
         self,
         selected: ModelSpec,
         complexity: TaskComplexity,
-        categories: List[TaskCategory],
+        categories: list[TaskCategory],
     ) -> str:
         """Build human-readable reasoning for the routing decision."""
         cat_names = ", ".join(c.value for c in categories)
@@ -491,19 +500,19 @@ class TaskRouter:
             f"for optimal quality/cost balance."
         )
 
-    def get_decision_log(self) -> List[RouteDecision]:
+    def get_decision_log(self) -> list[RouteDecision]:
         return list(self._decision_log)
 
     def clear_log(self) -> None:
         self._decision_log.clear()
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         """Return routing statistics."""
         if not self._decision_log:
             return {}
 
-        model_counts: Dict[str, int] = {}
-        complexity_counts: Dict[str, int] = {}
+        model_counts: dict[str, int] = {}
+        complexity_counts: dict[str, int] = {}
         total_latency = 0.0
 
         for d in self._decision_log:

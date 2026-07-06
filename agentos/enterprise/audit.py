@@ -17,23 +17,23 @@ import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 
-class AuditCategory(str, Enum):
+class AuditCategory(StrEnum):
     """审计事件分类。"""
-    AUTH = "auth"              # 登录/登出/Token
-    API_KEY = "api_key"        # Key 创建/撤销/轮转
-    AGENT = "agent"            # Agent 创建/运行/删除
-    TENANT = "tenant"          # 租户管理
-    CONFIG = "config"          # 配置变更
-    SYSTEM = "system"          # 系统事件
-    DATA = "data"              # 数据访问/导出
-    SECURITY = "security"      # 安全事件（违规/攻击）
+
+    AUTH = "auth"  # 登录/登出/Token
+    API_KEY = "api_key"  # Key 创建/撤销/轮转
+    AGENT = "agent"  # Agent 创建/运行/删除
+    TENANT = "tenant"  # 租户管理
+    CONFIG = "config"  # 配置变更
+    SYSTEM = "system"  # 系统事件
+    DATA = "data"  # 数据访问/导出
+    SECURITY = "security"  # 安全事件（违规/攻击）
 
 
-class AuditSeverity(str, Enum):
+class AuditSeverity(StrEnum):
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
@@ -43,19 +43,20 @@ class AuditSeverity(str, Enum):
 @dataclass
 class AuditEvent:
     """一条审计事件。"""
+
     event_id: str
     timestamp: float
     category: AuditCategory
-    action: str                         # 如 "api_key.created", "agent.run"
+    action: str  # 如 "api_key.created", "agent.run"
     severity: AuditSeverity
-    actor_type: str                     # "user" / "agent" / "system" / "api_key"
-    actor_id: str                       # user_id / agent_id / key_id
+    actor_type: str  # "user" / "agent" / "system" / "api_key"
+    actor_id: str  # user_id / agent_id / key_id
     tenant_id: str
-    resource_type: str                  # "agent" / "api_key" / "tenant" / ...
+    resource_type: str  # "agent" / "api_key" / "tenant" / ...
     resource_id: str
     ip_address: str
     user_agent: str
-    status: str                         # "success" / "failure"
+    status: str  # "success" / "failure"
     details: dict = field(default_factory=dict)
     metadata: dict = field(default_factory=dict)
 
@@ -63,9 +64,10 @@ class AuditEvent:
 @dataclass
 class RetentionPolicy:
     """审计日志保留策略。"""
-    max_events: int = 100_000           # 最大事件数
-    max_age_days: int = 90             # 最大保留天数
-    auto_prune: bool = True            # 是否自动清理过期事件
+
+    max_events: int = 100_000  # 最大事件数
+    max_age_days: int = 90  # 最大保留天数
+    auto_prune: bool = True  # 是否自动清理过期事件
 
 
 class AuditLogger:
@@ -127,7 +129,16 @@ class AuditLogger:
 
         return event
 
-    def log_auth(self, action: str, user_id: str, tenant_id: str, status: str, ip: str = "", ua: str = "", **kwargs):
+    def log_auth(
+        self,
+        action: str,
+        user_id: str,
+        tenant_id: str,
+        status: str,
+        ip: str = "",
+        ua: str = "",
+        **kwargs,
+    ):
         """便捷：记录认证事件。"""
         return self.log(
             category=AuditCategory.AUTH,
@@ -190,13 +201,13 @@ class AuditLogger:
 
     def query(
         self,
-        category: Optional[AuditCategory] = None,
-        severity: Optional[AuditSeverity] = None,
-        tenant_id: Optional[str] = None,
-        actor_id: Optional[str] = None,
-        status: Optional[str] = None,
-        since: Optional[float] = None,
-        until: Optional[float] = None,
+        category: AuditCategory | None = None,
+        severity: AuditSeverity | None = None,
+        tenant_id: str | None = None,
+        actor_id: str | None = None,
+        status: str | None = None,
+        since: float | None = None,
+        until: float | None = None,
         limit: int = 100,
     ) -> list[AuditEvent]:
         """多条件过滤查询。"""
@@ -239,28 +250,43 @@ class AuditLogger:
         """导出为 CSV 字符串。"""
         target = events or self._events
         output = io.StringIO()
-        writer = csv.DictWriter(output, fieldnames=[
-            "event_id", "timestamp", "category", "action", "severity",
-            "actor_type", "actor_id", "tenant_id", "resource_type", "resource_id",
-            "ip_address", "status", "details",
-        ])
+        writer = csv.DictWriter(
+            output,
+            fieldnames=[
+                "event_id",
+                "timestamp",
+                "category",
+                "action",
+                "severity",
+                "actor_type",
+                "actor_id",
+                "tenant_id",
+                "resource_type",
+                "resource_id",
+                "ip_address",
+                "status",
+                "details",
+            ],
+        )
         writer.writeheader()
         for e in target:
-            writer.writerow({
-                "event_id": e.event_id,
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(e.timestamp)),
-                "category": e.category.value,
-                "action": e.action,
-                "severity": e.severity.value,
-                "actor_type": e.actor_type,
-                "actor_id": e.actor_id,
-                "tenant_id": e.tenant_id,
-                "resource_type": e.resource_type,
-                "resource_id": e.resource_id,
-                "ip_address": e.ip_address,
-                "status": e.status,
-                "details": json.dumps(e.details, ensure_ascii=False),
-            })
+            writer.writerow(
+                {
+                    "event_id": e.event_id,
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(e.timestamp)),
+                    "category": e.category.value,
+                    "action": e.action,
+                    "severity": e.severity.value,
+                    "actor_type": e.actor_type,
+                    "actor_id": e.actor_id,
+                    "tenant_id": e.tenant_id,
+                    "resource_type": e.resource_type,
+                    "resource_id": e.resource_id,
+                    "ip_address": e.ip_address,
+                    "status": e.status,
+                    "details": json.dumps(e.details, ensure_ascii=False),
+                }
+            )
         return output.getvalue()
 
     # ── 合规 ──
@@ -320,7 +346,7 @@ class AuditLogger:
         """按保留策略清理过期事件。"""
         # 按数量
         if len(self._events) > self.retention.max_events:
-            self._events = self._events[-self.retention.max_events:]
+            self._events = self._events[-self.retention.max_events :]
 
         # 按时间
         cutoff = time.time() - self.retention.max_age_days * 86400

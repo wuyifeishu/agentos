@@ -7,7 +7,6 @@ Meta Developer App → Phone Number ID + Access Token → webhook → ChannelMes
 from __future__ import annotations
 
 import json
-from typing import Optional
 
 from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
 from agentos.channels.message import ChannelMessage, ChannelType, MessageType
@@ -52,7 +51,7 @@ class WhatsAppAdapter(BaseChannelAdapter):
 
     # ── Message parsing ──
 
-    async def parse_incoming(self, payload: dict) -> Optional[ChannelMessage]:
+    async def parse_incoming(self, payload: dict) -> ChannelMessage | None:
         """Parse WhatsApp webhook payload into ChannelMessage."""
         entries = payload.get("entry", [])
 
@@ -81,7 +80,7 @@ class WhatsAppAdapter(BaseChannelAdapter):
 
         return None
 
-    def _parse_message(self, msg: dict, value: dict) -> Optional[ChannelMessage]:
+    def _parse_message(self, msg: dict, value: dict) -> ChannelMessage | None:
         """Parse a WhatsApp message object."""
         msg_type = msg.get("type", "text")
         user_phone = msg.get("from", "")
@@ -143,14 +142,21 @@ class WhatsAppAdapter(BaseChannelAdapter):
 
     async def reply(self, channel_id: str, content: str, **kwargs) -> ReplyResult:
         """Send a text message via WhatsApp Cloud API."""
-        return await self._send_msg(channel_id, {
-            "type": "text",
-            "text": {"body": content, "preview_url": False},
-        })
+        return await self._send_msg(
+            channel_id,
+            {
+                "type": "text",
+                "text": {"body": content, "preview_url": False},
+            },
+        )
 
     async def reply_template(
-        self, channel_id: str, template_name: str,
-        language_code: str = "en", components: list = None, **kwargs,
+        self,
+        channel_id: str,
+        template_name: str,
+        language_code: str = "en",
+        components: list = None,
+        **kwargs,
     ) -> ReplyResult:
         """Send a WhatsApp message template."""
         body = {
@@ -165,34 +171,42 @@ class WhatsAppAdapter(BaseChannelAdapter):
         return await self._send_msg(channel_id, body)
 
     async def reply_interactive(
-        self, channel_id: str, body_text: str,
-        buttons: list[dict], **kwargs,
+        self,
+        channel_id: str,
+        body_text: str,
+        buttons: list[dict],
+        **kwargs,
     ) -> ReplyResult:
         """Send an interactive message with reply buttons.
 
         buttons = [{"id": "yes", "title": "Yes"}, ...]
         """
         button_list = [
-            {"type": "reply", "reply": {"id": b["id"], "title": b["title"]}}
-            for b in buttons[:3]
+            {"type": "reply", "reply": {"id": b["id"], "title": b["title"]}} for b in buttons[:3]
         ]
-        return await self._send_msg(channel_id, {
-            "type": "interactive",
-            "interactive": {
-                "type": "button",
-                "body": {"text": body_text},
-                "action": {"buttons": button_list},
+        return await self._send_msg(
+            channel_id,
+            {
+                "type": "interactive",
+                "interactive": {
+                    "type": "button",
+                    "body": {"text": body_text},
+                    "action": {"buttons": button_list},
+                },
             },
-        })
+        )
 
     async def reply_image(
         self, channel_id: str, image_url: str, caption: str = "", **kwargs
     ) -> ReplyResult:
         """Send an image."""
-        return await self._send_msg(channel_id, {
-            "type": "image",
-            "image": {"link": image_url, "caption": caption},
-        })
+        return await self._send_msg(
+            channel_id,
+            {
+                "type": "image",
+                "image": {"link": image_url, "caption": caption},
+            },
+        )
 
     # ── API Helper ──
 
@@ -212,6 +226,7 @@ class WhatsAppAdapter(BaseChannelAdapter):
 
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, headers=headers, json=body) as resp:
                     data = await resp.json()
@@ -224,9 +239,8 @@ class WhatsAppAdapter(BaseChannelAdapter):
                     )
         except ImportError:
             import urllib.request
-            req = urllib.request.Request(
-                url, data=json.dumps(body).encode(), headers=headers
-            )
+
+            req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
             with urllib.request.urlopen(req) as resp:
                 data = json.loads(resp.read())
                 wa_id = data.get("messages", [{}])[0].get("id", "")
@@ -246,13 +260,13 @@ class WhatsAppAdapter(BaseChannelAdapter):
         }
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, headers=headers, json=body) as resp:
                     return resp.status == 200
         except ImportError:
             import urllib.request
-            req = urllib.request.Request(
-                url, data=json.dumps(body).encode(), headers=headers
-            )
+
+            req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
             with urllib.request.urlopen(req) as resp:
                 return resp.status == 200

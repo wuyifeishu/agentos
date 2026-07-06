@@ -5,11 +5,16 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
-from typing import Optional
 
 from agentos.llm.base import (
-    LLMProvider, Message, MessageRole, CompletionResult,
-    CompletionChoice, CompletionUsage, Tool, ToolCall,
+    CompletionChoice,
+    CompletionResult,
+    CompletionUsage,
+    LLMProvider,
+    Message,
+    MessageRole,
+    Tool,
+    ToolCall,
 )
 
 
@@ -23,11 +28,11 @@ class AnthropicProvider(LLMProvider):
     API_URL = "https://api.anthropic.com/v1/messages"
     ANTHROPIC_VERSION = "2023-06-01"
 
-    def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
+    def __init__(self, model: str | None = None, api_key: str | None = None):
         super().__init__(model=model or "claude-3-5-sonnet-20241022")
         self._api_key = api_key or os.getenv("ANTHROPIC_API_KEY", "")
 
-    def _messages_to_anthropic(self, messages: list[Message]) -> tuple[list[dict], Optional[str]]:
+    def _messages_to_anthropic(self, messages: list[Message]) -> tuple[list[dict], str | None]:
         """Convert to Anthropic format. Returns (messages, system_prompt)."""
         system = None
         result = []
@@ -44,20 +49,24 @@ class AnthropicProvider(LLMProvider):
                 if m.content:
                     content_blocks.append({"type": "text", "text": m.content})
                 for tc in m.tool_calls:
-                    content_blocks.append({
-                        "type": "tool_use",
-                        "id": tc.id,
-                        "name": tc.name,
-                        "input": json.loads(tc.arguments),
-                    })
+                    content_blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tc.id,
+                            "name": tc.name,
+                            "input": json.loads(tc.arguments),
+                        }
+                    )
                 entry["content"] = content_blocks
             if m.tool_call_id:
                 entry["role"] = "user"
-                entry["content"] = [{
-                    "type": "tool_result",
-                    "tool_use_id": m.tool_call_id,
-                    "content": m.content or "",
-                }]
+                entry["content"] = [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": m.tool_call_id,
+                        "content": m.content or "",
+                    }
+                ]
             result.append(entry)
         return result, system
 
@@ -65,11 +74,13 @@ class AnthropicProvider(LLMProvider):
         result = []
         for t in tools:
             schema = t.as_schema()
-            result.append({
-                "name": schema["function"]["name"],
-                "description": schema["function"]["description"],
-                "input_schema": schema["function"]["parameters"],
-            })
+            result.append(
+                {
+                    "name": schema["function"]["name"],
+                    "description": schema["function"]["description"],
+                    "input_schema": schema["function"]["parameters"],
+                }
+            )
         return result
 
     def chat(self, messages: list[Message], **kwargs) -> CompletionResult:
@@ -110,30 +121,34 @@ class AnthropicProvider(LLMProvider):
             if block.get("type") == "text":
                 text_content += block.get("text", "")
             elif block.get("type") == "tool_use":
-                tool_calls.append(ToolCall(
-                    id=block.get("id", ""),
-                    name=block.get("name", ""),
-                    arguments=json.dumps(block.get("input", {})),
-                ))
+                tool_calls.append(
+                    ToolCall(
+                        id=block.get("id", ""),
+                        name=block.get("name", ""),
+                        arguments=json.dumps(block.get("input", {})),
+                    )
+                )
 
         return CompletionResult(
             id=data.get("id", ""),
             model=data.get("model", self.model),
-            choices=[CompletionChoice(
-                index=0,
-                message=Message(
-                    role=MessageRole.ASSISTANT,
-                    content=text_content,
-                    tool_calls=tool_calls if tool_calls else None,
-                ),
-                finish_reason=data.get("stop_reason", "end_turn"),
-            )],
+            choices=[
+                CompletionChoice(
+                    index=0,
+                    message=Message(
+                        role=MessageRole.ASSISTANT,
+                        content=text_content,
+                        tool_calls=tool_calls if tool_calls else None,
+                    ),
+                    finish_reason=data.get("stop_reason", "end_turn"),
+                )
+            ],
             usage=CompletionUsage(
                 prompt_tokens=data.get("usage", {}).get("input_tokens", 0),
                 completion_tokens=data.get("usage", {}).get("output_tokens", 0),
                 total_tokens=(
-                    data.get("usage", {}).get("input_tokens", 0) +
-                    data.get("usage", {}).get("output_tokens", 0)
+                    data.get("usage", {}).get("input_tokens", 0)
+                    + data.get("usage", {}).get("output_tokens", 0)
                 ),
             ),
         )

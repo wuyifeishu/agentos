@@ -3,15 +3,16 @@ AgentOS v0.30 Prompt模板管理 — 版本化Prompt仓库。
 支持模板继承、变量注入、A/B测试、回滚。
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
 import json
 import os
+from dataclasses import dataclass, field
+from datetime import datetime
 
 
 @dataclass
 class PromptTemplate:
     """Prompt 模板。"""
+
     name: str
     version: str
     template: str
@@ -62,13 +63,15 @@ class PromptRegistry:
         result = []
         for name, versions in self._templates.items():
             sorted_vers = sorted(versions.keys(), key=lambda v: [int(x) for x in v.split(".")])
-            result.append({
-                "name": name,
-                "versions": sorted_vers,
-                "latest": sorted_vers[-1],
-                "description": versions[sorted_vers[-1]].description,
-                "variables": versions[sorted_vers[-1]].variables,
-            })
+            result.append(
+                {
+                    "name": name,
+                    "versions": sorted_vers,
+                    "latest": sorted_vers[-1],
+                    "description": versions[sorted_vers[-1]].description,
+                    "variables": versions[sorted_vers[-1]].variables,
+                }
+            )
         return result
 
     def render(self, name: str, version: str = "latest", **kwargs) -> str:

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import pytest
+
 from agentos.conversation.conversation import (
-    ConversationManager,
     ConversationConfig,
+    ConversationManager,
     MessageRole,
     TrimStrategy,
 )
@@ -148,7 +149,9 @@ def test_get_system_prompt(conv):
 
 def test_importance_weighted_trim():
     """重要性加权裁剪。"""
-    cfg = ConversationConfig(max_messages=5, trim_strategy=TrimStrategy.IMPORTANCE_WEIGHTED, preserve_last_n=2)
+    cfg = ConversationConfig(
+        max_messages=5, trim_strategy=TrimStrategy.IMPORTANCE_WEIGHTED, preserve_last_n=2
+    )
     c = ConversationManager(cfg)
     for i in range(10):
         m = c.add("user", f"msg{i}")

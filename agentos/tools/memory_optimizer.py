@@ -6,8 +6,9 @@ Object pooling, LRU caching, memory monitoring, and smart caching with TTL.
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -15,6 +16,7 @@ T = TypeVar("T")
 # ============================================================================
 # ObjectPool
 # ============================================================================
+
 
 class ObjectPool(Generic[T]):
     """Thread-safe object pool with auto-expiry and size limits.
@@ -33,7 +35,7 @@ class ObjectPool(Generic[T]):
         self._max_size = max_size
         self._max_idle = max_idle
         self._idle_timeout = idle_timeout
-        self._pool: List[_PooledItem[T]] = []
+        self._pool: list[_PooledItem[T]] = []
         self._lock = threading.Lock()
         self._created: int = 0
         self._borrowed: int = 0
@@ -74,7 +76,7 @@ class ObjectPool(Generic[T]):
         self._pool[:] = [item for item in self._pool if now - item.acquired_at < self._idle_timeout]
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "created": self._created,
@@ -99,10 +101,11 @@ class _PooledItem(Generic[T]):
 # LRUCache
 # ============================================================================
 
+
 class LRUCache(Generic[T]):
     """Thread-safe LRU cache with capacity limit and optional TTL."""
 
-    def __init__(self, capacity: int = 1024, ttl: Optional[float] = None):
+    def __init__(self, capacity: int = 1024, ttl: float | None = None):
         self._capacity = capacity
         self._ttl = ttl
         self._cache: OrderedDict[str, _CacheEntry[T]] = OrderedDict()
@@ -111,7 +114,7 @@ class LRUCache(Generic[T]):
         self._misses: int = 0
         self._evictions: int = 0
 
-    def get(self, key: str) -> Optional[T]:
+    def get(self, key: str) -> T | None:
         with self._lock:
             entry = self._cache.get(key)
             if entry is None:
@@ -154,7 +157,7 @@ class LRUCache(Generic[T]):
         return self._hits / total if total > 0 else 0.0
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "size": len(self._cache),
@@ -182,6 +185,7 @@ class _CacheEntry(Generic[T]):
 # SmartCache
 # ============================================================================
 
+
 class SmartCache(Generic[T]):
     """Multi-tier cache with compute-on-miss and automatic invalidation."""
 
@@ -204,7 +208,7 @@ class SmartCache(Generic[T]):
             self._lru.put(key, value)
             return value
 
-    def prefetch(self, keys: List[str]) -> int:
+    def prefetch(self, keys: list[str]) -> int:
         """Pre-compute and cache values for a list of keys. Returns count cached."""
         count = 0
         for key in keys:
@@ -232,7 +236,7 @@ class SmartCache(Generic[T]):
         self._lru.clear()
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return self._lru.stats
 
     def __len__(self) -> int:
@@ -242,6 +246,7 @@ class SmartCache(Generic[T]):
 # ============================================================================
 # MemoryMonitor
 # ============================================================================
+
 
 class MemoryMonitor:
     """Monitor per-component memory usage with high-water mark tracking."""
@@ -261,7 +266,7 @@ class MemoryMonitor:
         if self._initialized:
             return
         self._initialized = True
-        self._components: Dict[str, _ComponentMetrics] = {}
+        self._components: dict[str, _ComponentMetrics] = {}
         self._lock = threading.Lock()
 
     def register(self, name: str) -> None:
@@ -283,7 +288,7 @@ class MemoryMonitor:
             if comp:
                 comp.current_bytes = max(0, comp.current_bytes - size_bytes)
 
-    def snapshot(self) -> Dict[str, Dict[str, Any]]:
+    def snapshot(self) -> dict[str, dict[str, Any]]:
         with self._lock:
             return {name: comp.to_dict() for name, comp in self._components.items()}
 
@@ -308,7 +313,7 @@ class _ComponentMetrics:
     peak_bytes: int = 0
     total_allocations: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "current_bytes": self.current_bytes,
@@ -321,6 +326,7 @@ class _ComponentMetrics:
 # Convenience Functions
 # ============================================================================
 
+
 def create_object_pool(
     factory: Callable[[], T],
     max_size: int = 100,
@@ -331,7 +337,7 @@ def create_object_pool(
     return ObjectPool(factory, max_size=max_size, max_idle=max_idle, idle_timeout=idle_timeout)
 
 
-def create_lru_cache(capacity: int = 1024, ttl: Optional[float] = None) -> LRUCache[Any]:
+def create_lru_cache(capacity: int = 1024, ttl: float | None = None) -> LRUCache[Any]:
     """Create a thread-safe LRU cache."""
     return LRUCache(capacity=capacity, ttl=ttl)
 

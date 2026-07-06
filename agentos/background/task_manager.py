@@ -26,27 +26,33 @@ import asyncio
 import json
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable
-
+from enum import StrEnum
+from typing import Any
 
 # ── Enums ────────────────────────────────────────────────────────
 
-class BackgroundTaskStatus(str, Enum):
+
+class BackgroundTaskStatus(StrEnum):
     """Background task lifecycle states."""
-    QUEUED = "queued"           # Accepted, waiting to start
-    RUNNING = "running"         # Actively executing
-    PAUSED = "paused"           # Paused by user or system
-    COMPLETED = "completed"     # Finished successfully
-    FAILED = "failed"           # Finished with error
-    CANCELLED = "cancelled"     # Cancelled by user
-    TIMED_OUT = "timed_out"     # Exceeded time budget
+
+    QUEUED = "queued"  # Accepted, waiting to start
+    RUNNING = "running"  # Actively executing
+    PAUSED = "paused"  # Paused by user or system
+    COMPLETED = "completed"  # Finished successfully
+    FAILED = "failed"  # Finished with error
+    CANCELLED = "cancelled"  # Cancelled by user
+    TIMED_OUT = "timed_out"  # Exceeded time budget
 
     @property
     def is_terminal(self) -> bool:
-        return self in (BackgroundTaskStatus.COMPLETED, BackgroundTaskStatus.FAILED,
-                        BackgroundTaskStatus.CANCELLED, BackgroundTaskStatus.TIMED_OUT)
+        return self in (
+            BackgroundTaskStatus.COMPLETED,
+            BackgroundTaskStatus.FAILED,
+            BackgroundTaskStatus.CANCELLED,
+            BackgroundTaskStatus.TIMED_OUT,
+        )
 
     @property
     def is_active(self) -> bool:
@@ -55,12 +61,14 @@ class BackgroundTaskStatus(str, Enum):
 
 # ── Data Models ──────────────────────────────────────────────────
 
+
 @dataclass
 class ProgressPhase:
     """A named phase within task execution."""
-    name: str                       # e.g. "data_loading", "analysis", "reporting"
-    label: str = ""                 # Human-readable label
-    weight: float = 1.0             # Relative weight for percent calculation
+
+    name: str  # e.g. "data_loading", "analysis", "reporting"
+    label: str = ""  # Human-readable label
+    weight: float = 1.0  # Relative weight for percent calculation
     started_at: float = 0.0
     finished_at: float = 0.0
     completed: bool = False
@@ -68,22 +76,32 @@ class ProgressPhase:
 
     def to_dict(self) -> dict:
         return {
-            "name": self.name, "label": self.label or self.name,
-            "weight": self.weight, "started_at": self.started_at,
-            "finished_at": self.finished_at, "completed": self.completed,
+            "name": self.name,
+            "label": self.label or self.name,
+            "weight": self.weight,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "completed": self.completed,
             "metadata": self.metadata,
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "ProgressPhase":
-        return cls(name=d["name"], label=d.get("label", ""), weight=d.get("weight", 1.0),
-                   started_at=d.get("started_at", 0.0), finished_at=d.get("finished_at", 0.0),
-                   completed=d.get("completed", False), metadata=d.get("metadata", {}))
+    def from_dict(cls, d: dict) -> ProgressPhase:
+        return cls(
+            name=d["name"],
+            label=d.get("label", ""),
+            weight=d.get("weight", 1.0),
+            started_at=d.get("started_at", 0.0),
+            finished_at=d.get("finished_at", 0.0),
+            completed=d.get("completed", False),
+            metadata=d.get("metadata", {}),
+        )
 
 
 @dataclass
 class TaskProgress:
     """Structured progress report for a background task."""
+
     task_id: str
     status: BackgroundTaskStatus = BackgroundTaskStatus.QUEUED
     phases: list[ProgressPhase] = field(default_factory=list)
@@ -98,39 +116,48 @@ class TaskProgress:
 
     def to_dict(self) -> dict:
         return {
-            "task_id": self.task_id, "status": self.status.value,
+            "task_id": self.task_id,
+            "status": self.status.value,
             "phases": [p.to_dict() for p in self.phases],
             "current_phase": self.current_phase,
-            "current_step": self.current_step, "total_steps": self.total_steps,
-            "percent": self.percent, "elapsed_seconds": self.elapsed_seconds,
+            "current_step": self.current_step,
+            "total_steps": self.total_steps,
+            "percent": self.percent,
+            "elapsed_seconds": self.elapsed_seconds,
             "estimated_remaining_seconds": self.estimated_remaining_seconds,
-            "last_update": self.last_update, "message": self.message,
+            "last_update": self.last_update,
+            "message": self.message,
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "TaskProgress":
+    def from_dict(cls, d: dict) -> TaskProgress:
         return cls(
-            task_id=d["task_id"], status=BackgroundTaskStatus(d.get("status", "queued")),
+            task_id=d["task_id"],
+            status=BackgroundTaskStatus(d.get("status", "queued")),
             phases=[ProgressPhase.from_dict(p) for p in d.get("phases", [])],
-            current_phase=d.get("current_phase", ""), current_step=d.get("current_step", 0),
-            total_steps=d.get("total_steps", 0), percent=d.get("percent", 0.0),
+            current_phase=d.get("current_phase", ""),
+            current_step=d.get("current_step", 0),
+            total_steps=d.get("total_steps", 0),
+            percent=d.get("percent", 0.0),
             elapsed_seconds=d.get("elapsed_seconds", 0.0),
             estimated_remaining_seconds=d.get("estimated_remaining_seconds", 0.0),
-            last_update=d.get("last_update", 0.0), message=d.get("message", ""),
+            last_update=d.get("last_update", 0.0),
+            message=d.get("message", ""),
         )
 
 
 @dataclass
 class BackgroundTaskConfig:
     """Configuration for a background task."""
-    max_duration_seconds: float = 3600.0       # 1 hour default
+
+    max_duration_seconds: float = 3600.0  # 1 hour default
     max_cost_usd: float = 10.0
     enable_checkpoints: bool = True
-    checkpoint_interval: int = 20              # iterations between checkpoints
+    checkpoint_interval: int = 20  # iterations between checkpoints
     enable_progress: bool = True
-    progress_report_interval: float = 5.0      # seconds between progress updates
-    auto_resume: bool = True                   # auto-resume from checkpoint on restart
-    max_retries: int = 2                       # retries on transient failure
+    progress_report_interval: float = 5.0  # seconds between progress updates
+    auto_resume: bool = True  # auto-resume from checkpoint on restart
+    max_retries: int = 2  # retries on transient failure
     pause_on_cost_warning: bool = True
     notify_on_completion: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -139,6 +166,7 @@ class BackgroundTaskConfig:
 @dataclass
 class BackgroundTask:
     """Complete background task record."""
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
     name: str = ""
     task_description: str = ""
@@ -167,8 +195,11 @@ class BackgroundTask:
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id, "name": self.name, "task_description": self.task_description,
-            "status": self.status.value, "config": {
+            "id": self.id,
+            "name": self.name,
+            "task_description": self.task_description,
+            "status": self.status.value,
+            "config": {
                 "max_duration_seconds": self.config.max_duration_seconds,
                 "max_cost_usd": self.config.max_cost_usd,
                 "enable_checkpoints": self.config.enable_checkpoints,
@@ -177,18 +208,23 @@ class BackgroundTask:
                 "max_retries": self.config.max_retries,
             },
             "progress": self.progress.to_dict(),
-            "result": self.result, "error": self.error,
-            "created_at": self.created_at, "started_at": self.started_at,
-            "finished_at": self.finished_at, "cost_usd": self.cost_usd,
-            "tokens_used": self.tokens_used, "checkpoint_id": self.checkpoint_id,
+            "result": self.result,
+            "error": self.error,
+            "created_at": self.created_at,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "cost_usd": self.cost_usd,
+            "tokens_used": self.tokens_used,
+            "checkpoint_id": self.checkpoint_id,
             "metadata": self.metadata,
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "BackgroundTask":
+    def from_dict(cls, d: dict) -> BackgroundTask:
         cfg_d = d.get("config", {})
         return cls(
-            id=d["id"], name=d.get("name", ""),
+            id=d["id"],
+            name=d.get("name", ""),
             task_description=d.get("task_description", ""),
             status=BackgroundTaskStatus(d.get("status", "queued")),
             config=BackgroundTaskConfig(
@@ -200,10 +236,14 @@ class BackgroundTask:
                 max_retries=cfg_d.get("max_retries", 2),
             ),
             progress=TaskProgress.from_dict(d.get("progress", {"task_id": d["id"]})),
-            result=d.get("result"), error=d.get("error", ""),
-            created_at=d.get("created_at", 0.0), started_at=d.get("started_at", 0.0),
-            finished_at=d.get("finished_at", 0.0), cost_usd=d.get("cost_usd", 0.0),
-            tokens_used=d.get("tokens_used", 0), checkpoint_id=d.get("checkpoint_id", ""),
+            result=d.get("result"),
+            error=d.get("error", ""),
+            created_at=d.get("created_at", 0.0),
+            started_at=d.get("started_at", 0.0),
+            finished_at=d.get("finished_at", 0.0),
+            cost_usd=d.get("cost_usd", 0.0),
+            tokens_used=d.get("tokens_used", 0),
+            checkpoint_id=d.get("checkpoint_id", ""),
             metadata=d.get("metadata", {}),
         )
 
@@ -215,6 +255,7 @@ CompletionCallback = Callable[[BackgroundTask], None]
 
 
 # ── Background Task Manager ──────────────────────────────────────
+
 
 class BackgroundTaskManager:
     """
@@ -232,7 +273,7 @@ class BackgroundTaskManager:
     def __init__(
         self,
         max_concurrent: int = 5,
-        store: Any = None,   # Optional CheckpointStore-like persistence
+        store: Any = None,  # Optional CheckpointStore-like persistence
     ):
         self.max_concurrent = max_concurrent
         self._store = store
@@ -368,8 +409,12 @@ class BackgroundTaskManager:
     # ── Progress Reporting ───────────────────────────────────────
 
     async def update_phase(
-        self, task_id: str, phase_name: str,
-        completed: bool = False, step: int = 0, message: str = "",
+        self,
+        task_id: str,
+        phase_name: str,
+        completed: bool = False,
+        step: int = 0,
+        message: str = "",
     ):
         """Update a named phase in the task progress."""
         t = self._tasks.get(task_id)
@@ -405,9 +450,15 @@ class BackgroundTaskManager:
         completed_weight = sum(p.weight for p in prog.phases if p.completed)
         if prog.current_phase and total_weight > 0:
             current_phase_obj = phase
-            if current_phase_obj and not current_phase_obj.completed and current_phase_obj.weight > 0:
+            if (
+                current_phase_obj
+                and not current_phase_obj.completed
+                and current_phase_obj.weight > 0
+            ):
                 # Partial credit for current phase
-                partial = current_phase_obj.weight * min(step / max(t.config.checkpoint_interval, 1), 1.0)
+                partial = current_phase_obj.weight * min(
+                    step / max(t.config.checkpoint_interval, 1), 1.0
+                )
                 completed_weight += partial
             prog.percent = min(completed_weight / total_weight * 100, 99.9)
         elif completed_weight >= total_weight:
@@ -451,22 +502,26 @@ class BackgroundTaskManager:
                     raise ValueError("Must provide loop_factory or agent_loop")
 
                 # Inject progress callback into the loop
-                original_on_iteration = getattr(loop, 'on_iteration', None)
+                original_on_iteration = getattr(loop, "on_iteration", None)
 
                 async def progress_on_iteration(iteration: int, tool_results: list):
                     elapsed = time.time() - start
                     if elapsed > timeout:
-                        raise asyncio.TimeoutError("Task exceeded max duration")
+                        raise TimeoutError("Task exceeded max duration")
                     if bt.status == BackgroundTaskStatus.PAUSED:
                         # Spin-wait for resume (or timeout)
                         while bt.status == BackgroundTaskStatus.PAUSED:
                             await asyncio.sleep(0.5)
                             if time.time() - start > timeout:
-                                raise asyncio.TimeoutError("Task timed out while paused")
-                    if bt.config.enable_checkpoints and iteration % bt.config.checkpoint_interval == 0:
+                                raise TimeoutError("Task timed out while paused")
+                    if (
+                        bt.config.enable_checkpoints
+                        and iteration % bt.config.checkpoint_interval == 0
+                    ):
                         bt.progress.current_step = iteration
-                        await self.update_phase(bt.id, "execution", step=iteration,
-                                                message=f"Step {iteration}")
+                        await self.update_phase(
+                            bt.id, "execution", step=iteration, message=f"Step {iteration}"
+                        )
                     if original_on_iteration:
                         original_on_iteration(iteration, tool_results)
 
@@ -474,14 +529,14 @@ class BackgroundTaskManager:
 
                 # Run
                 result = await loop.run(bt.task_description, session_id=bt.id)
-                bt.result = result.output if hasattr(result, 'output') else result
-                bt.cost_usd = getattr(result, 'cost_usd', 0.0)
-                bt.tokens_used = sum(getattr(result, 'tokens_used', {}).values())
+                bt.result = result.output if hasattr(result, "output") else result
+                bt.cost_usd = getattr(result, "cost_usd", 0.0)
+                bt.tokens_used = sum(getattr(result, "tokens_used", {}).values())
                 bt.status = BackgroundTaskStatus.COMPLETED
                 bt.progress.status = BackgroundTaskStatus.COMPLETED
                 bt.progress.percent = 100.0
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 bt.status = BackgroundTaskStatus.TIMED_OUT
                 bt.progress.status = BackgroundTaskStatus.TIMED_OUT
                 bt.error = f"Exceeded max duration of {bt.config.max_duration_seconds}s"
@@ -534,7 +589,7 @@ class BackgroundTaskManager:
             return
         try:
             data = json.dumps(bt.to_dict())
-            if hasattr(self._store, 'save'):
+            if hasattr(self._store, "save"):
                 await self._store.save(f"bg_task:{bt.id}", {"data": data})
         except Exception:
             pass

@@ -24,44 +24,46 @@ Architecture:
 
 from __future__ import annotations
 
+import builtins
 import hashlib
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set
-
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Data Classes
 # ---------------------------------------------------------------------------
 
 
-class FlagType(str, Enum):
+class FlagType(StrEnum):
     """Type of feature flag."""
-    BOOLEAN = "boolean"          # Simple on/off toggle
-    PERCENTAGE = "percentage"    # Gradual rollout (0-100%)
-    VARIANT = "variant"          # A/B test variants
-    SCHEDULED = "scheduled"      # Time-based enable/disable
+
+    BOOLEAN = "boolean"  # Simple on/off toggle
+    PERCENTAGE = "percentage"  # Gradual rollout (0-100%)
+    VARIANT = "variant"  # A/B test variants
+    SCHEDULED = "scheduled"  # Time-based enable/disable
 
 
 @dataclass
 class FlagRule:
     """Targeting rule for a feature flag."""
+
     flag_type: FlagType = FlagType.BOOLEAN
     enabled: bool = False
-    rollout_percentage: int = 0          # 0-100 for PERCENTAGE type
-    variants: Dict[str, int] = field(default_factory=dict)  # variant_name → weight
-    allowlist_users: Set[str] = field(default_factory=set)
-    allowlist_tenants: Set[str] = field(default_factory=set)
-    blocklist_users: Set[str] = field(default_factory=set)
-    blocklist_tenants: Set[str] = field(default_factory=set)
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    rollout_percentage: int = 0  # 0-100 for PERCENTAGE type
+    variants: dict[str, int] = field(default_factory=dict)  # variant_name → weight
+    allowlist_users: set[str] = field(default_factory=set)
+    allowlist_tenants: set[str] = field(default_factory=set)
+    blocklist_users: set[str] = field(default_factory=set)
+    blocklist_tenants: set[str] = field(default_factory=set)
+    start_time: datetime | None = None
+    end_time: datetime | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "flag_type": self.flag_type.value,
             "enabled": self.enabled,
@@ -80,18 +82,20 @@ class FlagRule:
 @dataclass
 class FlagContext:
     """Context for feature flag evaluation."""
-    user_id: Optional[str] = None
-    tenant_id: Optional[str] = None
-    attributes: Dict[str, Any] = field(default_factory=dict)
-    request_id: Optional[str] = None
+
+    user_id: str | None = None
+    tenant_id: str | None = None
+    attributes: dict[str, Any] = field(default_factory=dict)
+    request_id: str | None = None
 
 
 @dataclass
 class FlagEvaluation:
     """Result of a feature flag evaluation."""
+
     flag_name: str
     enabled: bool
-    variant: Optional[str] = None
+    variant: str | None = None
     reason: str = ""
     evaluated_at: float = field(default_factory=time.time)
 
@@ -105,7 +109,7 @@ class FlagStore(ABC):
     """Abstract storage backend for feature flags."""
 
     @abstractmethod
-    async def get(self, flag_name: str) -> Optional[FlagRule]:
+    async def get(self, flag_name: str) -> FlagRule | None:
         """Get a flag rule by name."""
 
     @abstractmethod
@@ -117,7 +121,7 @@ class FlagStore(ABC):
         """Delete a flag. Returns True if existed."""
 
     @abstractmethod
-    async def list(self) -> List[str]:
+    async def list(self) -> builtins.list[str]:
         """List all flag names."""
 
 
@@ -125,9 +129,9 @@ class InMemoryFlagStore(FlagStore):
     """In-memory flag store for development and testing."""
 
     def __init__(self):
-        self._flags: Dict[str, FlagRule] = {}
+        self._flags: dict[str, FlagRule] = {}
 
-    async def get(self, flag_name: str) -> Optional[FlagRule]:
+    async def get(self, flag_name: str) -> FlagRule | None:
         return self._flags.get(flag_name)
 
     async def set(self, flag_name: str, rule: FlagRule) -> None:
@@ -136,7 +140,7 @@ class InMemoryFlagStore(FlagStore):
     async def delete(self, flag_name: str) -> bool:
         return self._flags.pop(flag_name, None) is not None
 
-    async def list(self) -> List[str]:
+    async def list(self) -> builtins.list[str]:
         return list(self._flags.keys())
 
 
@@ -175,7 +179,7 @@ class FeatureFlagManager:
 
     def __init__(self, store: FlagStore):
         self._store = store
-        self._evaluation_log: List[FlagEvaluation] = []
+        self._evaluation_log: list[FlagEvaluation] = []
 
     # ── Flag Management ────────────────────────────────────────────────
 
@@ -187,11 +191,11 @@ class FeatureFlagManager:
         """Delete a feature flag."""
         return await self._store.delete(flag_name)
 
-    async def get_flag(self, flag_name: str) -> Optional[FlagRule]:
+    async def get_flag(self, flag_name: str) -> FlagRule | None:
         """Get a flag's rule."""
         return await self._store.get(flag_name)
 
-    async def list_flags(self) -> List[str]:
+    async def list_flags(self) -> list[str]:
         """List all registered flags."""
         return await self._store.list()
 
@@ -204,19 +208,17 @@ class FeatureFlagManager:
 
     # ── Flag Evaluation ────────────────────────────────────────────────
 
-    async def is_enabled(self, flag_name: str, context: Optional[FlagContext] = None) -> bool:
+    async def is_enabled(self, flag_name: str, context: FlagContext | None = None) -> bool:
         """Check if a feature flag is enabled for the given context."""
         evaluation = await self.evaluate(flag_name, context)
         return evaluation.enabled
 
-    async def get_variant(self, flag_name: str, context: Optional[FlagContext] = None) -> Optional[str]:
+    async def get_variant(self, flag_name: str, context: FlagContext | None = None) -> str | None:
         """Get the variant name for an A/B test flag."""
         evaluation = await self.evaluate(flag_name, context)
         return evaluation.variant
 
-    async def evaluate(
-        self, flag_name: str, context: Optional[FlagContext] = None
-    ) -> FlagEvaluation:
+    async def evaluate(self, flag_name: str, context: FlagContext | None = None) -> FlagEvaluation:
         """Full evaluation of a feature flag with audit trail."""
         ctx = context or FlagContext()
         rule = await self._store.get(flag_name)
@@ -273,7 +275,9 @@ class FeatureFlagManager:
             self._evaluation_log.append(evaluation)
             return evaluation
 
-        if has_tenant_allowlist and (not ctx.tenant_id or ctx.tenant_id not in rule.allowlist_tenants):
+        if has_tenant_allowlist and (
+            not ctx.tenant_id or ctx.tenant_id not in rule.allowlist_tenants
+        ):
             evaluation = FlagEvaluation(
                 flag_name=flag_name,
                 enabled=False,
@@ -289,7 +293,7 @@ class FeatureFlagManager:
             return self._enabled_eval(flag_name, rule, "Tenant in allowlist")
 
         # Time-based scheduling
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if rule.start_time and now < rule.start_time:
             evaluation = FlagEvaluation(
                 flag_name=flag_name,
@@ -317,8 +321,7 @@ class FeatureFlagManager:
             bucket = hash_val % 100
             if bucket < rule.rollout_percentage:
                 return self._enabled_eval(
-                    flag_name, rule,
-                    f"Percentage: bucket {bucket} < {rule.rollout_percentage}%"
+                    flag_name, rule, f"Percentage: bucket {bucket} < {rule.rollout_percentage}%"
                 )
             else:
                 evaluation = FlagEvaluation(
@@ -368,9 +371,7 @@ class FeatureFlagManager:
         seed = f"{flag_name}:{ctx.user_id or ''}:{ctx.tenant_id or ''}"
         return int(hashlib.md5(seed.encode()).hexdigest(), 16)
 
-    def _select_variant(
-        self, flag_name: str, ctx: FlagContext, rule: FlagRule
-    ) -> Optional[str]:
+    def _select_variant(self, flag_name: str, ctx: FlagContext, rule: FlagRule) -> str | None:
         """Select a variant based on weighted distribution."""
         if not rule.variants:
             return None
@@ -384,9 +385,7 @@ class FeatureFlagManager:
                 return variant_name
         return None
 
-    def _enabled_eval(
-        self, flag_name: str, rule: FlagRule, reason: str
-    ) -> FlagEvaluation:
+    def _enabled_eval(self, flag_name: str, rule: FlagRule, reason: str) -> FlagEvaluation:
         evaluation = FlagEvaluation(
             flag_name=flag_name,
             enabled=True,
@@ -397,7 +396,7 @@ class FeatureFlagManager:
 
     # ── Audit ──────────────────────────────────────────────────────────
 
-    def get_evaluation_log(self, limit: int = 100) -> List[FlagEvaluation]:
+    def get_evaluation_log(self, limit: int = 100) -> list[FlagEvaluation]:
         """Get recent flag evaluations for audit."""
         return self._evaluation_log[-limit:]
 
@@ -408,6 +407,7 @@ class FeatureFlagManager:
 # ---------------------------------------------------------------------------
 # Convenience
 # ---------------------------------------------------------------------------
+
 
 def create_flag_manager() -> FeatureFlagManager:
     """Create a FeatureFlagManager with in-memory store."""

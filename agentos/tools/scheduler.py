@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Set
-
+from typing import Any
 
 # ============================================================================
 # Job
 # ============================================================================
+
 
 class JobState:
     PENDING = "pending"
@@ -34,28 +35,30 @@ class Job:
     id: str
     func: Callable[..., Any]
     args: tuple = ()
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
     # Scheduling
-    interval: Optional[float] = None         # Fixed interval in seconds
-    cron: Optional[Dict[str, str]] = None    # {"minute": "*", "hour": "*", ...}
-    delay: Optional[float] = None            # One-shot delay
+    interval: float | None = None  # Fixed interval in seconds
+    cron: dict[str, str] | None = None  # {"minute": "*", "hour": "*", ...}
+    delay: float | None = None  # One-shot delay
     # State
     state: str = JobState.PENDING
     next_run: float = 0.0
-    last_run: Optional[float] = None
+    last_run: float | None = None
     run_count: int = 0
     error_count: int = 0
-    last_error: Optional[str] = None
-    _timer: Optional[threading.Timer] = field(default=None, repr=False)
+    last_error: str | None = None
+    _timer: threading.Timer | None = field(default=None, repr=False)
 
 
 # ============================================================================
 # Cron Parser
 # ============================================================================
 
-def _cron_next(cron: Dict[str, str], now: float) -> float:
+
+def _cron_next(cron: dict[str, str], now: float) -> float:
     """Compute next run time from cron expression. Returns timestamp."""
     import calendar
+
     t = time.localtime(now)
     # Parse fields
     minutes = _parse_cron_field(cron.get("minute", "*"), 0, 59)
@@ -131,7 +134,7 @@ def _cron_next(cron: Dict[str, str], now: float) -> float:
     raise RuntimeError("No cron match within 5 years")
 
 
-def _parse_cron_field(field: str, lo: int, hi: int) -> Set[int]:
+def _parse_cron_field(field: str, lo: int, hi: int) -> set[int]:
     """Parse cron field like '*' or '1,3,5' or '*/15'."""
     if field == "*":
         return set(range(lo, hi + 1))
@@ -156,6 +159,7 @@ def _parse_cron_field(field: str, lo: int, hi: int) -> Set[int]:
 # Scheduler
 # ============================================================================
 
+
 class Scheduler:
     """Lightweight job scheduler.
 
@@ -175,7 +179,7 @@ class Scheduler:
     """
 
     def __init__(self):
-        self._jobs: Dict[str, Job] = {}
+        self._jobs: dict[str, Job] = {}
         self._lock = threading.RLock()
         self._running = False
         self._id_counter = 0
@@ -192,7 +196,9 @@ class Scheduler:
         """Cron expression: 'minute hour day month day_of_week'"""
         parts = expression.strip().split()
         if len(parts) != 5:
-            raise ValueError("Cron expression must have 5 fields: 'minute hour day month day_of_week'")
+            raise ValueError(
+                "Cron expression must have 5 fields: 'minute hour day month day_of_week'"
+            )
         self._last_cron = {
             "minute": parts[0],
             "hour": parts[1],
@@ -351,19 +357,19 @@ class Scheduler:
 
     # ---------- Query ----------
 
-    def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
                 return None
             return self._job_info(job)
 
-    def list_jobs(self) -> List[Dict[str, Any]]:
+    def list_jobs(self) -> list[dict[str, Any]]:
         with self._lock:
             return [self._job_info(j) for j in self._jobs.values()]
 
     @staticmethod
-    def _job_info(job: Job) -> Dict[str, Any]:
+    def _job_info(job: Job) -> dict[str, Any]:
         return {
             "id": job.id,
             "state": job.state,

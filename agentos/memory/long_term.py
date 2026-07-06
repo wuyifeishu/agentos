@@ -12,6 +12,7 @@ from typing import Any
 @dataclass
 class MemoryEntry:
     """长期记忆条目。"""
+
     id: str
     content: str
     embedding: list[float] | None = None
@@ -57,6 +58,7 @@ class LongTermMemory:
 
     def search_by_vector(self, query_embedding: list[float], top_k: int = 10) -> list[MemoryEntry]:
         """向量相似度检索（余弦相似度）。"""
+
         def cosine(a, b):
             dot = sum(x * y for x, y in zip(a, b))
             norm_a = sum(x * x for x in a) ** 0.5

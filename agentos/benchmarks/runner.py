@@ -5,13 +5,15 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Awaitable
+from typing import Any
 
 
 @dataclass
 class BenchmarkScenario:
     """单个基准测试场景。"""
+
     name: str
     description: str = ""
     setup: Callable[[], Any] | None = None
@@ -21,6 +23,7 @@ class BenchmarkScenario:
 @dataclass
 class BenchmarkConfig:
     """基准测试配置。"""
+
     warmup_iterations: int = 3
     measure_iterations: int = 10
     concurrency_levels: list[int] = field(default_factory=lambda: [1, 4, 8])
@@ -37,7 +40,7 @@ class _LatencyStats:
     p99_ms: float = 0
 
     @staticmethod
-    def compute(latencies_ms: list[float]) -> "_LatencyStats":
+    def compute(latencies_ms: list[float]) -> _LatencyStats:
         if not latencies_ms:
             return _LatencyStats()
         s = sorted(latencies_ms)
@@ -55,6 +58,7 @@ class _LatencyStats:
 @dataclass
 class BenchmarkReport:
     """基准测试报告。"""
+
     scenario: str = ""
     description: str = ""
     config: BenchmarkConfig = field(default_factory=BenchmarkConfig)
@@ -62,12 +66,16 @@ class BenchmarkReport:
     summary: str = ""
 
     def to_json(self) -> str:
-        return json.dumps({
-            "scenario": self.scenario,
-            "description": self.description,
-            "results": self.results,
-            "summary": self.summary,
-        }, indent=2, ensure_ascii=False)
+        return json.dumps(
+            {
+                "scenario": self.scenario,
+                "description": self.description,
+                "results": self.results,
+                "summary": self.summary,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
 
     def to_markdown(self) -> str:
         lines = [
@@ -146,21 +154,23 @@ class BenchmarkRunner:
             total_time = time.perf_counter() - total_start
             stats = _LatencyStats.compute(latencies_ms)
 
-            results.append({
-                "concurrency": concurrency,
-                "total_calls": total_calls,
-                "total_time_s": round(total_time, 3),
-                "throughput_qps": round(total_calls / total_time, 1) if total_time > 0 else 0,
-                "latency_stats": {
-                    "min_ms": round(stats.min_ms, 2),
-                    "max_ms": round(stats.max_ms, 2),
-                    "avg_ms": round(stats.avg_ms, 2),
-                    "p50_ms": round(stats.p50_ms, 2),
-                    "p95_ms": round(stats.p95_ms, 2),
-                    "p99_ms": round(stats.p99_ms, 2),
-                },
-                "success_rate": round(success / total_calls, 4) if total_calls else 0,
-            })
+            results.append(
+                {
+                    "concurrency": concurrency,
+                    "total_calls": total_calls,
+                    "total_time_s": round(total_time, 3),
+                    "throughput_qps": round(total_calls / total_time, 1) if total_time > 0 else 0,
+                    "latency_stats": {
+                        "min_ms": round(stats.min_ms, 2),
+                        "max_ms": round(stats.max_ms, 2),
+                        "avg_ms": round(stats.avg_ms, 2),
+                        "p50_ms": round(stats.p50_ms, 2),
+                        "p95_ms": round(stats.p95_ms, 2),
+                        "p99_ms": round(stats.p99_ms, 2),
+                    },
+                    "success_rate": round(success / total_calls, 4) if total_calls else 0,
+                }
+            )
 
         if scenario.teardown and setup_state is not None:
             scenario.teardown(setup_state)

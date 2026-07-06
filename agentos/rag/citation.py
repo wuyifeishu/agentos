@@ -6,15 +6,16 @@ enabling answer provenance and fact-checking.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Tuple
-import re
 import hashlib
+import re
+from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
 class Citation:
     """A single citation linking generated text to a source chunk."""
+
     chunk_id: str
     chunk_text: str
     source_doc: str = ""  # source document identifier
@@ -27,13 +28,14 @@ class Citation:
 @dataclass
 class CitationReport:
     """Complete citation analysis for a generated response."""
+
     answer: str = ""
-    citations: List[Citation] = field(default_factory=list)
+    citations: list[Citation] = field(default_factory=list)
     source_count: int = 0
     coverage: float = 0.0  # fraction of answer covered by citations
-    unused_sources: List[str] = field(default_factory=list)
+    unused_sources: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "answer": self.answer,
             "num_citations": len(self.citations),
@@ -73,7 +75,7 @@ class CitationTracer:
     def trace(
         self,
         answer: str,
-        sources: List[Dict[str, Any]],
+        sources: list[dict[str, Any]],
     ) -> CitationReport:
         """Trace answer back to source chunks.
 
@@ -115,8 +117,8 @@ class CitationTracer:
     def _trace_overlap(
         self,
         answer: str,
-        sources: List[Dict[str, Any]],
-    ) -> List[Citation]:
+        sources: list[dict[str, Any]],
+    ) -> list[Citation]:
         """Find answer spans that overlap with source chunks."""
         citations = []
 
@@ -130,43 +132,47 @@ class CitationTracer:
             # Find longest common substrings
             matches = self._find_substring_matches(answer, chunk_text)
             for start, end in matches:
-                citations.append(Citation(
-                    chunk_id=chunk_id,
-                    chunk_text=chunk_text,
-                    source_doc=src.get("source", src.get("document", "")),
-                    relevance_score=src.get("score", 0.0),
-                    context=self._get_context(chunk_text, start, end),
-                    start_char=start,
-                    end_char=end,
-                ))
+                citations.append(
+                    Citation(
+                        chunk_id=chunk_id,
+                        chunk_text=chunk_text,
+                        source_doc=src.get("source", src.get("document", "")),
+                        relevance_score=src.get("score", 0.0),
+                        context=self._get_context(chunk_text, start, end),
+                        start_char=start,
+                        end_char=end,
+                    )
+                )
 
         return citations
 
     def _trace_explicit(
         self,
         answer: str,
-        sources: List[Dict[str, Any]],
-    ) -> List[Citation]:
+        sources: list[dict[str, Any]],
+    ) -> list[Citation]:
         """Parse explicit citation markers like [1], [source1], [doc:1]."""
         citations = []
 
         # Match [N], [docN], [source N]
-        pattern = r'\[(?:doc|source|ref)?\s*(\d+)\]'
+        pattern = r"\[(?:doc|source|ref)?\s*(\d+)\]"
         matches = re.finditer(pattern, answer, re.IGNORECASE)
 
         for m in matches:
             ref_num = int(m.group(1))
             if 1 <= ref_num <= len(sources):
                 src = sources[ref_num - 1]
-                citations.append(Citation(
-                    chunk_id=f"chunk_{src.get('index', ref_num - 1)}",
-                    chunk_text=src.get("text", ""),
-                    source_doc=src.get("source", ""),
-                    relevance_score=src.get("score", 0.0),
-                    context=src.get("text", "")[:500],
-                    start_char=m.start(),
-                    end_char=m.end(),
-                ))
+                citations.append(
+                    Citation(
+                        chunk_id=f"chunk_{src.get('index', ref_num - 1)}",
+                        chunk_text=src.get("text", ""),
+                        source_doc=src.get("source", ""),
+                        relevance_score=src.get("score", 0.0),
+                        context=src.get("text", "")[:500],
+                        start_char=m.start(),
+                        end_char=m.end(),
+                    )
+                )
 
         return citations
 
@@ -174,13 +180,13 @@ class CitationTracer:
         self,
         answer: str,
         chunk: str,
-    ) -> List[Tuple[int, int]]:
+    ) -> list[tuple[int, int]]:
         """Find spans in answer that match substrings from chunk."""
         matches = []
         min_len = min(self.min_overlap, len(chunk) // 4)
 
         # Use sliding window of sentences/phrases from chunk
-        sentences = re.split(r'(?<=[.!?。！？])\s+', chunk)
+        sentences = re.split(r"(?<=[.!?。！？])\s+", chunk)
         for sent in sentences:
             sent = sent.strip()
             if len(sent) < min_len:
@@ -194,7 +200,7 @@ class CitationTracer:
                 window = max(min_len, len(sent) // 2)
                 step = window // 2
                 for start in range(0, len(sent) - window + 1, step):
-                    sub = sent[start:start + window]
+                    sub = sent[start : start + window]
                     pos = answer.find(sub)
                     if pos >= 0:
                         matches.append((pos, pos + len(sub)))
@@ -204,8 +210,8 @@ class CitationTracer:
 
     def _merge_overlapping(
         self,
-        spans: List[Tuple[int, int]],
-    ) -> List[Tuple[int, int]]:
+        spans: list[tuple[int, int]],
+    ) -> list[tuple[int, int]]:
         """Merge overlapping citation spans."""
         if not spans:
             return []
@@ -231,7 +237,7 @@ class CitationTracer:
     def _compute_covered_chars(
         self,
         answer: str,
-        citations: List[Citation],
+        citations: list[Citation],
     ) -> int:
         """Compute total characters covered by citations."""
         if not citations:
@@ -247,7 +253,7 @@ class CitationTracer:
     def build_attribution_map(
         self,
         answer: str,
-        sources: List[Dict[str, Any]],
+        sources: list[dict[str, Any]],
     ) -> str:
         """Build HTML attribution map for the answer.
 
@@ -260,16 +266,16 @@ class CitationTracer:
 
         result = answer
         for c in citations:
-            prefix = result[:c.start_char]
-            cited = result[c.start_char:c.end_char]
-            suffix = result[c.end_char:]
+            prefix = result[: c.start_char]
+            cited = result[c.start_char : c.end_char]
+            suffix = result[c.end_char :]
 
             source_id = c.chunk_id.replace("chunk_", "")
             cited_wrapped = (
                 f'<cite data-source="{c.source_doc}" '
                 f'data-chunk="{source_id}" '
                 f'data-score="{c.relevance_score:.2f}">'
-                f'{cited}</cite>'
+                f"{cited}</cite>"
             )
             result = prefix + cited_wrapped + suffix
 

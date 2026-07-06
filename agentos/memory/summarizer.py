@@ -5,31 +5,31 @@ AgentOS v0.60 Memory Summarizer — 上下文压缩与记忆管理。
 
 from __future__ import annotations
 
-import time
 import math
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Callable
+from enum import StrEnum
 
 
-class MemoryType(str, Enum):
-
+class MemoryType(StrEnum):
     """记忆类型枚举。"""
 
-    EPISODIC = "episodic"       # 对话片段
-    SEMANTIC = "semantic"       # 知识点
-    PROCEDURAL = "procedural"   # 操作步骤
-    WORKING = "working"         # 当前上下文
+    EPISODIC = "episodic"  # 对话片段
+    SEMANTIC = "semantic"  # 知识点
+    PROCEDURAL = "procedural"  # 操作步骤
+    WORKING = "working"  # 当前上下文
 
 
 @dataclass
 class MemoryChunk:
     """记忆块。"""
+
     id: str
     content: str
     mtype: MemoryType = MemoryType.EPISODIC
     timestamp: float = field(default_factory=time.time)
-    importance: float = 0.5     # 0~1
+    importance: float = 0.5  # 0~1
     access_count: int = 0
     token_estimate: int = 0
     summary: str = ""
@@ -44,22 +44,35 @@ class ImportanceScorer:
     """多维度重要性评分。"""
 
     WEIGHTS = {
-        "recency": 0.20,        # 时间衰减
-        "access_frequency": 0.15, # 访问频率
+        "recency": 0.20,  # 时间衰减
+        "access_frequency": 0.15,  # 访问频率
         "content_length": 0.10,  # 内容长度（过短=噪音，适中=有用）
-        "keyword_density": 0.25, # 关键信息密度
+        "keyword_density": 0.25,  # 关键信息密度
         "task_relevance": 0.30,  # 任务相关性(外部传入)
     }
 
     _IMPORTANT_KEYWORDS = [
-        "error", "exception", "fail", "critical", "important",
-        "key", "decision", "conclusion", "result", "summary",
-        "must", "urgent", "deadline", "blocker", "fix",
+        "error",
+        "exception",
+        "fail",
+        "critical",
+        "important",
+        "key",
+        "decision",
+        "conclusion",
+        "result",
+        "summary",
+        "must",
+        "urgent",
+        "deadline",
+        "blocker",
+        "fix",
     ]
 
     @classmethod
-    def score(cls, chunk: MemoryChunk, task_relevance: float = 0.0,
-              current_time: float | None = None) -> float:
+    def score(
+        cls, chunk: MemoryChunk, task_relevance: float = 0.0, current_time: float | None = None
+    ) -> float:
         now = current_time or time.time()
         scores = {}
 
@@ -94,8 +107,9 @@ class ImportanceScorer:
 class MemorySummarizer:
     """记忆摘要器：递归压缩 + 重要性排序 + 滑动窗口裁剪。"""
 
-    def __init__(self, max_context_tokens: int = 8000,
-                 summarizer_fn: Callable[[str], str] | None = None):
+    def __init__(
+        self, max_context_tokens: int = 8000, summarizer_fn: Callable[[str], str] | None = None
+    ):
         self.max_context_tokens = max_context_tokens
         self._summarizer = summarizer_fn or self._default_summarizer
 
@@ -113,8 +127,9 @@ class MemorySummarizer:
 
     # ── 递归摘要 ───────────────────────────────────────────────────────────
 
-    def recursive_summarize(self, chunks: list[MemoryChunk],
-                            target_ratio: float = 0.3) -> list[MemoryChunk]:
+    def recursive_summarize(
+        self, chunks: list[MemoryChunk], target_ratio: float = 0.3
+    ) -> list[MemoryChunk]:
         """递归压缩：反复摘要直到总 token 数降至目标比例以下。"""
         current = list(chunks)
         total_tokens = sum(c.token_estimate for c in current)
@@ -126,12 +141,14 @@ class MemorySummarizer:
             for i in range(0, len(current) - 1, 2):
                 combined = current[i].content + "\n" + current[i + 1].content
                 summary = self._summarizer(combined)
-                merged.append(MemoryChunk(
-                    id=f"sum_{i}",
-                    content=summary,
-                    mtype=MemoryType.SEMANTIC,
-                    importance=max(current[i].importance, current[i + 1].importance),
-                ))
+                merged.append(
+                    MemoryChunk(
+                        id=f"sum_{i}",
+                        content=summary,
+                        mtype=MemoryType.SEMANTIC,
+                        importance=max(current[i].importance, current[i + 1].importance),
+                    )
+                )
             if len(current) % 2 == 1:
                 merged.append(current[-1])
             current = merged
@@ -141,8 +158,7 @@ class MemorySummarizer:
 
     # ── 重要性排序 ─────────────────────────────────────────────────────────
 
-    def rank_and_prune(self, chunks: list[MemoryChunk],
-                       max_chunks: int = 20) -> list[MemoryChunk]:
+    def rank_and_prune(self, chunks: list[MemoryChunk], max_chunks: int = 20) -> list[MemoryChunk]:
         """按重要性排序并截断。"""
         scored = [(ImportanceScorer.score(c), c) for c in chunks]
         scored.sort(key=lambda x: x[0], reverse=True)
@@ -150,16 +166,16 @@ class MemorySummarizer:
 
     # ── 滑动窗口 ───────────────────────────────────────────────────────────
 
-    def sliding_window(self, chunks: list[MemoryChunk],
-                       window_size: int = 10) -> list[MemoryChunk]:
+    def sliding_window(self, chunks: list[MemoryChunk], window_size: int = 10) -> list[MemoryChunk]:
         """最近N条记忆（按时间排序）。"""
         sorted_chunks = sorted(chunks, key=lambda c: c.timestamp, reverse=True)
         return sorted_chunks[:window_size]
 
     # ── 混合策略 ───────────────────────────────────────────────────────────
 
-    def build_context(self, chunks: list[MemoryChunk],
-                      strategy: str = "hybrid") -> list[MemoryChunk]:
+    def build_context(
+        self, chunks: list[MemoryChunk], strategy: str = "hybrid"
+    ) -> list[MemoryChunk]:
         """构建上下文：混合策略 = 重要记忆 + 最近窗口。"""
         if strategy == "recency":
             return self.sliding_window(chunks, 15)
@@ -210,10 +226,10 @@ class ConversationMemory:
         """压缩旧对话为摘要。"""
         if len(self.turns) <= self.max_turns:
             return
-        old_half = self.turns[:len(self.turns) // 2]
+        old_half = self.turns[: len(self.turns) // 2]
         self._backup = old_half
         compressed = self.summarizer.recursive_summarize(old_half, target_ratio=0.2)
-        self.turns = compressed + self.turns[len(self.turns) // 2:]
+        self.turns = compressed + self.turns[len(self.turns) // 2 :]
 
     def clear(self):
         self.turns.clear()

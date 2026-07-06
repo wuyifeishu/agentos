@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from threading import RLock
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Data types
 # ============================================================================
+
 
 class SecretNotFoundError(Exception):
     """Requested secret key does not exist."""
@@ -40,9 +41,9 @@ class BackendUnavailableError(Exception):
 class SecretsConfig:
     """Global secrets manager configuration."""
 
-    cache_ttl: float = 300.0       # Seconds to cache fetched secrets
-    max_cache_size: int = 1000     # Max cached entries
-    fail_open: bool = False        # If True, return None on backend error instead of raising
+    cache_ttl: float = 300.0  # Seconds to cache fetched secrets
+    max_cache_size: int = 1000  # Max cached entries
+    fail_open: bool = False  # If True, return None on backend error instead of raising
     allow_environment_fallback: bool = True  # Try env vars before backend
 
 
@@ -50,15 +51,16 @@ class SecretsConfig:
 # Abstract backend
 # ============================================================================
 
+
 class AbstractSecretsBackend(ABC):
     """Interface for secrets backends."""
 
     @abstractmethod
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Retrieve a single secret value."""
 
     @abstractmethod
-    async def get_all(self, prefix: str = "") -> Dict[str, str]:
+    async def get_all(self, prefix: str = "") -> dict[str, str]:
         """Retrieve all secrets matching prefix."""
 
     @abstractmethod
@@ -70,19 +72,20 @@ class AbstractSecretsBackend(ABC):
 # Env backend
 # ============================================================================
 
+
 class EnvSecretsBackend(AbstractSecretsBackend):
     """OS environment variable backend — no deps, always available."""
 
     def __init__(self, prefix: str = ""):
         self._prefix = prefix
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         return os.environ.get(f"{self._prefix}{key}")
 
-    async def get_all(self, prefix: str = "") -> Dict[str, str]:
+    async def get_all(self, prefix: str = "") -> dict[str, str]:
         full_prefix = f"{self._prefix}{prefix}"
         return {
-            k[len(self._prefix):] if k.startswith(self._prefix) else k: v
+            k[len(self._prefix) :] if k.startswith(self._prefix) else k: v
             for k, v in os.environ.items()
             if k.startswith(full_prefix)
         }
@@ -95,6 +98,7 @@ class EnvSecretsBackend(AbstractSecretsBackend):
 # Encrypted file backend
 # ============================================================================
 
+
 class EncryptedFileBackend(AbstractSecretsBackend):
     """Fernet-encrypted JSON file backend.
 
@@ -104,11 +108,11 @@ class EncryptedFileBackend(AbstractSecretsBackend):
     def __init__(self, file_path: str, encryption_key: str):
         self._path = Path(file_path)
         self._key = encryption_key
-        self._cache: Optional[Dict[str, str]] = None
+        self._cache: dict[str, str] | None = None
         self._cache_time: float = 0.0
         self._lock = RLock()
 
-    def _decrypt(self) -> Dict[str, str]:
+    def _decrypt(self) -> dict[str, str]:
         """Decrypt and load secrets file."""
         from cryptography.fernet import Fernet
 
@@ -121,7 +125,7 @@ class EncryptedFileBackend(AbstractSecretsBackend):
         decrypted = fernet.decrypt(encrypted)
         return json.loads(decrypted)
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         with self._lock:
             if self._cache is None or (time.monotonic() - self._cache_time) > 300:
                 try:
@@ -132,7 +136,7 @@ class EncryptedFileBackend(AbstractSecretsBackend):
                     raise BackendUnavailableError(f"Decryption failed: {exc}")
         return self._cache.get(key) if self._cache else None
 
-    async def get_all(self, prefix: str = "") -> Dict[str, str]:
+    async def get_all(self, prefix: str = "") -> dict[str, str]:
         await self.get("")  # Refresh cache
         if self._cache is None:
             return {}
@@ -151,6 +155,7 @@ class EncryptedFileBackend(AbstractSecretsBackend):
 # ============================================================================
 # Vault backend (HashiCorp Vault kv-v2)
 # ============================================================================
+
 
 class VaultSecretsBackend(AbstractSecretsBackend):
     """HashiCorp Vault backend (kv-v2).
@@ -171,7 +176,7 @@ class VaultSecretsBackend(AbstractSecretsBackend):
         self._mount_point = mount_point
         self._path_prefix = path_prefix
         self._verify_ssl = verify_ssl
-        self._cache: Dict[str, Optional[str]] = {}
+        self._cache: dict[str, str | None] = {}
         self._lock = RLock()
 
     async def _call(self, method: str, path: str) -> Any:
@@ -190,7 +195,7 @@ class VaultSecretsBackend(AbstractSecretsBackend):
                 )
             return resp.json()
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         full_path = f"{self._path_prefix}/{key}" if self._path_prefix else key
         vault_path = f"{self._mount_point}/data/{full_path}"
 
@@ -211,9 +216,9 @@ class VaultSecretsBackend(AbstractSecretsBackend):
         except BackendUnavailableError:
             raise
 
-    async def get_all(self, prefix: str = "") -> Dict[str, str]:
+    async def get_all(self, prefix: str = "") -> dict[str, str]:
         list_path = f"{self._mount_point}/metadata/{self._path_prefix}"
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
 
         try:
             data = await self._call("LIST", list_path)
@@ -240,16 +245,17 @@ class VaultSecretsBackend(AbstractSecretsBackend):
 # Composite backend (layered)
 # ============================================================================
 
+
 class CompositeSecretsBackend(AbstractSecretsBackend):
     """Resolve secrets from multiple backends in priority order.
 
     First backend that returns a non-None value wins.
     """
 
-    def __init__(self, backends: List[AbstractSecretsBackend]):
+    def __init__(self, backends: list[AbstractSecretsBackend]):
         self._backends = backends
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         for backend in self._backends:
             try:
                 value = await backend.get(key)
@@ -259,8 +265,8 @@ class CompositeSecretsBackend(AbstractSecretsBackend):
                 logger.debug("Backend %s failed for key=%s: %s", type(backend).__name__, key, exc)
         return None
 
-    async def get_all(self, prefix: str = "") -> Dict[str, str]:
-        result: Dict[str, str] = {}
+    async def get_all(self, prefix: str = "") -> dict[str, str]:
+        result: dict[str, str] = {}
         for backend in reversed(self._backends):  # Low-priority first
             try:
                 batch = await backend.get_all(prefix)
@@ -280,6 +286,7 @@ class CompositeSecretsBackend(AbstractSecretsBackend):
 # Secrets Manager (high-level)
 # ============================================================================
 
+
 class SecretsManager:
     """High-level secrets manager with caching and fail-open support.
 
@@ -293,19 +300,19 @@ class SecretsManager:
     def __init__(self, backend: AbstractSecretsBackend, config: SecretsConfig = SecretsConfig()):
         self._backend = backend
         self._config = config
-        self._cache: Dict[str, tuple[float, Optional[str]]] = {}
+        self._cache: dict[str, tuple[float, str | None]] = {}
         self._lock = RLock()
 
-    async def _cache_put(self, key: str, value: Optional[str]):
+    async def _cache_put(self, key: str, value: str | None):
         """Store value in cache with eviction."""
         with self._lock:
             if len(self._cache) >= self._config.max_cache_size:
                 sorted_keys = sorted(self._cache, key=lambda k: self._cache[k][0])
-                for old_key in sorted_keys[:len(self._cache) // 4]:
+                for old_key in sorted_keys[: len(self._cache) // 4]:
                     del self._cache[old_key]
             self._cache[key] = (time.monotonic(), value)
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Get secret value. Returns None if not found."""
         # Check cache
         with self._lock:
@@ -342,7 +349,7 @@ class SecretsManager:
             raise SecretNotFoundError(f"Required secret '{key}' not found")
         return value
 
-    async def get_all(self, prefix: str = "") -> Dict[str, str]:
+    async def get_all(self, prefix: str = "") -> dict[str, str]:
         """Get all secrets with given prefix."""
         try:
             return await self._backend.get_all(prefix)
@@ -356,7 +363,7 @@ class SecretsManager:
         """Check backend health."""
         return await self._backend.health_check()
 
-    def invalidate_cache(self, key: Optional[str] = None):
+    def invalidate_cache(self, key: str | None = None):
         """Invalidate cache entries."""
         with self._lock:
             if key is None:
@@ -368,6 +375,7 @@ class SecretsManager:
 # ============================================================================
 # Convenience factory
 # ============================================================================
+
 
 def create_secrets_manager(
     backend_type: str = "env",

@@ -22,29 +22,30 @@ import json
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
 from agentos.evaluation import GoldenCase, GoldenDataset
 
-
 # ── Scorers ─────────────────────────────────────────────────────────
+
 
 @dataclass
 class EvalScore:
     """Multi-dimensional evaluation score."""
-    overall: float = 0.0           # 0.0 - 1.0
-    accuracy: float = 0.0          # Did the agent get the right answer?
-    tool_selection: float = 0.0    # Did it pick the right tools?
-    efficiency: float = 0.0        # Minimal steps to solution?
-    consistency: float = 0.0       # Repeatable across runs?
+
+    overall: float = 0.0  # 0.0 - 1.0
+    accuracy: float = 0.0  # Did the agent get the right answer?
+    tool_selection: float = 0.0  # Did it pick the right tools?
+    efficiency: float = 0.0  # Minimal steps to solution?
+    consistency: float = 0.0  # Repeatable across runs?
     hallucination_free: float = 0.0  # No fabricated content?
-    latency_ms: float = 0.0       # Response time
+    latency_ms: float = 0.0  # Response time
     details: dict[str, Any] = field(default_factory=dict)
 
 
-class EvalCategory(str, Enum):
+class EvalCategory(StrEnum):
     CODING = "coding"
     REASONING = "reasoning"
     TOOL_USE = "tool_use"
@@ -55,6 +56,7 @@ class EvalCategory(str, Enum):
 
 
 # ── Hallucination Detector ──────────────────────────────────────────
+
 
 class HallucinationDetector:
     """Detect fabricated content in agent outputs.
@@ -69,7 +71,9 @@ class HallucinationDetector:
     def __init__(self, reference_kb: dict[str, str] | None = None):
         self._reference = reference_kb or {}
 
-    def detect(self, response: str, expected: str = "", context: dict[str, Any] | None = None) -> dict[str, Any]:
+    def detect(
+        self, response: str, expected: str = "", context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Analyze a response for hallucination signals.
 
         Args:
@@ -93,14 +97,20 @@ class HallucinationDetector:
             if len(response_tokens) > 0:
                 extra_ratio = len(extra_tokens) / len(response_tokens)
                 if extra_ratio > 0.5 and len(response) > 50:
-                    findings.append({
-                        "type": "possible_fabrication",
-                        "severity": "medium",
-                        "extra_token_ratio": round(extra_ratio, 3),
-                    })
+                    findings.append(
+                        {
+                            "type": "possible_fabrication",
+                            "severity": "medium",
+                            "extra_token_ratio": round(extra_ratio, 3),
+                        }
+                    )
 
         # Self-contradiction check
-        sentences = [s.strip() for s in response.replace("!", ".").replace("?", ".").split(".") if len(s.strip()) > 20]
+        sentences = [
+            s.strip()
+            for s in response.replace("!", ".").replace("?", ".").split(".")
+            if len(s.strip()) > 20
+        ]
         for i in range(len(sentences)):
             for j in range(i + 1, len(sentences)):
                 # Simple overlap-based contradiction detection
@@ -112,11 +122,13 @@ class HallucinationDetector:
         if "http" in response:
             urls = [w for w in response.split() if w.startswith("http")]
             if urls:
-                findings.append({
-                    "type": "external_source_cited",
-                    "severity": "info",
-                    "urls_found": len(urls),
-                })
+                findings.append(
+                    {
+                        "type": "external_source_cited",
+                        "severity": "info",
+                        "urls_found": len(urls),
+                    }
+                )
 
         # Score: 0 = clean, 1 = severe hallucination
         score = 0.0
@@ -135,11 +147,13 @@ class HallucinationDetector:
 
 # ── Multi-Round Evaluator ───────────────────────────────────────────
 
+
 @dataclass
 class MultiRoundCase:
     """A multi-turn conversation test case."""
+
     id: str
-    turns: list[dict[str, Any]]   # [{user: ..., expected_tools: [...], expected_response: ...}]
+    turns: list[dict[str, Any]]  # [{user: ..., expected_tools: [...], expected_response: ...}]
     category: EvalCategory = EvalCategory.CONVERSATION
     max_turns: int = 10
     tags: list[str] = field(default_factory=list)
@@ -165,7 +179,7 @@ class MultiRoundEvaluator:
         turn_scores: list[EvalScore] = []
         context: dict[str, Any] = {}
 
-        for i, turn in enumerate(case.turns[:case.max_turns]):
+        for i, turn in enumerate(case.turns[: case.max_turns]):
             start = time.time()
             try:
                 response = await agent.run(turn.get("user_input", ""), context=context)
@@ -177,7 +191,11 @@ class MultiRoundEvaluator:
             # Evaluate this turn
             expected_tools = turn.get("expected_tools", [])
             actual_tools = response.get("tools_used", []) if isinstance(response, dict) else []
-            actual_output = response.get("output", str(response)) if isinstance(response, dict) else str(response)
+            actual_output = (
+                response.get("output", str(response))
+                if isinstance(response, dict)
+                else str(response)
+            )
 
             # Tool accuracy
             tool_score = self._score_tool_selection(expected_tools, actual_tools)
@@ -196,7 +214,9 @@ class MultiRoundEvaluator:
                 accuracy = self._score_text_match(expected_resp, actual_output)
 
             turn_score = EvalScore(
-                overall=(accuracy * 0.5 + tool_score * 0.3 + (1 - h_result["hallucination_score"]) * 0.2),
+                overall=(
+                    accuracy * 0.5 + tool_score * 0.3 + (1 - h_result["hallucination_score"]) * 0.2
+                ),
                 accuracy=accuracy,
                 tool_selection=tool_score,
                 hallucination_free=1 - h_result["hallucination_score"],
@@ -204,12 +224,14 @@ class MultiRoundEvaluator:
                 details={"turn": i, "expected_tools": expected_tools, "actual_tools": actual_tools},
             )
             turn_scores.append(turn_score)
-            self._round_results.append({
-                "case_id": case.id,
-                "turn": i,
-                "score": turn_score.overall,
-                "latency_ms": latency,
-            })
+            self._round_results.append(
+                {
+                    "case_id": case.id,
+                    "turn": i,
+                    "score": turn_score.overall,
+                    "latency_ms": latency,
+                }
+            )
 
         # Aggregate
         n = len(turn_scores) if turn_scores else 1
@@ -255,6 +277,7 @@ class MultiRoundEvaluator:
 
 
 # ── SWE-Bench Style Evaluator ───────────────────────────────────────
+
 
 class SWEBenchEvaluator:
     """SWE-bench style: end-to-end task completion evaluation.
@@ -317,10 +340,13 @@ class SWEBenchEvaluator:
         """Run tests for verification."""
         try:
             import subprocess
+
             result = subprocess.run(
                 ["python3", "-m", "pytest", "-x", "-q"],
-                capture_output=True, text=True,
-                timeout=60, cwd=repo_path,
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=repo_path,
             )
             return result.returncode == 0
         except Exception:
@@ -342,6 +368,7 @@ class SWEBenchEvaluator:
 
 
 # ── Eval Suite Runner ───────────────────────────────────────────────
+
 
 class EvalSuiteRunner:
     """Orchestrates full evaluation suites.
@@ -420,7 +447,9 @@ class EvalSuiteRunner:
         latency = (time.time() - start) * 1000
 
         # Parse response
-        actual_output = response.get("output", str(response)) if isinstance(response, dict) else str(response)
+        actual_output = (
+            response.get("output", str(response)) if isinstance(response, dict) else str(response)
+        )
         actual_tools = response.get("tools_used", []) if isinstance(response, dict) else []
 
         # Accuracy: simple match (extensible with ROUGE/BLEU)
@@ -481,11 +510,14 @@ class EvalSuiteRunner:
             "max_score": max(scores) if scores else 0,
             "median_score": sorted(scores)[len(scores) // 2] if scores else 0,
             "by_category": {
-                cat: sum(vals) / len(vals) if vals else 0
-                for cat, vals in by_category.items()
+                cat: sum(vals) / len(vals) if vals else 0 for cat, vals in by_category.items()
             },
             "average_latency_ms": sum(latencies) / len(latencies) if latencies else 0,
-            "hallucination_rate": sum(1 for r in self._results if r.hallucination_free < 0.7) / len(self._results) if self._results else 0,
+            "hallucination_rate": (
+                sum(1 for r in self._results if r.hallucination_free < 0.7) / len(self._results)
+                if self._results
+                else 0
+            ),
         }
 
     def export_json(self, path: str):
@@ -523,8 +555,8 @@ class EvalSuiteRunner:
             else:
                 xml += f'  <testcase name="{case_name}" time="{r.latency_ms / 1000:.3f}">\n'
                 xml += f'    <failure message="Score: {r.overall:.2f}">Accuracy: {r.accuracy:.2f}, Tool: {r.tool_selection:.2f}, Hallucination: {r.hallucination_free:.2f}</failure>\n'
-                xml += '  </testcase>\n'
-        xml += '</testsuite>\n'
+                xml += "  </testcase>\n"
+        xml += "</testsuite>\n"
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
@@ -562,9 +594,11 @@ class EvalSuiteRunner:
 
 # ── Leaderboard ─────────────────────────────────────────────────────
 
+
 @dataclass
 class LeaderboardEntry:
     """A single entry in the agent leaderboard."""
+
     agent_name: str
     version: str
     score: float
@@ -577,7 +611,9 @@ class Leaderboard:
     """Track and compare agent performance over time."""
 
     def __init__(self, storage_path: str = ""):
-        self._path = Path(storage_path) if storage_path else Path.home() / ".agentos" / "leaderboard.json"
+        self._path = (
+            Path(storage_path) if storage_path else Path.home() / ".agentos" / "leaderboard.json"
+        )
         self._entries: list[LeaderboardEntry] = []
 
     def add_entry(self, entry: LeaderboardEntry):
@@ -610,18 +646,13 @@ class Leaderboard:
     def load(self):
         """Load leaderboard from disk."""
         if self._path.exists():
-            with open(self._path, "r", encoding="utf-8") as f:
+            with open(self._path, encoding="utf-8") as f:
                 data = json.load(f)
-                self._entries = [
-                    LeaderboardEntry(**entry) for entry in data
-                ]
+                self._entries = [LeaderboardEntry(**entry) for entry in data]
                 self._entries.sort(key=lambda e: e.score, reverse=True)
 
     def compare_versions(self, agent_name: str) -> list[dict]:
         """Compare all versions of an agent."""
         entries = [e for e in self._entries if e.agent_name == agent_name]
         entries.sort(key=lambda e: e.date)
-        return [
-            {"version": e.version, "score": e.score, "date": e.date}
-            for e in entries
-        ]
+        return [{"version": e.version, "score": e.score, "date": e.date} for e in entries]

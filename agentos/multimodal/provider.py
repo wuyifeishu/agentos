@@ -11,21 +11,21 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-
 # ── Enums & Data Classes ──────────────────────────────────────────
 
-class Modality(str, Enum):
+
+class Modality(StrEnum):
     TEXT = "text"
     IMAGE = "image"
     AUDIO = "audio"
     VIDEO = "video"
 
 
-class ImageFormat(str, Enum):
+class ImageFormat(StrEnum):
     PNG = "png"
     JPEG = "jpeg"
     WEBP = "webp"
@@ -33,7 +33,7 @@ class ImageFormat(str, Enum):
     SVG = "svg"
 
 
-class AudioFormat(str, Enum):
+class AudioFormat(StrEnum):
     MP3 = "mp3"
     WAV = "wav"
     OGG = "ogg"
@@ -44,44 +44,59 @@ class AudioFormat(str, Enum):
 @dataclass
 class MultiModalContent:
     """A piece of multimodal content."""
+
     type: Modality
     text: str = ""
     data: bytes = field(default=b"", repr=False)
-    data_url: str = ""       # data:image/png;base64,...
+    data_url: str = ""  # data:image/png;base64,...
     mime_type: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
-    def text(content: str) -> "MultiModalContent":
+    def text(content: str) -> MultiModalContent:
         return MultiModalContent(type=Modality.TEXT, text=content)
 
     @staticmethod
-    def from_path(path: str | Path) -> "MultiModalContent":
+    def from_path(path: str | Path) -> MultiModalContent:
         path = Path(path)
         data = path.read_bytes()
         ext = path.suffix.lower().lstrip(".")
-        fmt_map = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
-                    "webp": "image/webp", "gif": "image/gif", "mp3": "audio/mpeg",
-                    "wav": "audio/wav", "ogg": "audio/ogg", "flac": "audio/flac"}
+        fmt_map = {
+            "png": "image/png",
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "webp": "image/webp",
+            "gif": "image/gif",
+            "mp3": "audio/mpeg",
+            "wav": "audio/wav",
+            "ogg": "audio/ogg",
+            "flac": "audio/flac",
+        }
         mime = fmt_map.get(ext, "application/octet-stream")
         b64 = base64.b64encode(data).decode()
-        modality = Modality.IMAGE if mime.startswith("image/") else (
-            Modality.AUDIO if mime.startswith("audio/") else Modality.TEXT
+        modality = (
+            Modality.IMAGE
+            if mime.startswith("image/")
+            else (Modality.AUDIO if mime.startswith("audio/") else Modality.TEXT)
         )
         return MultiModalContent(
-            type=modality, data=data,
+            type=modality,
+            data=data,
             data_url=f"data:{mime};base64,{b64}",
             mime_type=mime,
         )
 
     @staticmethod
-    def from_bytes(data: bytes, mime_type: str = "image/png") -> "MultiModalContent":
+    def from_bytes(data: bytes, mime_type: str = "image/png") -> MultiModalContent:
         b64 = base64.b64encode(data).decode()
-        modality = Modality.IMAGE if "image" in mime_type else (
-            Modality.AUDIO if "audio" in mime_type else Modality.TEXT
+        modality = (
+            Modality.IMAGE
+            if "image" in mime_type
+            else (Modality.AUDIO if "audio" in mime_type else Modality.TEXT)
         )
         return MultiModalContent(
-            type=modality, data=data,
+            type=modality,
+            data=data,
             data_url=f"data:{mime_type};base64,{b64}",
             mime_type=mime_type,
         )
@@ -90,19 +105,20 @@ class MultiModalContent:
 @dataclass
 class MultiModalMessage:
     """A multimodal message with mixed content blocks."""
-    role: str = "user"                      # system / user / assistant
+
+    role: str = "user"  # system / user / assistant
     content: list[MultiModalContent] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    def add_text(self, text: str) -> "MultiModalMessage":
+    def add_text(self, text: str) -> MultiModalMessage:
         self.content.append(MultiModalContent.text(text))
         return self
 
-    def add_image_path(self, path: str | Path) -> "MultiModalMessage":
+    def add_image_path(self, path: str | Path) -> MultiModalMessage:
         self.content.append(MultiModalContent.from_path(path))
         return self
 
-    def add_audio_path(self, path: str | Path) -> "MultiModalMessage":
+    def add_audio_path(self, path: str | Path) -> MultiModalMessage:
         self.content.append(MultiModalContent.from_path(path))
         return self
 
@@ -113,15 +129,22 @@ class MultiModalMessage:
             if c.type == Modality.TEXT:
                 blocks.append({"type": "text", "text": c.text})
             elif c.type == Modality.IMAGE:
-                blocks.append({
-                    "type": "image_url",
-                    "image_url": {"url": c.data_url, "detail": "auto"},
-                })
+                blocks.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": c.data_url, "detail": "auto"},
+                    }
+                )
             elif c.type == Modality.AUDIO:
-                blocks.append({
-                    "type": "input_audio",
-                    "input_audio": {"data": base64.b64encode(c.data).decode(), "format": c.mime_type.split("/")[-1] if c.mime_type else "wav"},
-                })
+                blocks.append(
+                    {
+                        "type": "input_audio",
+                        "input_audio": {
+                            "data": base64.b64encode(c.data).decode(),
+                            "format": c.mime_type.split("/")[-1] if c.mime_type else "wav",
+                        },
+                    }
+                )
         return {"role": self.role, "content": blocks}
 
     def to_gemini_format(self) -> dict[str, Any]:
@@ -131,23 +154,28 @@ class MultiModalMessage:
             if c.type == Modality.TEXT:
                 parts.append({"text": c.text})
             elif c.type == Modality.IMAGE:
-                parts.append({
-                    "inline_data": {
-                        "mime_type": c.mime_type or "image/png",
-                        "data": base64.b64encode(c.data).decode(),
+                parts.append(
+                    {
+                        "inline_data": {
+                            "mime_type": c.mime_type or "image/png",
+                            "data": base64.b64encode(c.data).decode(),
+                        }
                     }
-                })
+                )
             elif c.type == Modality.AUDIO:
-                parts.append({
-                    "inline_data": {
-                        "mime_type": c.mime_type or "audio/wav",
-                        "data": base64.b64encode(c.data).decode(),
+                parts.append(
+                    {
+                        "inline_data": {
+                            "mime_type": c.mime_type or "audio/wav",
+                            "data": base64.b64encode(c.data).decode(),
+                        }
                     }
-                })
+                )
         return {"role": "user" if self.role == "user" else "model", "parts": parts}
 
 
 # ── Vision Provider ───────────────────────────────────────────────
+
 
 @runtime_checkable
 class VisionProvider(Protocol):
@@ -191,7 +219,11 @@ class OpenAIVisionProvider:
             "max_tokens": 1024,
         }
 
-        url = f"{self.base_url}/chat/completions" if self.base_url else "https://api.openai.com/v1/chat/completions"
+        url = (
+            f"{self.base_url}/chat/completions"
+            if self.base_url
+            else "https://api.openai.com/v1/chat/completions"
+        )
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
 
         async with aiohttp.ClientSession() as session:
@@ -229,6 +261,7 @@ class LocalVisionProvider:
 
 # ── Audio Provider ─────────────────────────────────────────────────
 
+
 @runtime_checkable
 class AudioProvider(Protocol):
     """Protocol for audio providers (TTS + STT)."""
@@ -237,7 +270,9 @@ class AudioProvider(Protocol):
         """Speech-to-text: transcribe audio to text."""
         ...
 
-    async def synthesize(self, text: str, voice: str = "alloy", speed: float = 1.0) -> MultiModalContent:
+    async def synthesize(
+        self, text: str, voice: str = "alloy", speed: float = 1.0
+    ) -> MultiModalContent:
         """Text-to-speech: generate audio from text."""
         ...
 
@@ -255,30 +290,40 @@ class OpenAIAudioProvider:
 
         form = aiohttp.FormData()
         form.add_field("model", self.stt_model)
-        form.add_field("file", audio.data, filename=f"audio.{audio.mime_type.split('/')[-1] or 'wav'}",
-                       content_type=audio.mime_type or "audio/wav")
+        form.add_field(
+            "file",
+            audio.data,
+            filename=f"audio.{audio.mime_type.split('/')[-1] or 'wav'}",
+            content_type=audio.mime_type or "audio/wav",
+        )
         if language:
             form.add_field("language", language)
 
         headers = {"Authorization": f"Bearer {self.api_key}"}
         async with aiohttp.ClientSession() as session:
-            async with session.post("https://api.openai.com/v1/audio/transcriptions",
-                                     data=form, headers=headers) as resp:
+            async with session.post(
+                "https://api.openai.com/v1/audio/transcriptions", data=form, headers=headers
+            ) as resp:
                 result = await resp.json()
                 return result.get("text", "")
 
-    async def synthesize(self, text: str, voice: str = "alloy", speed: float = 1.0) -> MultiModalContent:
+    async def synthesize(
+        self, text: str, voice: str = "alloy", speed: float = 1.0
+    ) -> MultiModalContent:
         import aiohttp
 
         payload = {
-            "model": self.tts_model, "input": text,
-            "voice": voice, "speed": speed,
+            "model": self.tts_model,
+            "input": text,
+            "voice": voice,
+            "speed": speed,
             "response_format": "mp3",
         }
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         async with aiohttp.ClientSession() as session:
-            async with session.post("https://api.openai.com/v1/audio/speech",
-                                     json=payload, headers=headers) as resp:
+            async with session.post(
+                "https://api.openai.com/v1/audio/speech", json=payload, headers=headers
+            ) as resp:
                 audio_data = await resp.read()
                 return MultiModalContent.from_bytes(audio_data, "audio/mpeg")
 
@@ -304,6 +349,7 @@ class EdgeTTSProvider:
 
 
 # ── MultiModal Client ─────────────────────────────────────────────
+
 
 class MultiModalClient:
     """Unified multimodal client: vision + audio in one interface."""

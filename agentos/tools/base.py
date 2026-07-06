@@ -6,11 +6,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class PermissionLevel(str, Enum):
+class PermissionLevel(StrEnum):
     """工具权限等级。"""
 
     SAFE = "safe"
@@ -37,11 +37,11 @@ class ToolResult:
     exit_code: int | None = None
 
     @classmethod
-    def ok(cls, call_id: str, output: str) -> "ToolResult":
+    def ok(cls, call_id: str, output: str) -> ToolResult:
         return cls(call_id=call_id, output=output)
 
     @classmethod
-    def fail(cls, call_id: str, error: str) -> "ToolResult":
+    def fail(cls, call_id: str, error: str) -> ToolResult:
         return cls(call_id=call_id, error=error)
 
 

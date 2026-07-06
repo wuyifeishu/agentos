@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import Any
-
 
 # ── Data Classes ──────────────────────────────────────────────────
 
-class ProviderPricing(str, Enum):
+
+class ProviderPricing(StrEnum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     GOOGLE = "google"
@@ -28,15 +28,17 @@ class ProviderPricing(str, Enum):
 @dataclass
 class TokenPricing:
     """Pricing per 1M tokens (input/output)."""
+
     provider: ProviderPricing
     model: str
-    input_price_per_1m: float       # USD per 1M input tokens
-    output_price_per_1m: float      # USD per 1M output tokens
+    input_price_per_1m: float  # USD per 1M input tokens
+    output_price_per_1m: float  # USD per 1M output tokens
     cache_write_price_per_1m: float = 0.0
     cache_read_price_per_1m: float = 0.0
 
-    def cost(self, input_tokens: int, output_tokens: int,
-             cache_write: int = 0, cache_read: int = 0) -> float:
+    def cost(
+        self, input_tokens: int, output_tokens: int, cache_write: int = 0, cache_read: int = 0
+    ) -> float:
         return (
             (input_tokens / 1_000_000) * self.input_price_per_1m
             + (output_tokens / 1_000_000) * self.output_price_per_1m
@@ -48,6 +50,7 @@ class TokenPricing:
 @dataclass
 class TokenUsage:
     """Token usage for a single API call."""
+
     model: str
     input_tokens: int = 0
     output_tokens: int = 0
@@ -62,18 +65,19 @@ class TokenUsage:
         if not self.total_tokens:
             self.total_tokens = self.input_tokens + self.output_tokens
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
 
 @dataclass
 class Budget:
     """Spending budget configuration."""
+
     name: str
-    limit: float                        # USD
-    period: str = "monthly"             # daily / weekly / monthly / total
+    limit: float  # USD
+    period: str = "monthly"  # daily / weekly / monthly / total
     current_spend: float = 0.0
-    alert_threshold: float = 0.8        # Alert at 80% of limit
-    hard_stop: bool = False             # Block requests when exceeded
+    alert_threshold: float = 0.8  # Alert at 80% of limit
+    hard_stop: bool = False  # Block requests when exceeded
 
     @property
     def remaining(self) -> float:
@@ -102,8 +106,14 @@ DEFAULT_PRICING: dict[str, TokenPricing] = {
     "gpt-3.5-turbo": TokenPricing(ProviderPricing.OPENAI, "gpt-3.5-turbo", 0.50, 1.50),
     "o3-mini": TokenPricing(ProviderPricing.OPENAI, "o3-mini", 1.10, 4.40),
     # Anthropic
-    "claude-3-5-sonnet": TokenPricing(ProviderPricing.ANTHROPIC, "claude-3-5-sonnet", 3.00, 15.00,
-                                      cache_write_price_per_1m=3.75, cache_read_price_per_1m=0.30),
+    "claude-3-5-sonnet": TokenPricing(
+        ProviderPricing.ANTHROPIC,
+        "claude-3-5-sonnet",
+        3.00,
+        15.00,
+        cache_write_price_per_1m=3.75,
+        cache_read_price_per_1m=0.30,
+    ),
     "claude-3-haiku": TokenPricing(ProviderPricing.ANTHROPIC, "claude-3-haiku", 0.25, 1.25),
     "claude-3-opus": TokenPricing(ProviderPricing.ANTHROPIC, "claude-3-opus", 15.00, 75.00),
     # Google
@@ -122,6 +132,7 @@ DEFAULT_PRICING: dict[str, TokenPricing] = {
 
 # ── Token Counter (heuristic-based, provider-agnostic) ────────────
 
+
 class TokenCounter:
     """Approximate token counter based on word count + code heuristics.
 
@@ -131,8 +142,8 @@ class TokenCounter:
 
     # Rough tokens-per-word ratios (language-dependent)
     TOKENS_PER_WORD: dict[str, float] = {
-        "en": 1.3,   # ~4 chars/token for English
-        "zh": 0.5,   # ~2 chars/token for Chinese (character-based)
+        "en": 1.3,  # ~4 chars/token for English
+        "zh": 0.5,  # ~2 chars/token for Chinese (character-based)
         "ja": 0.6,
         "ko": 0.6,
         "code": 0.7,  # Code tends to be denser in tokens per word
@@ -149,8 +160,7 @@ class TokenCounter:
         chars = len(text)
 
         # For Chinese (high CJK ratio), use character-based estimation
-        cjk_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff'
-                       or '\u3040' <= c <= '\u30ff')
+        cjk_chars = sum(1 for c in text if "\u4e00" <= c <= "\u9fff" or "\u3040" <= c <= "\u30ff")
         cjk_ratio = cjk_chars / max(chars, 1)
 
         if cjk_ratio > 0.3:
@@ -167,13 +177,26 @@ class TokenCounter:
     @staticmethod
     def _is_code(text: str) -> bool:
         """Heuristic: detect if text is code."""
-        code_indicators = ["def ", "class ", "import ", "from ", "function",
-                          "const ", "let ", "var ", "{", "}", "=>", "return "]
+        code_indicators = [
+            "def ",
+            "class ",
+            "import ",
+            "from ",
+            "function",
+            "const ",
+            "let ",
+            "var ",
+            "{",
+            "}",
+            "=>",
+            "return ",
+        ]
         count = sum(1 for ind in code_indicators if ind in text)
         return count >= 3
 
 
 # ── Cost Tracker ───────────────────────────────────────────────────
+
 
 class CostTracker:
     """Track token usage and costs across all provider calls.
@@ -189,7 +212,7 @@ class CostTracker:
     total_tokens: int = 0
 
     @classmethod
-    def noop(cls) -> "CostTracker":
+    def noop(cls) -> CostTracker:
         """Return a minimal no-op tracker that does not record anything."""
         inst = cls.__new__(cls)
         inst.pricing = {}
@@ -281,9 +304,13 @@ class CostTracker:
         alerts = []
         for budget in self.budgets.values():
             if budget.exceeded and budget.hard_stop:
-                alerts.append(f"BUDGET EXCEEDED: {budget.name} (${budget.current_spend:.2f}/${budget.limit:.2f})")
+                alerts.append(
+                    f"BUDGET EXCEEDED: {budget.name} (${budget.current_spend:.2f}/${budget.limit:.2f})"
+                )
             elif budget.should_alert:
-                alerts.append(f"Budget alert: {budget.name} at {budget.pct_used:.0f}% (${budget.current_spend:.2f}/${budget.limit:.2f})")
+                alerts.append(
+                    f"Budget alert: {budget.name} at {budget.pct_used:.0f}% (${budget.current_spend:.2f}/${budget.limit:.2f})"
+                )
         return alerts
 
     def report(self) -> str:
@@ -325,10 +352,7 @@ class CostTracker:
             "total_calls": len(self.usage_log),
             "total_tokens": sum(u.total_tokens for u in self.usage_log),
             "total_cost": sum(u.cost for u in self.usage_log),
-            "by_model": {
-                model: dict(totals)
-                for model, totals in self._model_totals.items()
-            },
+            "by_model": {model: dict(totals) for model, totals in self._model_totals.items()},
             "recent": [
                 {
                     "model": u.model,
@@ -357,7 +381,7 @@ class CostTracker:
 
 # ── Backward Compatibility Aliases (v1.2.7-) ──────────────────────
 # Old names → new equivalents
-RunCostSession = CostTracker              # CostTracker was RunCostSession
-ModelPricing = TokenPricing               # ModelPricing → TokenPricing
-UsageRecord = TokenUsage                  # UsageRecord → TokenUsage
-PRICING = DEFAULT_PRICING                 # PRICING → DEFAULT_PRICING
+RunCostSession = CostTracker  # CostTracker was RunCostSession
+ModelPricing = TokenPricing  # ModelPricing → TokenPricing
+UsageRecord = TokenUsage  # UsageRecord → TokenUsage
+PRICING = DEFAULT_PRICING  # PRICING → DEFAULT_PRICING

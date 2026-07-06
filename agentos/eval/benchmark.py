@@ -11,28 +11,31 @@ Supports:
 from __future__ import annotations
 
 import json
-import time
 import statistics
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable
-
+from typing import Any
 
 # ── Enums & Data Classes ──────────────────────────────────────────
 
-class EvalMetric(str, Enum):
+
+class EvalMetric(StrEnum):
     """Supported evaluation metrics."""
-    PASS_AT_K = "pass@k"           # Fraction of correct in k generations
-    EXACT_MATCH = "exact_match"    # String equality
-    F1 = "f1"                      # F1 score (token overlap)
-    ROUGE_L = "rouge_l"            # ROUGE-L
+
+    PASS_AT_K = "pass@k"  # Fraction of correct in k generations
+    EXACT_MATCH = "exact_match"  # String equality
+    F1 = "f1"  # F1 score (token overlap)
+    ROUGE_L = "rouge_l"  # ROUGE-L
     SEMANTIC_SIM = "semantic_sim"  # Embedding cosine similarity
     LLM_AS_JUDGE = "llm_as_judge"  # LLM-graded
 
 
-class EvalSuite(str, Enum):
+class EvalSuite(StrEnum):
     """Supported benchmark suites."""
+
     SWE_BENCH = "swe-bench"
     SWE_BENCH_LITE = "swe-bench-lite"
     GAIA = "gaia"
@@ -43,21 +46,23 @@ class EvalSuite(str, Enum):
 @dataclass
 class EvalCase:
     """A single evaluation case."""
+
     id: str
     suite: EvalSuite
     prompt: str
     expected: str
-    repo: str = ""                         # For SWE-bench: git repo
-    base_commit: str = ""                  # For SWE-bench: base commit hash
-    test_patch: str = ""                   # For SWE-bench: test patch
+    repo: str = ""  # For SWE-bench: git repo
+    base_commit: str = ""  # For SWE-bench: base commit hash
+    test_patch: str = ""  # For SWE-bench: test patch
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class EvalSample:
     """One generation sample for a case."""
+
     case_id: str
-    sample_index: int                     # 0..k-1 for pass@k
+    sample_index: int  # 0..k-1 for pass@k
     generated: str
     score: float = 0.0
     passed: bool = False
@@ -68,10 +73,11 @@ class EvalSample:
 @dataclass
 class EvalResult:
     """Result for a single evaluation case (aggregated across samples)."""
+
     case_id: str
     suite: EvalSuite
     metric: EvalMetric
-    score: float                          # pass@k or single-sample score
+    score: float  # pass@k or single-sample score
     samples: list[EvalSample] = field(default_factory=list)
     error: str = ""
 
@@ -79,6 +85,7 @@ class EvalResult:
 @dataclass
 class EvalReport:
     """Full evaluation report across all cases."""
+
     suite: EvalSuite
     total_cases: int
     passed_cases: int
@@ -103,6 +110,7 @@ class EvalReport:
 
 
 # ── Scorers ────────────────────────────────────────────────────────
+
 
 class Scorer:
     """Base scorer."""
@@ -203,6 +211,7 @@ def get_scorer(metric: EvalMetric) -> Scorer:
 
 # ── SWE-bench Loader ──────────────────────────────────────────────
 
+
 class SWEBenchLoader:
     """Load and parse SWE-bench dataset.
 
@@ -251,6 +260,7 @@ class SWEBenchLoader:
 
 
 # ── GAIA Loader ────────────────────────────────────────────────────
+
 
 class GAIALoader:
     """Load and parse GAIA benchmark dataset.
@@ -301,6 +311,7 @@ class GAIALoader:
 
 
 # ── Evaluation Runner ──────────────────────────────────────────────
+
 
 class EvalRunner:
     """Run evaluations over multiple cases with pass@k support.
@@ -362,30 +373,43 @@ class EvalRunner:
                     latency = (time.time() - t0) * 1000
 
                     s = scorer.score(generated, case.expected)
-                    samples.append(EvalSample(
-                        case_id=case.id, sample_index=i,
-                        generated=generated, score=s,
-                        passed=s >= 0.5, latency_ms=latency,
-                    ))
+                    samples.append(
+                        EvalSample(
+                            case_id=case.id,
+                            sample_index=i,
+                            generated=generated,
+                            score=s,
+                            passed=s >= 0.5,
+                            latency_ms=latency,
+                        )
+                    )
                     scores.append(s)
                 except Exception as e:
                     error = str(e)
-                    samples.append(EvalSample(
-                        case_id=case.id, sample_index=i,
-                        generated="", score=0.0, passed=False,
-                        latency_ms=0,
-                    ))
+                    samples.append(
+                        EvalSample(
+                            case_id=case.id,
+                            sample_index=i,
+                            generated="",
+                            score=0.0,
+                            passed=False,
+                            latency_ms=0,
+                        )
+                    )
                     scores.append(0.0)
 
             # pass@k: fraction where at least one sample passes
-            any_pass = any(s.passed for s in samples)
+            any(s.passed for s in samples)
             # Use max score for the case score
             case_score = max(scores) if scores else 0.0
 
             result = EvalResult(
-                case_id=case.id, suite=case.suite,
-                metric=metric, score=case_score,
-                samples=samples, error=error,
+                case_id=case.id,
+                suite=case.suite,
+                metric=metric,
+                score=case_score,
+                samples=samples,
+                error=error,
             )
             results.append(result)
 
@@ -441,6 +465,7 @@ class EvalRunner:
 
 # ── Eval Registry ──────────────────────────────────────────────────
 
+
 class EvalRegistry:
     """Registry for custom evaluation suites and scorers."""
 
@@ -467,6 +492,7 @@ class EvalRegistry:
 
 
 # ── Quick Eval Helpers ─────────────────────────────────────────────
+
 
 def evaluate_quick(
     generate_fn: Callable[[str], str],

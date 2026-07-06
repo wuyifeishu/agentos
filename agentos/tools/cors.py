@@ -13,17 +13,21 @@ Supports:
 from __future__ import annotations
 
 import re
-from typing import Dict, List, Optional, Pattern, Set
-
+from re import Pattern
 
 # ============================================================================
 # CORS
 # ============================================================================
 
 SAFELISTED_METHODS = frozenset({"GET", "HEAD", "POST"})
-SAFELISTED_HEADERS = frozenset({
-    "accept", "accept-language", "content-language", "content-type",
-})
+SAFELISTED_HEADERS = frozenset(
+    {
+        "accept",
+        "accept-language",
+        "content-language",
+        "content-type",
+    }
+)
 
 
 class CORSConfig:
@@ -46,14 +50,14 @@ class CORSConfig:
     """
 
     def __init__(self):
-        self._origins: List[str] = []
-        self._origin_patterns: List[Pattern] = []
+        self._origins: list[str] = []
+        self._origin_patterns: list[Pattern] = []
         self._allow_any_origin: bool = False
-        self._methods: Set[str] = set()
-        self._headers: Set[str] = set()
-        self._expose_headers: Set[str] = set()
+        self._methods: set[str] = set()
+        self._headers: set[str] = set()
+        self._expose_headers: set[str] = set()
         self._allow_credentials: bool = False
-        self._max_age: Optional[int] = None
+        self._max_age: int | None = None
 
     # ---------- Fluent setters ----------
 
@@ -119,9 +123,9 @@ class CORSConfig:
     def preflight_headers(
         self,
         origin: str,
-        request_method: Optional[str] = None,
-        request_headers: Optional[List[str]] = None,
-    ) -> Dict[str, str]:
+        request_method: str | None = None,
+        request_headers: list[str] | None = None,
+    ) -> dict[str, str]:
         """Build response headers for a preflight OPTIONS request."""
         headers: dict = {}
 
@@ -162,7 +166,7 @@ class CORSConfig:
 
         return headers
 
-    def actual_headers(self, origin: str) -> Dict[str, str]:
+    def actual_headers(self, origin: str) -> dict[str, str]:
         """Build response headers for the actual (non-preflight) request."""
         headers: dict = {}
 
@@ -182,7 +186,7 @@ class CORSConfig:
 
         return headers
 
-    def is_preflight(self, method: str, headers: Optional[List[str]] = None) -> bool:
+    def is_preflight(self, method: str, headers: list[str] | None = None) -> bool:
         """Check if a request is a CORS preflight request."""
         if method.upper() != "OPTIONS":
             return False

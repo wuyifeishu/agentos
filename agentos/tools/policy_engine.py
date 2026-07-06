@@ -17,7 +17,7 @@ import logging
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Condition Operators
 # ============================================================================
+
 
 class Op(Enum):
     EQ = "eq"
@@ -70,31 +71,34 @@ class Op(Enum):
 # Condition
 # ============================================================================
 
+
 @dataclass
 class Condition:
     """A single condition: field OP value."""
+
     field: str
     op: Op
     value: Any
 
-    def evaluate(self, context: Dict[str, Any]) -> bool:
+    def evaluate(self, context: dict[str, Any]) -> bool:
         actual = context.get(self.field)
         return self.op.evaluate(actual, self.value)
 
-    def to_dict(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {"field": self.field, "op": self.op.value}
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"field": self.field, "op": self.op.value}
         if self.op != Op.EXISTS:
             result["value"] = self.value if self.op != Op.CUSTOM else "<callable>"
         return result
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Condition":
+    def from_dict(cls, d: dict[str, Any]) -> Condition:
         return cls(field=d["field"], op=Op(d["op"]), value=d.get("value"))
 
 
 # ============================================================================
 # Actions
 # ============================================================================
+
 
 class ActionType(Enum):
     SET = "set"
@@ -106,10 +110,10 @@ class ActionType(Enum):
 
     def execute(
         self,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         params: Any,
-    ) -> Optional[Dict[str, Any]]:
-        result: Optional[Dict[str, Any]] = None
+    ) -> dict[str, Any] | None:
+        result: dict[str, Any] | None = None
         if self == ActionType.SET:
             if isinstance(params, dict):
                 for k, v in params.items():
@@ -131,7 +135,7 @@ class ActionType(Enum):
         return result
 
     @classmethod
-    def from_str(cls, s: str) -> "ActionType":
+    def from_str(cls, s: str) -> ActionType:
         return ActionType(s.lower())
 
 
@@ -139,23 +143,25 @@ class ActionType(Enum):
 # Action
 # ============================================================================
 
+
 @dataclass
 class Action:
     """Action definition."""
+
     type: ActionType
     params: Any = None
 
-    def execute(self, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def execute(self, context: dict[str, Any]) -> dict[str, Any] | None:
         return self.type.execute(context, self.params)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {"type": self.type.value}
         if self.params is not None:
             result["params"] = self.params if not callable(self.params) else "<callable>"
         return result
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Action":
+    def from_dict(cls, d: dict[str, Any]) -> Action:
         return cls(type=ActionType.from_str(d["type"]), params=d.get("params"))
 
 
@@ -163,22 +169,24 @@ class Action:
 # Rule
 # ============================================================================
 
+
 @dataclass
 class Rule:
     """A single rule: when all conditions match, execute actions."""
+
     name: str
-    conditions: List[Condition] = field(default_factory=list)
-    actions: List[Action] = field(default_factory=list)
+    conditions: list[Condition] = field(default_factory=list)
+    actions: list[Action] = field(default_factory=list)
     priority: int = 0
     enabled: bool = True
     description: str = ""
 
-    def matches(self, context: Dict[str, Any]) -> bool:
+    def matches(self, context: dict[str, Any]) -> bool:
         if not self.enabled:
             return False
         return all(c.evaluate(context) for c in self.conditions)
 
-    def evaluate(self, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def evaluate(self, context: dict[str, Any]) -> dict[str, Any] | None:
         """Evaluate rule against context. Returns action result if triggered."""
         if not self.matches(context):
             return None
@@ -189,7 +197,7 @@ class Rule:
                 results.append(r)
         return results[-1] if results else None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "conditions": [c.to_dict() for c in self.conditions],
@@ -200,7 +208,7 @@ class Rule:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Rule":
+    def from_dict(cls, d: dict[str, Any]) -> Rule:
         return cls(
             name=d["name"],
             conditions=[Condition.from_dict(c) for c in d.get("conditions", [])],
@@ -215,14 +223,16 @@ class Rule:
 # Match Mode
 # ============================================================================
 
+
 class MatchMode(Enum):
     FIRST = "first"  # Stop after first matching rule
-    ALL = "all"      # Evaluate all rules, collect results
+    ALL = "all"  # Evaluate all rules, collect results
 
 
 # ============================================================================
 # PolicyEngine
 # ============================================================================
+
 
 class PolicyEngine:
     """Declarative rule engine.
@@ -253,17 +263,17 @@ class PolicyEngine:
     """
 
     def __init__(self, mode: MatchMode = MatchMode.FIRST):
-        self._rules: List[Rule] = []
+        self._rules: list[Rule] = []
         self._mode = mode
-        self._rule_names: Set[str] = set()
+        self._rule_names: set[str] = set()
 
     # ---------- CRUD ----------
 
     def add_rule(
         self,
         name: str,
-        conditions: Optional[List[Condition]] = None,
-        actions: Optional[List[Action]] = None,
+        conditions: list[Condition] | None = None,
+        actions: list[Action] | None = None,
         priority: int = 0,
         enabled: bool = True,
         description: str = "",
@@ -289,7 +299,7 @@ class PolicyEngine:
         self._rule_names.discard(name)
         return len(self._rules) < before
 
-    def get_rule(self, name: str) -> Optional[Rule]:
+    def get_rule(self, name: str) -> Rule | None:
         for r in self._rules:
             if r.name == name:
                 return r
@@ -314,7 +324,7 @@ class PolicyEngine:
 
     # ---------- evaluation ----------
 
-    def evaluate(self, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def evaluate(self, context: dict[str, Any]) -> dict[str, Any] | None:
         """Evaluate rules against context."""
         results = []
         for rule in self._rules:
@@ -331,7 +341,7 @@ class PolicyEngine:
             return results[0]
         return {"matches": results}
 
-    def evaluate_all(self, context: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def evaluate_all(self, context: dict[str, Any]) -> list[dict[str, Any]]:
         """Evaluate all rules, return list of matches (ignores mode)."""
         matches = []
         for rule in self._rules:
@@ -343,14 +353,14 @@ class PolicyEngine:
 
     # ---------- serialization ----------
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"rules": [r.to_dict() for r in self._rules], "mode": self._mode.value}
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), indent=2, ensure_ascii=False)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "PolicyEngine":
+    def from_dict(cls, d: dict[str, Any]) -> PolicyEngine:
         pe = cls(mode=MatchMode(d.get("mode", "first")))
         for rule_d in d.get("rules", []):
             pe.add_rule(
@@ -364,9 +374,9 @@ class PolicyEngine:
         return pe
 
     @classmethod
-    def from_json(cls, json_str: str) -> "PolicyEngine":
+    def from_json(cls, json_str: str) -> PolicyEngine:
         return cls.from_dict(json.loads(json_str))
 
     @property
-    def rules(self) -> List[Rule]:
+    def rules(self) -> list[Rule]:
         return list(self._rules)

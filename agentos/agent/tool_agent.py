@@ -13,22 +13,22 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
-from typing import Callable, Generator, Optional
 
 from agentos.llm.base import (
+    CompletionChoice,
+    CompletionResult,
+    CompletionUsage,
     LLMProvider,
     Message,
     MessageRole,
-    CompletionResult,
-    CompletionChoice,
-    CompletionUsage,
     Tool,
     ToolCall,
 )
 from agentos.tools.circuit_breaker import CircuitBreaker
-from agentos.tools.validation import ToolOutputValidator, ToolResult, ValidationResult
 from agentos.tools.metrics import MetricsCollector
+from agentos.tools.validation import ToolOutputValidator, ToolResult, ValidationResult
 
 __all__ = [
     "ToolAgent",
@@ -41,6 +41,7 @@ __all__ = [
 
 
 # ── 数据类型 ─────────────────────────────────────────────────────
+
 
 @dataclass
 class AgentConfig:
@@ -80,6 +81,7 @@ class AgentResult:
 
 # ── 工具执行器 ───────────────────────────────────────────────────
 
+
 class ToolExecutor:
     """工具注册与执行器。
 
@@ -89,9 +91,9 @@ class ToolExecutor:
 
     def __init__(
         self,
-        circuit_breaker: Optional[CircuitBreaker] = None,
-        validator: Optional[ToolOutputValidator] = None,
-        metrics: Optional[MetricsCollector] = None,
+        circuit_breaker: CircuitBreaker | None = None,
+        validator: ToolOutputValidator | None = None,
+        metrics: MetricsCollector | None = None,
     ):
         self._tools: dict[str, Callable[..., str]] = {}
         self._schemas: dict[str, Tool] = {}
@@ -116,10 +118,12 @@ class ToolExecutor:
         if self._cb is not None:
             if not self._cb.allow_request():
                 self._cb.record_failure()
-                return json.dumps({
-                    "error": f"Circuit breaker OPEN for '{self._cb.name}'",
-                    "circuit_state": self._cb.state.name,
-                })
+                return json.dumps(
+                    {
+                        "error": f"Circuit breaker OPEN for '{self._cb.name}'",
+                        "circuit_state": self._cb.state.name,
+                    }
+                )
 
         t0 = time.monotonic()
         try:
@@ -159,6 +163,7 @@ class ToolExecutor:
 
 # ── MockLLMProvider ──────────────────────────────────────────────
 
+
 class MockLLMProvider(LLMProvider):
     """可编程响应的 Mock Provider，供集成测试使用。"""
 
@@ -173,10 +178,12 @@ class MockLLMProvider(LLMProvider):
             return self._build_result({"content": "done", "finish_reason": "stop"})
         resp = self._responses[self._cursor]
         self._cursor += 1
-        self.calls.append({
-            "tools": [t.function.name for t in (tools or [])],
-            "cursor": self._cursor - 1,
-        })
+        self.calls.append(
+            {
+                "tools": [t.function.name for t in (tools or [])],
+                "cursor": self._cursor - 1,
+            }
+        )
         return self._build_result(resp)
 
     async def achat(self, *args, **kwargs):
@@ -214,11 +221,16 @@ class MockLLMProvider(LLMProvider):
             id=f"mock_{self._cursor}",
             model="mock-model",
             choices=[choice],
-            usage=CompletionUsage(prompt_tokens=5, completion_tokens=len(resp.get("content", "")) + 3, total_tokens=len(resp.get("content", "")) + 8),
+            usage=CompletionUsage(
+                prompt_tokens=5,
+                completion_tokens=len(resp.get("content", "")) + 3,
+                total_tokens=len(resp.get("content", "")) + 8,
+            ),
         )
 
 
 # ── Tool-Using Agent ─────────────────────────────────────────────
+
 
 class ToolAgent:
     """基于 LLM Function Calling 的自主 Agent。
@@ -245,7 +257,7 @@ class ToolAgent:
         *,
         config: AgentConfig | None = None,
         system_prompt: str = "",
-        metrics: Optional[MetricsCollector] = None,
+        metrics: MetricsCollector | None = None,
     ):
         self._provider = provider
         self._executor = tool_executor
@@ -270,7 +282,13 @@ class ToolAgent:
         return self._run_loop(messages, task, tools, steps, 1, t0)
 
     def _run_loop(
-        self, messages, task, tools, steps, start_step, t0,
+        self,
+        messages,
+        task,
+        tools,
+        steps,
+        start_step,
+        t0,
     ) -> AgentResult:
         final_answer = ""
         total_tokens = 0
@@ -289,15 +307,22 @@ class ToolAgent:
                     break
                 messages.append(result.choices[0].message)
                 for tc in step.tool_calls:
-                    messages.append(Message(
-                        role=MessageRole.TOOL,
-                        content=step.tool_results.get(tc.id, ""),
-                        tool_call_id=tc.id,
-                    ))
+                    messages.append(
+                        Message(
+                            role=MessageRole.TOOL,
+                            content=step.tool_results.get(tc.id, ""),
+                            tool_call_id=tc.id,
+                        )
+                    )
                 self._checkpoint(messages, task, step_num)
             else:
                 return self._make_result(
-                    False, "", steps, total_tokens, total_cost, t0,
+                    False,
+                    "",
+                    steps,
+                    total_tokens,
+                    total_cost,
+                    t0,
                     f"Reached max steps ({self._config.max_steps}) without final answer",
                 )
         except Exception as e:
@@ -332,15 +357,22 @@ class ToolAgent:
                     break
                 messages.append(result.choices[0].message)
                 for tc in step.tool_calls:
-                    messages.append(Message(
-                        role=MessageRole.TOOL,
-                        content=step.tool_results.get(tc.id, ""),
-                        tool_call_id=tc.id,
-                    ))
+                    messages.append(
+                        Message(
+                            role=MessageRole.TOOL,
+                            content=step.tool_results.get(tc.id, ""),
+                            tool_call_id=tc.id,
+                        )
+                    )
                 self._checkpoint(messages, task, step_num)
             else:
                 return self._make_result(
-                    False, "", steps, total_tokens, total_cost, t0,
+                    False,
+                    "",
+                    steps,
+                    total_tokens,
+                    total_cost,
+                    t0,
                     f"Reached max steps ({self._config.max_steps}) without final answer",
                 )
         except Exception as e:
@@ -374,15 +406,22 @@ class ToolAgent:
                     break
                 messages.append(result.choices[0].message)
                 for tc in step.tool_calls:
-                    messages.append(Message(
-                        role=MessageRole.TOOL,
-                        content=step.tool_results.get(tc.id, ""),
-                        tool_call_id=tc.id,
-                    ))
+                    messages.append(
+                        Message(
+                            role=MessageRole.TOOL,
+                            content=step.tool_results.get(tc.id, ""),
+                            tool_call_id=tc.id,
+                        )
+                    )
                 self._checkpoint(messages, task, step_num)
             else:
                 return self._make_result(
-                    False, "", steps, total_tokens, total_cost, t0,
+                    False,
+                    "",
+                    steps,
+                    total_tokens,
+                    total_cost,
+                    t0,
                     f"Reached max steps ({self._config.max_steps}) without final answer",
                 )
         except Exception as e:
@@ -393,7 +432,9 @@ class ToolAgent:
     # ── 共享步骤逻辑 ───────────────────────────────────────────────
 
     def _process_step(
-        self, result: CompletionResult, step_num: int,
+        self,
+        result: CompletionResult,
+        step_num: int,
     ) -> tuple[AgentStep, bool, str]:
         """处理单步 LLM 结果：构建 AgentStep、执行工具、判断终止。
 
@@ -441,8 +482,14 @@ class ToolAgent:
         return step, False, ""
 
     def _make_result(
-        self, success: bool, answer: str, steps: list[AgentStep],
-        total_tokens: int, total_cost: float, t0: float, error: str = None,
+        self,
+        success: bool,
+        answer: str,
+        steps: list[AgentStep],
+        total_tokens: int,
+        total_cost: float,
+        t0: float,
+        error: str = None,
     ) -> AgentResult:
         """统一构造 AgentResult。"""
         return AgentResult(
@@ -474,7 +521,9 @@ class ToolAgent:
                 role=MessageRole(m["role"]),
                 content=m["content"],
                 tool_call_id=m.get("tool_call_id"),
-                tool_calls=[ToolCall(**tc) for tc in m["tool_calls"]] if m.get("tool_calls") else None,
+                tool_calls=(
+                    [ToolCall(**tc) for tc in m["tool_calls"]] if m.get("tool_calls") else None
+                ),
             )
             for m in messages_raw
         ]
@@ -495,10 +544,14 @@ class ToolAgent:
                     "role": m.role.value,
                     "content": m.content,
                     "tool_call_id": m.tool_call_id,
-                    "tool_calls": [
-                        {"id": tc.id, "name": tc.name, "arguments": tc.arguments}
-                        for tc in m.tool_calls
-                    ] if m.tool_calls else None,
+                    "tool_calls": (
+                        [
+                            {"id": tc.id, "name": tc.name, "arguments": tc.arguments}
+                            for tc in m.tool_calls
+                        ]
+                        if m.tool_calls
+                        else None
+                    ),
                 }
                 for m in messages
             ],
@@ -524,7 +577,9 @@ class ToolAgent:
                     time.sleep(self._config.retry_delay)
         raise last_error  # type: ignore
 
-    async def _acall_with_retry(self, messages: list[Message], tools: list[Tool]) -> CompletionResult:
+    async def _acall_with_retry(
+        self, messages: list[Message], tools: list[Tool]
+    ) -> CompletionResult:
         last_error = None
         for attempt in range(self._config.max_retries + 1):
             try:
@@ -538,11 +593,14 @@ class ToolAgent:
                 last_error = e
                 if attempt < self._config.max_retries:
                     import asyncio
+
                     await asyncio.sleep(self._config.retry_delay)
         raise last_error  # type: ignore
 
     def _log_step(self, step: AgentStep) -> None:
-        print(f"\n── Step {step.step} ({step.duration_ms:.0f}ms, {step.tokens_used}t, ${step.cost_usd:.6f}) ──")
+        print(
+            f"\n── Step {step.step} ({step.duration_ms:.0f}ms, {step.tokens_used}t, ${step.cost_usd:.6f}) ──"
+        )
         if step.thought:
             print(f"  Thought: {step.thought}")
         if step.tool_calls:

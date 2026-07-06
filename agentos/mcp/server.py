@@ -15,7 +15,7 @@ import json
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +42,9 @@ class MCPServer:
         *,
         name: str = "agentos",
         version: str = "1.5.2",
-        tools: Optional[List] = None,
-        resources: Optional[List] = None,
-        prompts: Optional[List] = None,
+        tools: list | None = None,
+        resources: list | None = None,
+        prompts: list | None = None,
     ):
         if server_info is not None:
             if isinstance(server_info, ServerInfo):
@@ -57,32 +57,32 @@ class MCPServer:
         else:
             self.name = name
             self.version = version
-        self._tools: Dict[str, Any] = {}
-        self._resources: Dict[str, MCPResource] = {}
-        self._prompts: Dict[str, MCPPromptDef] = {}
+        self._tools: dict[str, Any] = {}
+        self._resources: dict[str, MCPResource] = {}
+        self._prompts: dict[str, MCPPromptDef] = {}
         self._initialized = False
 
-        for t in (tools or []):
+        for t in tools or []:
             self.register_tool(t)
-        for r in (resources or []):
+        for r in resources or []:
             self._resources[r.uri] = r
-        for p in (prompts or []):
+        for p in prompts or []:
             self._prompts[p.name] = p
 
         # 内置工具
         self._register_builtin_tools()
 
     @property
-    def info(self) -> "ServerInfo":
+    def info(self) -> ServerInfo:
         return ServerInfo(name=self.name, version=self.version)
 
     @property
-    def tools(self) -> Dict[str, Any]:
+    def tools(self) -> dict[str, Any]:
         return self._tools
 
     def register_tool(self, tool):
         """注册一个 MCP 工具。兼容 MCPToolDef 和 Tool dataclass。"""
-        if hasattr(tool, 'name'):
+        if hasattr(tool, "name"):
             self._tools[tool.name] = tool
         else:
             # MCPToolDef compat
@@ -92,11 +92,13 @@ class MCPServer:
         """异步列出所有工具。"""
         result = []
         for t in self._tools.values():
-            result.append({
-                "name": t.name,
-                "description": t.description,
-                "inputSchema": getattr(t, 'input_schema', {}),
-            })
+            result.append(
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "inputSchema": getattr(t, "input_schema", {}),
+                }
+            )
         return result
 
     def run_stdio(self):
@@ -207,11 +209,13 @@ class MCPServer:
     async def _handle_tools_list(self, params: dict) -> dict:
         tools = []
         for t in self._tools.values():
-            tools.append({
-                "name": t.name,
-                "description": t.description,
-                "inputSchema": t.input_schema,
-            })
+            tools.append(
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "inputSchema": t.input_schema,
+                }
+            )
         return {"tools": tools}
 
     async def _handle_tools_call(self, params: dict) -> dict:
@@ -222,7 +226,11 @@ class MCPServer:
             raise MCPError(-32602, f"Unknown tool: {tool_name}")
 
         try:
-            result = tool.handler(arguments) if not asyncio.iscoroutinefunction(tool.handler) else await tool.handler(arguments)
+            result = (
+                tool.handler(arguments)
+                if not asyncio.iscoroutinefunction(tool.handler)
+                else await tool.handler(arguments)
+            )
             return {
                 "content": [
                     {"type": "text", "text": str(result) if not isinstance(result, str) else result}
@@ -230,21 +238,21 @@ class MCPServer:
             }
         except Exception as e:
             return {
-                "content": [
-                    {"type": "text", "text": f"Error: {str(e)}"}
-                ],
+                "content": [{"type": "text", "text": f"Error: {str(e)}"}],
                 "isError": True,
             }
 
     async def _handle_resources_list(self, params: dict) -> dict:
         resources = []
         for r in self._resources.values():
-            resources.append({
-                "uri": r.uri,
-                "name": r.name,
-                "description": r.description,
-                "mimeType": r.mime_type,
-            })
+            resources.append(
+                {
+                    "uri": r.uri,
+                    "name": r.name,
+                    "description": r.description,
+                    "mimeType": r.mime_type,
+                }
+            )
         return {"resources": resources}
 
     async def _handle_resources_read(self, params: dict) -> dict:
@@ -253,20 +261,18 @@ class MCPServer:
         if r is None:
             raise MCPError(-32602, f"Unknown resource: {uri}")
         text = r.content() if callable(r.content) else r.content
-        return {
-            "contents": [
-                {"uri": uri, "mimeType": r.mime_type, "text": str(text)}
-            ]
-        }
+        return {"contents": [{"uri": uri, "mimeType": r.mime_type, "text": str(text)}]}
 
     async def _handle_prompts_list(self, params: dict) -> dict:
         prompts = []
         for p in self._prompts.values():
-            prompts.append({
-                "name": p.name,
-                "description": p.description,
-                "arguments": p.arguments,
-            })
+            prompts.append(
+                {
+                    "name": p.name,
+                    "description": p.description,
+                    "arguments": p.arguments,
+                }
+            )
         return {"prompts": prompts}
 
     async def _handle_prompts_get(self, params: dict) -> dict:
@@ -278,9 +284,7 @@ class MCPServer:
         template = p.template(prompt_args) if callable(p.template) else p.template
         return {
             "description": p.description,
-            "messages": [
-                {"role": "user", "content": {"type": "text", "text": template}}
-            ]
+            "messages": [{"role": "user", "content": {"type": "text", "text": template}}],
         }
 
     # ── 内置工具 ──────────────────────────
@@ -288,51 +292,64 @@ class MCPServer:
     def _register_builtin_tools(self):
         """注册 AgentOS 内置 MCP 工具。"""
 
-        self.register_tool(MCPToolDef(
-            name="agentos_chat",
-            description="使用 AgentOS LLM 进行对话（支持 OpenAI/DeepSeek/Anthropic/Claude/Ollama）",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "messages": {
-                        "type": "array",
-                        "description": "对话消息列表",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "role": {"type": "string", "enum": ["system", "user", "assistant"]},
-                                "content": {"type": "string"},
+        self.register_tool(
+            MCPToolDef(
+                name="agentos_chat",
+                description="使用 AgentOS LLM 进行对话（支持 OpenAI/DeepSeek/Anthropic/Claude/Ollama）",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "messages": {
+                            "type": "array",
+                            "description": "对话消息列表",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "role": {
+                                        "type": "string",
+                                        "enum": ["system", "user", "assistant"],
+                                    },
+                                    "content": {"type": "string"},
+                                },
+                                "required": ["role", "content"],
                             },
-                            "required": ["role", "content"],
+                        },
+                        "model": {"type": "string", "description": "模型名称，默认从配置读取"},
+                        "temperature": {"type": "number", "description": "温度参数（0-2）"},
+                        "max_tokens": {"type": "integer", "description": "最大输出 token 数"},
+                    },
+                    "required": ["messages"],
+                },
+                handler=self._tool_agentos_chat,
+            )
+        )
+
+        self.register_tool(
+            MCPToolDef(
+                name="agentos_list_tools",
+                description="列出 AgentOS 中所有可用的工具（含 MCP 工具）",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "format": {
+                            "type": "string",
+                            "enum": ["openai", "anthropic"],
+                            "description": "输出格式",
                         },
                     },
-                    "model": {"type": "string", "description": "模型名称，默认从配置读取"},
-                    "temperature": {"type": "number", "description": "温度参数（0-2）"},
-                    "max_tokens": {"type": "integer", "description": "最大输出 token 数"},
                 },
-                "required": ["messages"],
-            },
-            handler=self._tool_agentos_chat,
-        ))
+                handler=self._tool_list_tools,
+            )
+        )
 
-        self.register_tool(MCPToolDef(
-            name="agentos_list_tools",
-            description="列出 AgentOS 中所有可用的工具（含 MCP 工具）",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "format": {"type": "string", "enum": ["openai", "anthropic"], "description": "输出格式"},
-                },
-            },
-            handler=self._tool_list_tools,
-        ))
-
-        self.register_tool(MCPToolDef(
-            name="agentos_version",
-            description="获取 AgentOS 版本信息",
-            input_schema={"type": "object", "properties": {}},
-            handler=self._tool_version,
-        ))
+        self.register_tool(
+            MCPToolDef(
+                name="agentos_version",
+                description="获取 AgentOS 版本信息",
+                input_schema={"type": "object", "properties": {}},
+                handler=self._tool_version,
+            )
+        )
 
     async def _tool_agentos_chat(self, args: dict) -> str:
         """调用 AgentOS LLM 对话。"""
@@ -358,12 +375,24 @@ class MCPServer:
         tools_list = []
         for name, tool in self._tools.items():
             if fmt == "openai":
-                tools_list.append({
-                    "type": "function",
-                    "function": {"name": name, "description": tool.description, "parameters": tool.input_schema},
-                })
+                tools_list.append(
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "description": tool.description,
+                            "parameters": tool.input_schema,
+                        },
+                    }
+                )
             else:
-                tools_list.append({"name": name, "description": tool.description, "input_schema": tool.input_schema})
+                tools_list.append(
+                    {
+                        "name": name,
+                        "description": tool.description,
+                        "input_schema": tool.input_schema,
+                    }
+                )
         return json.dumps(tools_list, ensure_ascii=False, indent=2)
 
     def _tool_version(self, args: dict) -> str:
@@ -372,12 +401,15 @@ class MCPServer:
             from agentos import __version__
         except ImportError:
             __version__ = self.version
-        return json.dumps({
-            "name": self.name,
-            "version": self.version,
-            "agentos_version": __version__,
-            "tools_count": len(self._tools),
-        }, ensure_ascii=False)
+        return json.dumps(
+            {
+                "name": self.name,
+                "version": self.version,
+                "agentos_version": __version__,
+                "tools_count": len(self._tools),
+            },
+            ensure_ascii=False,
+        )
 
 
 # ── 数据结构 ───────────────────────────────
@@ -466,8 +498,10 @@ def start_mcp_server(port: int = 0):
         print("MCP HTTP SSE 模式暂未实现。请使用 stdio 模式（port=0）。")
         sys.exit(1)
 
+
 # ── ServerInfo & Tool (test compatibility) ──
 from dataclasses import dataclass, field
+
 
 @dataclass
 class ServerInfo:
@@ -475,12 +509,14 @@ class ServerInfo:
     version: str
     description: str = ""
 
+
 @dataclass
 class Tool:
     name: str
     description: str
     input_schema: dict
     call: callable = field(default=lambda params: None)
+
 
 @dataclass
 class AgentCard:

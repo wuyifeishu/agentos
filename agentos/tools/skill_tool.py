@@ -11,7 +11,7 @@ import inspect
 import json
 import os
 import sys
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from agentos.tools.base import BaseTool, ToolResult
 
@@ -24,8 +24,13 @@ class SkillTool(BaseTool):
 
     permission_level = "safe"  # type: ignore
 
-    def __init__(self, skill_name: str, skill_run: Callable[..., str],
-                 description: str = "", parameters: Optional[dict] = None):
+    def __init__(
+        self,
+        skill_name: str,
+        skill_run: Callable[..., str],
+        description: str = "",
+        parameters: dict | None = None,
+    ):
         self._skill_name = skill_name
         self._run_fn = skill_run
         self._description = description
@@ -138,9 +143,7 @@ def _infer_parameters(fn: Callable) -> dict:
     except (ValueError, TypeError):
         return {
             "type": "object",
-            "properties": {
-                "kwargs": {"type": "string", "description": "JSON string of arguments"}
-            },
+            "properties": {"kwargs": {"type": "string", "description": "JSON string of arguments"}},
         }
 
     properties = {}

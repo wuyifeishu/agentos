@@ -20,40 +20,91 @@ import asyncio
 import inspect
 import sys
 import traceback
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any
 
 from agentos.models.router import ModelRouter
 
-
 # ── 安全常量 ───────────────────────────────────
 
-DEFAULT_ALLOWED_MODULES = frozenset({
-    "math", "json", "re", "datetime", "collections",
-    "itertools", "functools", "typing", "dataclasses",
-    "decimal", "fractions", "statistics", "random",
-    "string", "textwrap", "unicodedata", "hashlib",
-    "base64", "binascii", "uuid", "copy", "pprint",
-    "enum", "pathlib", "logging", "warnings",
-    "csv", "html", "urllib.parse", "xml.etree.ElementTree",
-    "operator", "heapq", "bisect", "array",
-    "struct", "io", "os.path",
-})
+DEFAULT_ALLOWED_MODULES = frozenset(
+    {
+        "math",
+        "json",
+        "re",
+        "datetime",
+        "collections",
+        "itertools",
+        "functools",
+        "typing",
+        "dataclasses",
+        "decimal",
+        "fractions",
+        "statistics",
+        "random",
+        "string",
+        "textwrap",
+        "unicodedata",
+        "hashlib",
+        "base64",
+        "binascii",
+        "uuid",
+        "copy",
+        "pprint",
+        "enum",
+        "pathlib",
+        "logging",
+        "warnings",
+        "csv",
+        "html",
+        "urllib.parse",
+        "xml.etree.ElementTree",
+        "operator",
+        "heapq",
+        "bisect",
+        "array",
+        "struct",
+        "io",
+        "os.path",
+    }
+)
 
-FORBIDDEN_CALLS = frozenset({
-    "exec", "eval", "compile", "open", "__import__",
-    "getattr", "setattr", "delattr", "hasattr",
-    "globals", "locals", "vars",
-    "breakpoint", "input",
-    "os", "subprocess", "shutil", "sys",
-    "ctypes", "socket", "pickle", "marshal",
-    "multiprocessing", "threading", "signal",
-})
+FORBIDDEN_CALLS = frozenset(
+    {
+        "exec",
+        "eval",
+        "compile",
+        "open",
+        "__import__",
+        "getattr",
+        "setattr",
+        "delattr",
+        "hasattr",
+        "globals",
+        "locals",
+        "vars",
+        "breakpoint",
+        "input",
+        "os",
+        "subprocess",
+        "shutil",
+        "sys",
+        "ctypes",
+        "socket",
+        "pickle",
+        "marshal",
+        "multiprocessing",
+        "threading",
+        "signal",
+    }
+)
 
 MAX_OUTPUT_LENGTH = 10000
 
 
 # ── 数据结构 ───────────────────────────────────
+
 
 @dataclass
 class CodeStep:
@@ -63,7 +114,7 @@ class CodeStep:
     code: str
     result: Any = None
     stdout: str = ""
-    error: Optional[str] = None
+    error: str | None = None
     duration_ms: float = 0.0
 
 
@@ -73,19 +124,20 @@ class CodeResult:
 
     success: bool
     final_answer: Any = None
-    steps: List[CodeStep] = field(default_factory=list)
+    steps: list[CodeStep] = field(default_factory=list)
     total_duration_ms: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 # ── 代码安全检查器 ─────────────────────────────
+
 
 class CodeGuard(ast.NodeVisitor):
     """Python 代码 AST 安全扫描器，拦截危险操作。"""
 
     def __init__(self, allowed_modules: frozenset):
         self.allowed_modules = allowed_modules
-        self.violations: List[str] = []
+        self.violations: list[str] = []
 
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
@@ -117,7 +169,7 @@ class CodeGuard(ast.NodeVisitor):
         self.generic_visit(node)
 
 
-def scan_code(code: str, allowed_modules: frozenset) -> List[str]:
+def scan_code(code: str, allowed_modules: frozenset) -> list[str]:
     try:
         tree = ast.parse(code)
     except SyntaxError:
@@ -129,12 +181,13 @@ def scan_code(code: str, allowed_modules: frozenset) -> List[str]:
 
 # ── 受控执行环境 ───────────────────────────────
 
+
 def safe_exec(
     code: str,
-    tools: Dict[str, Callable],
-    state: Dict[str, Any],
+    tools: dict[str, Callable],
+    state: dict[str, Any],
     timeout: float,
-) -> Tuple[Any, str, Optional[str]]:
+) -> tuple[Any, str, str | None]:
     from io import StringIO
 
     stdout_capture = StringIO()
@@ -146,11 +199,13 @@ def safe_exec(
     try:
         exec_globals = {"__builtins__": __builtins__}
         exec_globals.update(tools)
-        exec_globals.update({
-            "print": lambda *a, **kw: print(*a, **kw),
-            "__result__": None,
-            "state": state,
-        })
+        exec_globals.update(
+            {
+                "print": lambda *a, **kw: print(*a, **kw),
+                "__result__": None,
+                "state": state,
+            }
+        )
         compiled = compile(code, "<code_agent>", "exec")
         exec(compiled, exec_globals)
         result = exec_globals.get("__result__")
@@ -198,12 +253,13 @@ Now solve the following task. ONLY output the code block."""
 
 # ── CodeAgent ───────────────────────────────────
 
+
 class CodeAgent:
     """代码执行型 Agent。"""
 
     def __init__(
         self,
-        tools: List[Callable] | None = None,
+        tools: list[Callable] | None = None,
         model: str = "gpt-4o",
         max_steps: int = 10,
         timeout_per_step: float = 30.0,
@@ -213,13 +269,13 @@ class CodeAgent:
         self.max_steps = max_steps
         self.timeout_per_step = timeout_per_step
         self.allowed_modules = allowed_modules
-        self._tools: Dict[str, Callable] = {}
+        self._tools: dict[str, Callable] = {}
         if tools:
             for tool in tools:
                 self._tools[tool.__name__] = tool
 
     @property
-    def tools(self) -> Dict[str, Callable]:
+    def tools(self) -> dict[str, Callable]:
         return self._tools
 
     def _tools_description(self) -> str:
@@ -230,11 +286,11 @@ class CodeAgent:
             lines.append(f"  {name}{sig}: {doc}")
         return "\n".join(lines) if lines else "  (no tools available)"
 
-    async def run(self, task: str, state: Dict[str, Any] | None = None) -> CodeResult:
+    async def run(self, task: str, state: dict[str, Any] | None = None) -> CodeResult:
         if state is None:
             state = {"_vars": {}}
         tools_desc = self._tools_description()
-        steps: List[CodeStep] = []
+        steps: list[CodeStep] = []
         total_start = asyncio.get_event_loop().time()
 
         for step_num in range(1, self.max_steps + 1):
@@ -248,14 +304,21 @@ class CodeAgent:
                     rp = str(last.result)[:500] if last.result is not None else "None"
                     op = last.stdout[:500] if last.stdout else ""
                     feedback = f"Output: {op}\nResult: {rp}"
-                user_prompt = f"Step {step_num}: Continue.\nPrevious result:\n{feedback}\n\nTask: {task}"
+                user_prompt = (
+                    f"Step {step_num}: Continue.\nPrevious result:\n{feedback}\n\nTask: {task}"
+                )
 
             router = ModelRouter()
             try:
                 response = await router.chat(
                     model=self.model,
                     messages=[
-                        {"role": "system", "content": CODE_AGENT_SYSTEM_PROMPT.format(tools_description=tools_desc)},
+                        {
+                            "role": "system",
+                            "content": CODE_AGENT_SYSTEM_PROMPT.format(
+                                tools_description=tools_desc
+                            ),
+                        },
                         {"role": "user", "content": user_prompt},
                     ],
                     temperature=0.0,
@@ -263,7 +326,8 @@ class CodeAgent:
                 )
             except Exception as e:
                 return CodeResult(
-                    success=False, steps=steps,
+                    success=False,
+                    steps=steps,
                     total_duration_ms=(asyncio.get_event_loop().time() - total_start) * 1000,
                     error=f"LLM error: {e}",
                 )
@@ -272,29 +336,45 @@ class CodeAgent:
             if not code:
                 if steps:
                     return CodeResult(
-                        success=True, final_answer=steps[-1].result, steps=steps,
+                        success=True,
+                        final_answer=steps[-1].result,
+                        steps=steps,
                         total_duration_ms=(asyncio.get_event_loop().time() - total_start) * 1000,
                     )
                 continue
 
             violations = scan_code(code, self.allowed_modules)
             if violations:
-                steps.append(CodeStep(step=step_num, code=code,
-                            error=f"Security violation: {'; '.join(violations)}"))
+                steps.append(
+                    CodeStep(
+                        step=step_num,
+                        code=code,
+                        error=f"Security violation: {'; '.join(violations)}",
+                    )
+                )
                 continue
 
             step_start = asyncio.get_event_loop().time()
             try:
                 loop = asyncio.get_event_loop()
                 result, stdout, error = await asyncio.wait_for(
-                    loop.run_in_executor(None, safe_exec, code, self._tools, state, self.timeout_per_step),
+                    loop.run_in_executor(
+                        None, safe_exec, code, self._tools, state, self.timeout_per_step
+                    ),
                     timeout=self.timeout_per_step + 5,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 result, stdout, error = None, "", "TimeoutError: exceeded limit"
 
             step_duration = (asyncio.get_event_loop().time() - step_start) * 1000
-            cs = CodeStep(step=step_num, code=code, result=result, stdout=stdout, error=error, duration_ms=step_duration)
+            cs = CodeStep(
+                step=step_num,
+                code=code,
+                result=result,
+                stdout=stdout,
+                error=error,
+                duration_ms=step_duration,
+            )
             steps.append(cs)
 
             if error:
@@ -302,25 +382,31 @@ class CodeAgent:
 
             if "__result__" in code or (result is not None and "__result__" in code):
                 return CodeResult(
-                    success=True, final_answer=result, steps=steps,
+                    success=True,
+                    final_answer=result,
+                    steps=steps,
                     total_duration_ms=(asyncio.get_event_loop().time() - total_start) * 1000,
                 )
 
             # heuristic: non-trivial result without error = likely done
             if result is not None and step_num >= 1:
                 return CodeResult(
-                    success=True, final_answer=result, steps=steps,
+                    success=True,
+                    final_answer=result,
+                    steps=steps,
                     total_duration_ms=(asyncio.get_event_loop().time() - total_start) * 1000,
                 )
 
         return CodeResult(
-            success=False, final_answer=steps[-1].result if steps else None, steps=steps,
+            success=False,
+            final_answer=steps[-1].result if steps else None,
+            steps=steps,
             total_duration_ms=(asyncio.get_event_loop().time() - total_start) * 1000,
             error=f"Max steps ({self.max_steps}) reached",
         )
 
     @staticmethod
-    def _extract_code(content: str) -> Optional[str]:
+    def _extract_code(content: str) -> str | None:
         if "```python" in content:
             parts = content.split("```python", 1)
             if len(parts) > 1:

@@ -16,9 +16,10 @@ import asyncio
 import logging
 import signal
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +28,20 @@ logger = logging.getLogger(__name__)
 # Types
 # ============================================================================
 
-class LifecyclePhase(str, Enum):
+
+class LifecyclePhase(StrEnum):
     """Ordered lifecycle phases during startup."""
 
-    CONFIG = "config"             # Configuration loading
-    INFRA = "infra"               # DB, Redis, message queues
-    SECURITY = "security"         # Auth, encryption, certs
-    SERVICES = "services"         # Internal services
-    MIDDLEWARE = "middleware"     # Middleware pipeline
-    API = "api"                   # HTTP/gRPC server
-    READY = "ready"               # Final readiness signal
+    CONFIG = "config"  # Configuration loading
+    INFRA = "infra"  # DB, Redis, message queues
+    SECURITY = "security"  # Auth, encryption, certs
+    SERVICES = "services"  # Internal services
+    MIDDLEWARE = "middleware"  # Middleware pipeline
+    API = "api"  # HTTP/gRPC server
+    READY = "ready"  # Final readiness signal
 
 
-class ComponentStatus(str, Enum):
+class ComponentStatus(StrEnum):
     """Component health status."""
 
     UNINITIALIZED = "uninitialized"
@@ -61,7 +63,7 @@ class LifecycleHook:
     timeout_seconds: float = 30.0
     is_async: bool = False
     critical: bool = True  # Fail startup if critical hook fails
-    weight: int = 50       # Ordering within same phase (lower = first)
+    weight: int = 50  # Ordering within same phase (lower = first)
     retries: int = 0
     retry_delay: float = 1.0
 
@@ -72,10 +74,10 @@ class ComponentHealth:
 
     name: str
     status: ComponentStatus = ComponentStatus.UNINITIALIZED
-    phase: Optional[LifecyclePhase] = None
+    phase: LifecyclePhase | None = None
     message: str = ""
-    error: Optional[str] = None
-    started_at: Optional[float] = None
+    error: str | None = None
+    started_at: float | None = None
     duration_ms: float = 0.0
 
 
@@ -85,7 +87,7 @@ class LifecycleReport:
 
     overall_status: ComponentStatus = ComponentStatus.UNINITIALIZED
     phase: str = ""
-    components: Dict[str, ComponentHealth] = field(default_factory=dict)
+    components: dict[str, ComponentHealth] = field(default_factory=dict)
     startup_duration_ms: float = 0.0
     shutdown_remaining_hooks: int = 0
 
@@ -95,14 +97,13 @@ class LifecycleReport:
 
     @property
     def is_ready(self) -> bool:
-        return self.overall_status in (
-            ComponentStatus.HEALTHY, ComponentStatus.DEGRADED
-        )
+        return self.overall_status in (ComponentStatus.HEALTHY, ComponentStatus.DEGRADED)
 
 
 # ============================================================================
 # Lifecycle Manager
 # ============================================================================
+
 
 class LifecycleManager:
     """Orchestrates ordered startup and graceful shutdown.
@@ -125,7 +126,7 @@ class LifecycleManager:
     Signal handling (SIGTERM, SIGINT) integrated automatically.
     """
 
-    PHASE_ORDER: List[LifecyclePhase] = [
+    PHASE_ORDER: list[LifecyclePhase] = [
         LifecyclePhase.CONFIG,
         LifecyclePhase.INFRA,
         LifecyclePhase.SECURITY,
@@ -140,11 +141,11 @@ class LifecycleManager:
         grace_period: float = 30.0,
         startup_timeout: float = 120.0,
     ):
-        self._startup_hooks: List[LifecycleHook] = []
-        self._shutdown_hooks: List[LifecycleHook] = []
-        self._health: Dict[str, ComponentHealth] = {}
+        self._startup_hooks: list[LifecycleHook] = []
+        self._shutdown_hooks: list[LifecycleHook] = []
+        self._health: dict[str, ComponentHealth] = {}
         self._status = ComponentStatus.UNINITIALIZED
-        self._start_time: Optional[float] = None
+        self._start_time: float | None = None
         self._grace_period = grace_period
         self._startup_timeout = startup_timeout
         self._shutdown_event = asyncio.Event()
@@ -154,7 +155,7 @@ class LifecycleManager:
 
     def on_startup(
         self,
-        name: Optional[str] = None,
+        name: str | None = None,
         *,
         phase: LifecyclePhase = LifecyclePhase.SERVICES,
         critical: bool = True,
@@ -164,47 +165,53 @@ class LifecycleManager:
         retry_delay: float = 1.0,
     ) -> Callable:
         """Decorator: register a startup hook."""
+
         def decorator(fn):
             hook_name = name or fn.__name__
             is_async = asyncio.iscoroutinefunction(fn)
-            self._startup_hooks.append(LifecycleHook(
-                name=hook_name,
-                phase=phase,
-                fn=fn,
-                timeout_seconds=timeout_seconds,
-                is_async=is_async,
-                critical=critical,
-                weight=weight,
-                retries=retries,
-                retry_delay=retry_delay,
-            ))
-            self._health[hook_name] = ComponentHealth(
-                name=hook_name, phase=phase
+            self._startup_hooks.append(
+                LifecycleHook(
+                    name=hook_name,
+                    phase=phase,
+                    fn=fn,
+                    timeout_seconds=timeout_seconds,
+                    is_async=is_async,
+                    critical=critical,
+                    weight=weight,
+                    retries=retries,
+                    retry_delay=retry_delay,
+                )
             )
+            self._health[hook_name] = ComponentHealth(name=hook_name, phase=phase)
             return fn
+
         return decorator
 
     def on_shutdown(
         self,
-        name: Optional[str] = None,
+        name: str | None = None,
         *,
         timeout_seconds: float = 10.0,
         weight: int = 50,
     ) -> Callable:
         """Decorator: register a shutdown hook (reverse order)."""
+
         def decorator(fn):
             hook_name = name or fn.__name__
             is_async = asyncio.iscoroutinefunction(fn)
-            self._shutdown_hooks.append(LifecycleHook(
-                name=hook_name,
-                phase=LifecyclePhase.READY,  # irrelevant for shutdown
-                fn=fn,
-                timeout_seconds=timeout_seconds,
-                is_async=is_async,
-                critical=False,
-                weight=weight,
-            ))
+            self._shutdown_hooks.append(
+                LifecycleHook(
+                    name=hook_name,
+                    phase=LifecyclePhase.READY,  # irrelevant for shutdown
+                    fn=fn,
+                    timeout_seconds=timeout_seconds,
+                    is_async=is_async,
+                    critical=False,
+                    weight=weight,
+                )
+            )
             return fn
+
         return decorator
 
     # ── Startup ───────────────────────────────────────────────────────────
@@ -232,9 +239,7 @@ class LifecycleManager:
 
         return self.report()
 
-    async def _execute_hook(
-        self, hook: LifecycleHook, is_startup: bool = True
-    ) -> bool:
+    async def _execute_hook(self, hook: LifecycleHook, is_startup: bool = True) -> bool:
         """Execute a single hook with timeout, retries, and health tracking."""
         health = self._health.get(hook.name) or ComponentHealth(name=hook.name)
         health.status = ComponentStatus.STARTING if is_startup else ComponentStatus.SHUTTING_DOWN
@@ -260,7 +265,7 @@ class LifecycleManager:
                 logger.info(f"[lifecycle] {hook.name}: OK ({health.duration_ms:.0f}ms)")
                 return True
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 last_error = f"Timeout after {hook.timeout_seconds}s"
                 health.error = last_error
                 logger.warning(f"[lifecycle] {hook.name}: {last_error}")
@@ -286,7 +291,9 @@ class LifecycleManager:
 
         self._status = ComponentStatus.SHUTTING_DOWN
         self._shutdown_event.set()
-        logger.info(f"[lifecycle] Shutting down gracefully{f' ({signal_name})' if signal_name else ''}")
+        logger.info(
+            f"[lifecycle] Shutting down gracefully{f' ({signal_name})' if signal_name else ''}"
+        )
 
         # Reverse order for shutdown (LIFO — last started, first stopped)
         for hook in reversed(self._shutdown_hooks):
@@ -297,7 +304,7 @@ class LifecycleManager:
 
     # ── Signal integration ────────────────────────────────────────────────
 
-    def setup_signal_handlers(self, loop: Optional[asyncio.AbstractEventLoop] = None):
+    def setup_signal_handlers(self, loop: asyncio.AbstractEventLoop | None = None):
         """Register SIGTERM/SIGINT handlers on the event loop."""
         if loop is None:
             loop = asyncio.get_event_loop()
@@ -306,15 +313,13 @@ class LifecycleManager:
             try:
                 loop.add_signal_handler(
                     sig,
-                    lambda s=sig: asyncio.ensure_future(
-                        self.shutdown(signal.Signals(s).name)
-                    ),
+                    lambda s=sig: asyncio.ensure_future(self.shutdown(signal.Signals(s).name)),
                 )
             except (NotImplementedError, RuntimeError):
                 # Windows or non-main-thread — fallback to signal.signal
-                signal.signal(sig, lambda s, f: asyncio.ensure_future(
-                    self.shutdown(signal.Signals(s).name)
-                ))
+                signal.signal(
+                    sig, lambda s, f: asyncio.ensure_future(self.shutdown(signal.Signals(s).name))
+                )
 
     # ── Probes ────────────────────────────────────────────────────────────
 
@@ -339,11 +344,14 @@ class LifecycleManager:
             phase=self._status.value,
             components=dict(self._health),
             startup_duration_ms=startup_ms,
-            shutdown_remaining_hooks=len([
-                h for h in self._shutdown_hooks
-                if self._health.get(h.name, ComponentHealth(name=h.name)).status
-                not in (ComponentStatus.STOPPED,)
-            ]),
+            shutdown_remaining_hooks=len(
+                [
+                    h
+                    for h in self._shutdown_hooks
+                    if self._health.get(h.name, ComponentHealth(name=h.name)).status
+                    not in (ComponentStatus.STOPPED,)
+                ]
+            ),
         )
 
     # ── Context manager ───────────────────────────────────────────────────
@@ -364,7 +372,7 @@ class LifecycleManager:
 # Singleton helper
 # ============================================================================
 
-_default_lifecycle: Optional[LifecycleManager] = None
+_default_lifecycle: LifecycleManager | None = None
 
 
 def get_lifecycle(

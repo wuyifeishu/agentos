@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
-from typing import Any, AsyncIterator, Awaitable, Callable, Optional
+from typing import Any
 
 from agentos.core.context import AgentContext
 from agentos.core.streaming import StreamChunk
@@ -43,7 +44,7 @@ class AsyncInvocationResult:
     agent_id: str
     success: bool
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     latency_ms: float = 0.0
     retries: int = 0
 
@@ -65,7 +66,7 @@ class AsyncAgentLoop:
         results = await loop.run_all([task1, task2, task3])
     """
 
-    def __init__(self, config: Optional[AsyncLoopConfig] = None):
+    def __init__(self, config: AsyncLoopConfig | None = None):
         self.config = config or AsyncLoopConfig()
         self._semaphore = asyncio.Semaphore(self.config.max_concurrency)
         self._metrics: list[float] = []
@@ -99,7 +100,7 @@ class AsyncAgentLoop:
         args: tuple,
         kwargs: dict,
     ) -> AsyncInvocationResult:
-        last_error: Optional[str] = None
+        last_error: str | None = None
         t0 = time.perf_counter()
 
         for attempt in range(self.config.max_retries + 1):
@@ -118,7 +119,7 @@ class AsyncAgentLoop:
                     latency_ms=latency,
                     retries=attempt,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 last_error = f"Timeout after {self.config.timeout_seconds}s"
                 if not self.config.retry_on_timeout:
                     break
@@ -152,8 +153,7 @@ class AsyncAgentLoop:
             List of results in the same order as input tasks.
         """
         coros = [
-            self.run_single(agent_id, fn, *args, **kwargs)
-            for agent_id, fn, args, kwargs in tasks
+            self.run_single(agent_id, fn, *args, **kwargs) for agent_id, fn, args, kwargs in tasks
         ]
         return list(await asyncio.gather(*coros))
 

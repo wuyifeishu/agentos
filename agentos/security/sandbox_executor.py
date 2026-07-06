@@ -21,14 +21,12 @@ import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Dict, List, Optional
-
+from enum import StrEnum
 
 # ── 枚举与配置 ───────────────────────────────────
 
-class SandboxMode(str, Enum):
 
+class SandboxMode(StrEnum):
     """沙箱模式枚举。"""
 
     DOCKER = "docker"
@@ -39,41 +37,45 @@ class SandboxMode(str, Enum):
 @dataclass
 class SandboxConfig:
     """沙箱执行配置"""
+
     mode: SandboxMode = SandboxMode.PROCESS
     memory_limit_mb: int = 256
-    cpu_limit: float = 1.0           # CPU 核心数上限
+    cpu_limit: float = 1.0  # CPU 核心数上限
     timeout_seconds: float = 30.0
     max_output_bytes: int = 1_000_000  # stdout+stderr 上限
     network_enabled: bool = False
-    writable_root: bool = False        # root 是否可写（Docker模式）
+    writable_root: bool = False  # root 是否可写（Docker模式）
     docker_image: str = "python:3.11-slim"
     container_name_prefix: str = "agentos-sandbox-"
-    env_vars: Dict[str, str] = field(default_factory=dict)
+    env_vars: dict[str, str] = field(default_factory=dict)
 
 
 # ── 执行结果 ────────────────────────────────────
 
+
 @dataclass
 class SandboxResult:
     """沙箱执行结果"""
+
     success: bool
     exit_code: int = 0
     stdout: str = ""
     stderr: str = ""
-    output_files: Dict[str, str] = field(default_factory=dict)  # 文件名→本地路径
+    output_files: dict[str, str] = field(default_factory=dict)  # 文件名→本地路径
     duration_ms: float = 0.0
     truncated: bool = False
-    error: Optional[str] = None
+    error: str | None = None
 
 
 # ── Process 沙箱 ────────────────────────────────
+
 
 class ProcessSandbox:
     """进程级隔离沙箱。使用 subprocess + 临时目录隔离文件系统。"""
 
     def __init__(self, config: SandboxConfig | None = None):
         self.config = config or SandboxConfig()
-        self._work_dir: Optional[str] = None
+        self._work_dir: str | None = None
 
     def setup(self) -> str:
         """创建隔离的工作目录。返回沙箱目录路径。"""
@@ -99,7 +101,7 @@ class ProcessSandbox:
             shutil.copy2(sandbox_path, local_path)
         return local_path
 
-    def collect_output_files(self, patterns: List[str] | None = None) -> Dict[str, str]:
+    def collect_output_files(self, patterns: list[str] | None = None) -> dict[str, str]:
         """收集沙箱内生成的文件（按扩展名匹配），复制到本地临时目录。
 
         Args:
@@ -112,7 +114,7 @@ class ProcessSandbox:
         if not self._work_dir:
             return {}
         output_dir = tempfile.mkdtemp(prefix="agentos-output-")
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
         for root, dirs, files in os.walk(self._work_dir):
             for fname in files:
                 match = True
@@ -131,7 +133,7 @@ class ProcessSandbox:
         self,
         code: str,
         language: str = "python",
-        input_files: Dict[str, str] | None = None,
+        input_files: dict[str, str] | None = None,
     ) -> SandboxResult:
         """在沙箱中执行代码。
 
@@ -140,7 +142,7 @@ class ProcessSandbox:
             language: python | bash
             input_files: {文件名: 外部路径} 输入文件映射
         """
-        start = time.monotonic()
+        time.monotonic()
         if not self._work_dir:
             self.setup()
 
@@ -165,9 +167,9 @@ class ProcessSandbox:
 
         return self._run_subprocess(cmd)
 
-    def execute_command(self, command: str | List[str]) -> SandboxResult:
+    def execute_command(self, command: str | list[str]) -> SandboxResult:
         """在沙箱中执行命令。"""
-        start = time.monotonic()
+        time.monotonic()
         if not self._work_dir:
             self.setup()
         if isinstance(command, str):
@@ -176,7 +178,7 @@ class ProcessSandbox:
             cmd = list(command)
         return self._run_subprocess(cmd)
 
-    def _run_subprocess(self, cmd: List[str]) -> SandboxResult:
+    def _run_subprocess(self, cmd: list[str]) -> SandboxResult:
         start = time.monotonic()
         env = os.environ.copy()
         env.update(self.config.env_vars)
@@ -201,10 +203,10 @@ class ProcessSandbox:
             truncated = False
 
             if len(stdout) > self.config.max_output_bytes:
-                stdout = stdout[:self.config.max_output_bytes] + "\n... [stdout truncated]"
+                stdout = stdout[: self.config.max_output_bytes] + "\n... [stdout truncated]"
                 truncated = True
             if len(stderr) > self.config.max_output_bytes:
-                stderr = stderr[:self.config.max_output_bytes] + "\n... [stderr truncated]"
+                stderr = stderr[: self.config.max_output_bytes] + "\n... [stderr truncated]"
                 truncated = True
 
             duration = (time.monotonic() - start) * 1000
@@ -222,7 +224,11 @@ class ProcessSandbox:
                 success=False,
                 exit_code=-1,
                 stdout=e.stdout or "" if e.stdout else "",
-                stderr=e.stderr or "Timeout: execution exceeded limit" if e.stderr else "Timeout: execution exceeded limit",
+                stderr=(
+                    e.stderr or "Timeout: execution exceeded limit"
+                    if e.stderr
+                    else "Timeout: execution exceeded limit"
+                ),
                 duration_ms=duration,
                 error=f"Timeout after {self.config.timeout_seconds}s",
             )
@@ -242,13 +248,14 @@ class ProcessSandbox:
 
 # ── Docker 沙箱 ────────────────────────────────
 
+
 class DockerSandbox:
     """Docker 容器隔离沙箱。更强的隔离性和可重现性。"""
 
     def __init__(self, config: SandboxConfig | None = None):
         self.config = config or SandboxConfig(mode=SandboxMode.DOCKER)
-        self._container_id: Optional[str] = None
-        self._host_work_dir: Optional[str] = None
+        self._container_id: str | None = None
+        self._host_work_dir: str | None = None
 
     def setup(self) -> str:
         """创建并启动 Docker 容器。返回沙箱目录路径。"""
@@ -256,12 +263,18 @@ class DockerSandbox:
         container_name = f"{self.config.container_name_prefix}{uuid.uuid4().hex[:8]}"
 
         cmd = [
-            "docker", "run", "-d", "--rm",
-            "--name", container_name,
+            "docker",
+            "run",
+            "-d",
+            "--rm",
+            "--name",
+            container_name,
             f"--memory={self.config.memory_limit_mb}m",
             f"--cpus={self.config.cpu_limit}",
-            "-v", f"{self._host_work_dir}:/workspace",
-            "-w", "/workspace",
+            "-v",
+            f"{self._host_work_dir}:/workspace",
+            "-w",
+            "/workspace",
         ]
         if not self.config.network_enabled:
             cmd.append("--network=none")
@@ -287,7 +300,9 @@ class DockerSandbox:
         fname = dst_filename or os.path.basename(src)
         subprocess.run(
             ["docker", "cp", src, f"{self._container_id}:/workspace/{fname}"],
-            check=True, capture_output=True, timeout=10,
+            check=True,
+            capture_output=True,
+            timeout=10,
         )
         return os.path.join(self._host_work_dir, fname)
 
@@ -295,7 +310,7 @@ class DockerSandbox:
         self,
         code: str,
         language: str = "python",
-        input_files: Dict[str, str] | None = None,
+        input_files: dict[str, str] | None = None,
     ) -> SandboxResult:
         if not self._container_id:
             self.setup()
@@ -322,7 +337,7 @@ class DockerSandbox:
 
         return self._run_docker(cmd)
 
-    def execute_command(self, command: str | List[str]) -> SandboxResult:
+    def execute_command(self, command: str | list[str]) -> SandboxResult:
         if not self._container_id:
             self.setup()
         if isinstance(command, str):
@@ -331,11 +346,13 @@ class DockerSandbox:
             cmd = ["docker", "exec", self._container_id] + list(command)
         return self._run_docker(cmd)
 
-    def _run_docker(self, cmd: List[str]) -> SandboxResult:
+    def _run_docker(self, cmd: list[str]) -> SandboxResult:
         start = time.monotonic()
         try:
             proc = subprocess.run(
-                cmd, capture_output=True, text=True,
+                cmd,
+                capture_output=True,
+                text=True,
                 timeout=self.config.timeout_seconds,
             )
             duration = (time.monotonic() - start) * 1000
@@ -344,7 +361,7 @@ class DockerSandbox:
             truncated = False
 
             if len(stdout) > self.config.max_output_bytes:
-                stdout = stdout[:self.config.max_output_bytes] + "\n... [truncated]"
+                stdout = stdout[: self.config.max_output_bytes] + "\n... [truncated]"
                 truncated = True
 
             return SandboxResult(
@@ -359,7 +376,8 @@ class DockerSandbox:
             if self._container_id:
                 subprocess.run(["docker", "kill", self._container_id], capture_output=True)
             return SandboxResult(
-                success=False, exit_code=-1,
+                success=False,
+                exit_code=-1,
                 error=f"Timeout after {self.config.timeout_seconds}s",
                 duration_ms=(time.monotonic() - start) * 1000,
             )
@@ -370,11 +388,11 @@ class DockerSandbox:
                 duration_ms=(time.monotonic() - start) * 1000,
             )
 
-    def collect_output_files(self, patterns: List[str] | None = None) -> Dict[str, str]:
+    def collect_output_files(self, patterns: list[str] | None = None) -> dict[str, str]:
         if not self._host_work_dir:
             return {}
         output_dir = tempfile.mkdtemp(prefix="agentos-output-")
-        result: Dict[str, str] = {}
+        result: dict[str, str] = {}
         for root, dirs, files in os.walk(self._host_work_dir):
             for fname in files:
                 if fname.startswith("_sandbox"):
@@ -400,6 +418,7 @@ class DockerSandbox:
 
 # ── 统一沙箱执行器 ─────────────────────────────
 
+
 class SandboxExecutor:
     """统一沙箱执行器。根据 SandboxConfig.mode 自动选择 Process/Docker。"""
 
@@ -420,18 +439,22 @@ class SandboxExecutor:
         self,
         code: str,
         language: str = "python",
-        input_files: Dict[str, str] | None = None,
+        input_files: dict[str, str] | None = None,
     ) -> SandboxResult:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None, self._sandbox.execute_code, code, language, input_files,
+            None,
+            self._sandbox.execute_code,
+            code,
+            language,
+            input_files,
         )
 
-    async def execute_command(self, command: str | List[str]) -> SandboxResult:
+    async def execute_command(self, command: str | list[str]) -> SandboxResult:
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._sandbox.execute_command, command)
 
-    def collect_output_files(self, patterns: List[str] | None = None) -> Dict[str, str]:
+    def collect_output_files(self, patterns: list[str] | None = None) -> dict[str, str]:
         return self._sandbox.collect_output_files(patterns)
 
     async def cleanup(self):

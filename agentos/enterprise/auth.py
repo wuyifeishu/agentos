@@ -16,15 +16,14 @@ import hmac
 import json
 import time
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional
-
+from enum import StrEnum
 
 # ── 权限系统 ──
 
 
-class Permission(str, Enum):
+class Permission(StrEnum):
     """细粒度权限定义。"""
+
     # Agent
     AGENT_CREATE = "agent:create"
     AGENT_READ = "agent:read"
@@ -50,8 +49,9 @@ class Permission(str, Enum):
     SYSTEM_CONFIG = "system:config"
 
 
-class Role(str, Enum):
+class Role(StrEnum):
     """预定义角色。"""
+
     ADMIN = "admin"
     DEVELOPER = "developer"
     VIEWER = "viewer"
@@ -62,10 +62,14 @@ class Role(str, Enum):
 ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.ADMIN: set(Permission),  # 全部权限
     Role.DEVELOPER: {
-        Permission.AGENT_CREATE, Permission.AGENT_READ, Permission.AGENT_UPDATE,
+        Permission.AGENT_CREATE,
+        Permission.AGENT_READ,
+        Permission.AGENT_UPDATE,
         Permission.AGENT_RUN,
-        Permission.TOOLS_LIST, Permission.TOOLS_EXECUTE,
-        Permission.KEYS_CREATE, Permission.KEYS_READ,
+        Permission.TOOLS_LIST,
+        Permission.TOOLS_EXECUTE,
+        Permission.KEYS_CREATE,
+        Permission.KEYS_READ,
         Permission.AUDIT_READ,
     },
     Role.VIEWER: {
@@ -85,6 +89,7 @@ ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
 @dataclass
 class User:
     """用户实体。"""
+
     user_id: str
     username: str
     email: str
@@ -129,7 +134,9 @@ class RBACEngine:
         """检查用户是否有某权限。"""
         return permission in self.get_permissions(user)
 
-    def check_permissions(self, user: User, permissions: list[Permission]) -> dict[Permission, bool]:
+    def check_permissions(
+        self, user: User, permissions: list[Permission]
+    ) -> dict[Permission, bool]:
         """批量权限检查。"""
         user_perms = self.get_permissions(user)
         return {p: p in user_perms for p in permissions}
@@ -158,7 +165,8 @@ class RBACEngine:
 @dataclass
 class OIDCConfig:
     """OIDC 提供商配置。"""
-    issuer: str                          # 如 "https://accounts.google.com"
+
+    issuer: str  # 如 "https://accounts.google.com"
     client_id: str
     client_secret: str
     redirect_uri: str
@@ -172,6 +180,7 @@ class OIDCConfig:
 @dataclass
 class SAMLConfig:
     """SAML 提供商配置。"""
+
     idp_entity_id: str
     idp_sso_url: str
     idp_certificate: str
@@ -183,6 +192,7 @@ class SAMLConfig:
 @dataclass
 class SSOUser:
     """SSO 返回的用户信息。"""
+
     external_id: str
     email: str
     display_name: str
@@ -197,6 +207,7 @@ class SSOProvider:
     def build_oidc_login_url(config: OIDCConfig, state: str = "", nonce: str = "") -> str:
         """构建 OIDC 登录 URL。"""
         import urllib.parse
+
         params = {
             "response_type": "code",
             "client_id": config.client_id,
@@ -213,6 +224,7 @@ class SSOProvider:
         """构建 SAML 登录 URL（SAMLRequest Base64）。"""
         import base64
         import uuid
+
         saml_request = (
             f'<?xml version="1.0" encoding="UTF-8"?>'
             f'<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"'
@@ -221,18 +233,19 @@ class SSOProvider:
             f' Destination="{config.idp_sso_url}"'
             f' AssertionConsumerServiceURL="{config.sp_acs_url}">'
             f'<saml:Issuer xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion">'
-            f'{config.sp_entity_id}</saml:Issuer>'
-            f'</samlp:AuthnRequest>'
+            f"{config.sp_entity_id}</saml:Issuer>"
+            f"</samlp:AuthnRequest>"
         )
         encoded = base64.b64encode(saml_request.encode()).decode()
         import urllib.parse
+
         params = {"SAMLRequest": encoded}
         if relay_state:
             params["RelayState"] = relay_state
         return f"{config.idp_sso_url}?{urllib.parse.urlencode(params)}"
 
     @staticmethod
-    async def exchange_oidc_code(config: OIDCConfig, code: str) -> Optional[SSOUser]:
+    async def exchange_oidc_code(config: OIDCConfig, code: str) -> SSOUser | None:
         """用 OIDC authorization_code 交换 token 并获取用户信息。（需要 httpx）"""
         try:
             import httpx
@@ -241,22 +254,28 @@ class SSOProvider:
 
         token_ep = config.token_endpoint or f"{config.issuer.rstrip('/')}/token"
         async with httpx.AsyncClient() as client:
-            resp = await client.post(token_ep, data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": config.redirect_uri,
-                "client_id": config.client_id,
-                "client_secret": config.client_secret,
-            })
+            resp = await client.post(
+                token_ep,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "redirect_uri": config.redirect_uri,
+                    "client_id": config.client_id,
+                    "client_secret": config.client_secret,
+                },
+            )
             if resp.status_code != 200:
                 return None
             token_data = resp.json()
             access_token = token_data.get("access_token")
 
             userinfo_ep = config.userinfo_endpoint or f"{config.issuer.rstrip('/')}/userinfo"
-            resp2 = await client.get(userinfo_ep, headers={
-                "Authorization": f"Bearer {access_token}",
-            })
+            resp2 = await client.get(
+                userinfo_ep,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                },
+            )
             if resp2.status_code != 200:
                 return None
             info = resp2.json()
@@ -276,6 +295,7 @@ class SSOProvider:
 @dataclass
 class Session:
     """用户会话。"""
+
     session_id: str
     user_id: str
     tenant_id: str
@@ -297,6 +317,7 @@ class SessionStore:
 
     def create(self, user: User, ip: str = "", ua: str = "", ttl: int = 3600) -> Session:
         import uuid
+
         session = Session(
             session_id=f"sess_{uuid.uuid4().hex[:16]}",
             user_id=user.user_id,
@@ -309,7 +330,7 @@ class SessionStore:
         self._sessions[session.session_id] = session
         return session
 
-    def get(self, session_id: str) -> Optional[Session]:
+    def get(self, session_id: str) -> Session | None:
         s = self._sessions.get(session_id)
         if s and s.is_expired():
             del self._sessions[session_id]
@@ -344,6 +365,7 @@ class JWTManager:
     def encode(self, payload: dict, ttl: int = 3600) -> str:
         """签发 JWT。"""
         import base64
+
         header = {"alg": "HS256", "typ": "JWT"}
         claims = {
             **payload,
@@ -359,9 +381,10 @@ class JWTManager:
         segments.append(base64.urlsafe_b64encode(sig).rstrip(b"=").decode())
         return ".".join(segments)
 
-    def decode(self, token: str) -> Optional[dict]:
+    def decode(self, token: str) -> dict | None:
         """验证并解码 JWT。"""
         import base64
+
         try:
             parts = token.split(".")
             if len(parts) != 3:
@@ -371,17 +394,19 @@ class JWTManager:
             signing_input = f"{header_b64}.{payload_b64}"
 
             # Verify signature
-            expected_sig = base64.urlsafe_b64encode(
-                hmac.new(self.secret.encode(), signing_input.encode(), hashlib.sha256).digest()
-            ).rstrip(b"=").decode()
+            expected_sig = (
+                base64.urlsafe_b64encode(
+                    hmac.new(self.secret.encode(), signing_input.encode(), hashlib.sha256).digest()
+                )
+                .rstrip(b"=")
+                .decode()
+            )
 
             if not hmac.compare_digest(sig_b64, expected_sig):
                 return None
 
             # Decode payload
-            payload = json.loads(
-                base64.urlsafe_b64decode(payload_b64 + "==").decode()
-            )
+            payload = json.loads(base64.urlsafe_b64decode(payload_b64 + "==").decode())
 
             # Check expiration
             if payload.get("exp", 0) < time.time():
@@ -397,14 +422,18 @@ class JWTManager:
 
 def _rand_str(n: int) -> str:
     import secrets
+
     return secrets.token_hex(n // 2 + 1)[:n]
 
 
 def require_permission(permission: Permission):
     """装饰器：要求调用者拥有指定权限。（示例用途）"""
+
     def decorator(func):
         def wrapper(*args, **kwargs):
             # 实际使用时会从上下文获取当前用户
             raise NotImplementedError("权限检查需在框架中间件中实现")
+
         return wrapper
+
     return decorator

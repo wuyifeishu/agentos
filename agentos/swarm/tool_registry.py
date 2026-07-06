@@ -10,15 +10,17 @@ from __future__ import annotations
 import json
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable
-
+from enum import StrEnum
+from typing import Any
 
 # ── Tool Schema ───────────────────────────────────────────────────
 
-class ToolCategory(str, Enum):
+
+class ToolCategory(StrEnum):
     """Top-level tool category for coarse-grained routing."""
+
     FILE = "file"
     NETWORK = "network"
     CODE = "code"
@@ -31,35 +33,37 @@ class ToolCategory(str, Enum):
 @dataclass
 class ToolParam:
     """Parameter definition for a tool."""
+
     name: str
-    type: str                          # str, int, float, bool, list, dict
+    type: str  # str, int, float, bool, list, dict
     description: str = ""
     required: bool = False
     default: Any = None
     enum_values: list[str] | None = None
     min_value: float | None = None
     max_value: float | None = None
-    pattern: str = ""                  # Regex validation pattern
+    pattern: str = ""  # Regex validation pattern
 
 
 @dataclass
 class ToolSchema:
     """Complete tool schema definition."""
-    name: str                         # Unique tool name
-    description: str                  # Human-readable description
+
+    name: str  # Unique tool name
+    description: str  # Human-readable description
     category: ToolCategory = ToolCategory.CUSTOM
     params: list[ToolParam] = field(default_factory=list)
-    returns: str = "any"              # Return type description
+    returns: str = "any"  # Return type description
     version: str = "1.0.0"
     capabilities: list[str] = field(default_factory=list)  # e.g. ["read", "text", "file"]
-    tags: list[str] = field(default_factory=list)    # Searchable tags
+    tags: list[str] = field(default_factory=list)  # Searchable tags
     dependencies: list[str] = field(default_factory=list)  # Required other tools
-    handler: Callable[..., Any] | None = None      # Actual implementation
-    handler_ref: str = ""             # String reference for serialization
-    cost_estimate: float = 0.0        # Relative cost (latency, tokens, etc)
-    is_destructive: bool = False      # Data-modifying operations
-    requires_auth: bool = False       # Needs authentication
-    rate_limit: int = 0               # Max calls per minute, 0 = unlimited
+    handler: Callable[..., Any] | None = None  # Actual implementation
+    handler_ref: str = ""  # String reference for serialization
+    cost_estimate: float = 0.0  # Relative cost (latency, tokens, etc)
+    is_destructive: bool = False  # Data-modifying operations
+    requires_auth: bool = False  # Needs authentication
+    rate_limit: int = 0  # Max calls per minute, 0 = unlimited
     deprecated: bool = False
     deprecated_message: str = ""
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -131,6 +135,7 @@ class ToolSchema:
 
 # ── Tool Registry ─────────────────────────────────────────────────
 
+
 class ToolRegistry:
     """Central tool catalog with versioning, query, and lifecycle management.
 
@@ -192,11 +197,13 @@ class ToolRegistry:
         """Get tool by name. Returns None and logs warning if deprecated."""
         tool = self._tools.get(name)
         if tool and tool.deprecated:
-            self._deprecation_log.append({
-                "tool": name,
-                "message": tool.deprecated_message,
-                "timestamp": time.time(),
-            })
+            self._deprecation_log.append(
+                {
+                    "tool": name,
+                    "message": tool.deprecated_message,
+                    "timestamp": time.time(),
+                }
+            )
         return tool
 
     def search(
@@ -303,13 +310,15 @@ class ToolRegistry:
 
 # ── Tool Router ───────────────────────────────────────────────────
 
+
 @dataclass
 class RoutingDecision:
     """Result of tool routing decision."""
+
     tool_name: str
     tool_schema: ToolSchema | None
-    confidence: float      # 0.0 - 1.0
-    reasoning: str          # Why this tool was chosen
+    confidence: float  # 0.0 - 1.0
+    reasoning: str  # Why this tool was chosen
     alternatives: list[str]  # Fallback tool names
     params: dict[str, Any] = field(default_factory=dict)
 
@@ -317,12 +326,13 @@ class RoutingDecision:
 @dataclass
 class RoutingContext:
     """Context for tool routing decisions."""
-    task: str                      # User's task description
+
+    task: str  # User's task description
     available_capabilities: list[str] = field(default_factory=list)
     preferred_category: ToolCategory | None = None
     exclude_destructive: bool = False
-    min_confidence: float = 0.3    # Minimum confidence threshold
-    max_alternatives: int = 3      # Max fallback alternatives
+    min_confidence: float = 0.3  # Minimum confidence threshold
+    max_alternatives: int = 3  # Max fallback alternatives
 
 
 class ToolRouter:
@@ -421,9 +431,7 @@ class ToolRouter:
 
         # Filter destructive tools if excluded
         if context.exclude_destructive:
-            candidates = [
-                (t, s) for t, s in candidates if not t.is_destructive
-            ]
+            candidates = [(t, s) for t, s in candidates if not t.is_destructive]
 
         if not candidates:
             return RoutingDecision(
@@ -444,7 +452,7 @@ class ToolRouter:
             max_s = max(scores) if scores else 1
             best_tool, raw_score = candidates[0]
             confidence = min(raw_score / max_s, 1.0) if max_s > 0 else 0.5
-            alternatives = [t.name for t, _ in candidates[1:context.max_alternatives + 1]]
+            alternatives = [t.name for t, _ in candidates[1 : context.max_alternatives + 1]]
 
         return RoutingDecision(
             tool_name=best_tool.name,
@@ -470,8 +478,7 @@ class ToolRouter:
             if context.exclude_destructive and tool.is_destructive:
                 continue
             params_desc = ", ".join(
-                f"{p.name}:{p.type}" + ("?" if not p.required else "")
-                for p in tool.params[:5]
+                f"{p.name}:{p.type}" + ("?" if not p.required else "") for p in tool.params[:5]
             )
             cap_tags = ", ".join(tool.capabilities[:3])
             tools.append(
@@ -484,8 +491,10 @@ class ToolRouter:
 
 # ── Tool Execution Engine ─────────────────────────────────────────
 
+
 class ToolExecutionError(Exception):
     """Raised when tool execution fails."""
+
     def __init__(self, tool_name: str, message: str, recoverable: bool = True):
         self.tool_name = tool_name
         self.recoverable = recoverable
@@ -537,7 +546,9 @@ class ToolExecutor:
 
         tool = self.registry.get(tool_name)
         if not tool:
-            raise ToolExecutionError(tool_name, f"Tool '{tool_name}' not registered", recoverable=False)
+            raise ToolExecutionError(
+                tool_name, f"Tool '{tool_name}' not registered", recoverable=False
+            )
 
         if tool.deprecated:
             raise ToolExecutionError(
@@ -616,13 +627,21 @@ class ToolExecutor:
                 value = params[p.name]
                 # Type check
                 if p.type == "str" and not isinstance(value, str):
-                    raise ToolExecutionError(tool.name, f"Parameter '{p.name}' must be string", recoverable=False)
+                    raise ToolExecutionError(
+                        tool.name, f"Parameter '{p.name}' must be string", recoverable=False
+                    )
                 if p.type == "int" and not isinstance(value, int):
-                    raise ToolExecutionError(tool.name, f"Parameter '{p.name}' must be int", recoverable=False)
+                    raise ToolExecutionError(
+                        tool.name, f"Parameter '{p.name}' must be int", recoverable=False
+                    )
                 if p.type == "float" and not isinstance(value, (int, float)):
-                    raise ToolExecutionError(tool.name, f"Parameter '{p.name}' must be number", recoverable=False)
+                    raise ToolExecutionError(
+                        tool.name, f"Parameter '{p.name}' must be number", recoverable=False
+                    )
                 if p.type == "bool" and not isinstance(value, bool):
-                    raise ToolExecutionError(tool.name, f"Parameter '{p.name}' must be bool", recoverable=False)
+                    raise ToolExecutionError(
+                        tool.name, f"Parameter '{p.name}' must be bool", recoverable=False
+                    )
 
                 # Enum check
                 if p.enum_values and value not in p.enum_values:
@@ -653,6 +672,7 @@ class ToolExecutor:
 
 
 # ── Utility helpers ───────────────────────────────────────────────
+
 
 def create_tool(
     name: str,

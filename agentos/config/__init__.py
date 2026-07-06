@@ -8,8 +8,8 @@
 from agentos.config.loader import AgentOSConfig
 from agentos.config.presets import AgentOSPreset
 from agentos.config.validator import (
-    ValidationLevel,
     ValidationIssue,
+    ValidationLevel,
     ValidationResult,
 )
 

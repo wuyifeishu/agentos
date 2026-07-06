@@ -7,7 +7,7 @@ Nexus AgentOS — LLM 快速入门示例 v1.3.36。
     python examples/llm_quickstart.py
 """
 
-from agentos.llm import create_provider, Message, MessageRole
+from agentos.llm import Message, MessageRole, create_provider
 
 # 1. 创建 Provider（一行切换 OpenAI/DeepSeek/Anthropic）
 provider = create_provider("openai", model="gpt-4o-mini")

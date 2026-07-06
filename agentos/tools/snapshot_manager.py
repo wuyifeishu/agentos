@@ -14,34 +14,33 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
-
+from typing import Any, Protocol, runtime_checkable
 
 # ============================================================================
 # Snapshottable protocol
 # ============================================================================
 
+
 @runtime_checkable
 class Snapshottable(Protocol):
     """Objects that can be snapshotted must implement these two methods."""
 
-    def get_state(self) -> Any:
-        ...
+    def get_state(self) -> Any: ...
 
-    def restore_state(self, state: Any) -> None:
-        ...
+    def restore_state(self, state: Any) -> None: ...
 
 
 # ============================================================================
 # Snapshot
 # ============================================================================
 
+
 class Snapshot:
     """A named point-in-time state capture."""
 
     __slots__ = ("name", "states", "timestamp")
 
-    def __init__(self, name: str, states: Dict[str, Any]):
+    def __init__(self, name: str, states: dict[str, Any]):
         self.name = name
         self.states = states  # {object_id: state}
         self.timestamp = time.time()
@@ -50,6 +49,7 @@ class Snapshot:
 # ============================================================================
 # SnapshotManager
 # ============================================================================
+
 
 class SnapshotManager:
     """Manages snapshots of Snapshottable objects.
@@ -75,8 +75,8 @@ class SnapshotManager:
         if max_snapshots < 1:
             raise ValueError("max_snapshots must be >= 1")
         self._max_snapshots = max_snapshots
-        self._objects: Dict[str, Snapshottable] = {}
-        self._snapshots: List[Snapshot] = []
+        self._objects: dict[str, Snapshottable] = {}
+        self._snapshots: list[Snapshot] = []
         self._lock = threading.RLock()
 
     # ---------- Registration ----------
@@ -95,7 +95,7 @@ class SnapshotManager:
             return self._objects.pop(name, None) is not None
 
     @property
-    def registered(self) -> List[str]:
+    def registered(self) -> list[str]:
         with self._lock:
             return sorted(self._objects.keys())
 
@@ -135,7 +135,7 @@ class SnapshotManager:
                     restored += 1
             return restored > 0
 
-    def _find_snapshot(self, name: str) -> Optional[Snapshot]:
+    def _find_snapshot(self, name: str) -> Snapshot | None:
         with self._lock:
             for snap in reversed(self._snapshots):
                 if snap.name == name:
@@ -144,7 +144,7 @@ class SnapshotManager:
 
     # ---------- Management ----------
 
-    def list_snapshots(self) -> List[str]:
+    def list_snapshots(self) -> list[str]:
         with self._lock:
             return [s.name for s in self._snapshots]
 

@@ -25,9 +25,10 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from contextlib import contextmanager
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +37,10 @@ _TRACE_ENABLED: bool = os.environ.get("AGENTOS_TRACE_ENABLED", "").lower() == "t
 
 try:
     from opentelemetry import trace
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.trace import SpanKind, Status, StatusCode
+    from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
     _OTEL_AVAILABLE = True
 except ImportError:
@@ -50,7 +50,7 @@ except ImportError:
 
 def setup_tracing(
     service_name: str = "agentos",
-    otlp_endpoint: Optional[str] = None,
+    otlp_endpoint: str | None = None,
     sample_rate: float = 1.0,
 ) -> None:
     """Initialize OpenTelemetry tracing.
@@ -71,10 +71,12 @@ def setup_tracing(
         logger.debug("No OTLP endpoint configured — tracing disabled")
         return
 
-    resource = Resource(attributes={
-        SERVICE_NAME: service_name,
-        "deployment.environment": os.environ.get("AGENTOS_ENV", "production"),
-    })
+    resource = Resource(
+        attributes={
+            SERVICE_NAME: service_name,
+            "deployment.environment": os.environ.get("AGENTOS_ENV", "production"),
+        }
+    )
 
     exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True)
     processor = BatchSpanProcessor(exporter)
@@ -113,16 +115,28 @@ class _NoOpTracer:
 
 
 class _NoOpSpan:
-    def set_attribute(self, key: str, value: Any) -> None: pass
-    def set_status(self, status: Any) -> None: pass
-    def add_event(self, name: str, attributes: dict = None) -> None: pass
-    def end(self) -> None: pass
-    def __enter__(self): return self
-    def __exit__(self, *args): pass
+    def set_attribute(self, key: str, value: Any) -> None:
+        pass
+
+    def set_status(self, status: Any) -> None:
+        pass
+
+    def add_event(self, name: str, attributes: dict = None) -> None:
+        pass
+
+    def end(self) -> None:
+        pass
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
 
 
-def trace_function(name: Optional[str] = None, attributes: dict = None):
+def trace_function(name: str | None = None, attributes: dict = None):
     """Decorator to trace a function as a span."""
+
     def decorator(fn: Callable):
         span_name = name or f"{fn.__module__}.{fn.__qualname__}"
 
@@ -134,7 +148,9 @@ def trace_function(name: Optional[str] = None, attributes: dict = None):
                     for k, v in attributes.items():
                         span.set_attribute(k, v)
                 return fn(*args, **kwargs)
+
         return wrapper
+
     return decorator
 
 

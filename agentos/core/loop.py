@@ -8,29 +8,29 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Callable
+from datetime import UTC
+from enum import StrEnum
 
-from agentos.core.context import ContextManager
-from agentos.tools.registry import ToolRegistry
-from agentos.models.router import ModelRouter, AllModelsFailed
-from agentos.security.sandbox import SandboxManager
-from agentos.observability.tracer import Tracer
-from agentos.observability.metrics import MetricsCollector
-from agentos.observability.cost_analytics import CostAnalytics
-from agentos.core.streaming import StreamChunk
-from agentos.storage.base import CheckpointStore
-from agentos.checkpoint.base import Checkpoint, CheckpointMetadata, CheckpointBackend
-from agentos.cost.tracker import CostTracker
-from agentos.swarm.coordinator import SwarmCoordinator, SwarmTopology, AgentRole, SwarmResult
+from agentos.checkpoint.base import Checkpoint, CheckpointBackend, CheckpointMetadata
 from agentos.comm.layer import CommunicationLayer
-from agentos.tools.audit_logger import AuditLogger, AuditEvent, Severity
+from agentos.core.context import ContextManager
+from agentos.core.streaming import StreamChunk
+from agentos.cost.tracker import CostTracker
+from agentos.models.router import AllModelsFailed, ModelRouter
+from agentos.observability.cost_analytics import CostAnalytics
+from agentos.observability.metrics import MetricsCollector
+from agentos.observability.tracer import Tracer
+from agentos.security.sandbox import SandboxManager
+from agentos.storage.base import CheckpointStore
+from agentos.swarm.coordinator import AgentRole, SwarmCoordinator, SwarmResult, SwarmTopology
+from agentos.tools.audit_logger import AuditEvent, AuditLogger, Severity
 from agentos.tools.rate_limiter import TokenBucket
+from agentos.tools.registry import ToolRegistry
 
 
-class LoopState(str, Enum):
-
+class LoopState(StrEnum):
     """主循环状态。"""
 
     RUNNING = "running"
@@ -87,20 +87,19 @@ class LoopConfig:
     enable_comm_layer: bool = True
     enable_semantic_cache: bool = True
     # v1.11.0 — long-running task support
-    checkpoint_backend: CheckpointBackend | None = None  # Full checkpoint backend for crash recovery
-    enable_auto_paging: bool = True    # Auto-evict old memories when context fills
+    checkpoint_backend: CheckpointBackend | None = (
+        None  # Full checkpoint backend for crash recovery
+    )
+    enable_auto_paging: bool = True  # Auto-evict old memories when context fills
     auto_page_threshold: float = 0.85  # Page out at 85% context window usage
 
 
 class MaxIterationsExceeded(Exception):
-
     """超出最大迭代次数异常。"""
 
-    pass
 
 
 class HumanInterruptNeeded(Exception):
-
     """需要人工介入异常。"""
 
     def __init__(self, message: str, context: dict | None = None):
@@ -111,6 +110,7 @@ class HumanInterruptNeeded(Exception):
 @dataclass
 class ReflectionResult:
     """反思结果。"""
+
     quality_score: float
     issues: list[str]
     suggestions: list[str]
@@ -170,13 +170,15 @@ class AgentLoop:
         await self.context_manager.init_session(session_id, task)
 
         if self.audit_logger:
-            self.audit_logger.log(event=AuditEvent(
-                actor="agentos",
-                action="loop.start",
-                resource=session_id,
-                outcome="initiated",
-                details={"task": task[:200]},
-            ))
+            self.audit_logger.log(
+                event=AuditEvent(
+                    actor="agentos",
+                    action="loop.start",
+                    resource=session_id,
+                    outcome="initiated",
+                    details={"task": task[:200]},
+                )
+            )
 
         if self.config.auto_select_model:
             await self._auto_route_model(task)
@@ -192,7 +194,10 @@ class AgentLoop:
                 with self.tracer.step("reflection"):
                     reflection = await self._reflect(session_id)
                     self._reflection_history.append(reflection)
-                if not reflection.should_continue and reflection_loops < self.config.max_reflection_loops:
+                if (
+                    not reflection.should_continue
+                    and reflection_loops < self.config.max_reflection_loops
+                ):
                     reflection_loops += 1
                     if reflection.new_plan:
                         self.context_manager.update_plan(reflection.new_plan)
@@ -205,13 +210,15 @@ class AgentLoop:
                 if step_result.is_terminal:
                     duration_ms = (time.time() - start_time) * 1000
                     if self.audit_logger:
-                        self.audit_logger.log(event=AuditEvent(
-                            actor="agentos",
-                            action="loop.complete",
-                            resource=session_id,
-                            outcome="success",
-                            details={"iterations": iteration, "duration_ms": duration_ms},
-                        ))
+                        self.audit_logger.log(
+                            event=AuditEvent(
+                                actor="agentos",
+                                action="loop.complete",
+                                resource=session_id,
+                                outcome="success",
+                                details={"iterations": iteration, "duration_ms": duration_ms},
+                            )
+                        )
                     return AgentResult(
                         output=step_result.content,
                         iterations=iteration,
@@ -232,14 +239,19 @@ class AgentLoop:
             except HumanInterruptNeeded as e:
                 self._human_interrupts += 1
                 if self.audit_logger:
-                    self.audit_logger.log(event=AuditEvent(
-                        actor="agentos",
-                        action="loop.human_interrupt",
-                        resource=session_id,
-                        outcome="paused",
-                        severity=Severity.WARNING,
-                        details={"interrupt_count": self._human_interrupts, "message": str(e)[:200]},
-                    ))
+                    self.audit_logger.log(
+                        event=AuditEvent(
+                            actor="agentos",
+                            action="loop.human_interrupt",
+                            resource=session_id,
+                            outcome="paused",
+                            severity=Severity.WARNING,
+                            details={
+                                "interrupt_count": self._human_interrupts,
+                                "message": str(e)[:200],
+                            },
+                        )
+                    )
                 if self.on_human_interrupt:
                     feedback = self.on_human_interrupt(str(e), e.context)
                     if feedback:
@@ -247,7 +259,12 @@ class AgentLoop:
                 continue
 
             except StepTimeoutError:
-                return AgentResult(output="", iterations=iteration, final_state=LoopState.FAILED, error="Step timeout")
+                return AgentResult(
+                    output="",
+                    iterations=iteration,
+                    final_state=LoopState.FAILED,
+                    error="Step timeout",
+                )
 
             if self.config.enable_checkpoints and iteration % self.config.checkpoint_interval == 0:
                 await self._save_checkpoint(session_id, iteration)
@@ -268,6 +285,7 @@ class AgentLoop:
         resp = await self.model_router.call_simple(prompt)
         try:
             import json
+
             d = json.loads(resp)
             result = ReflectionResult(
                 quality_score=d.get("quality_score", 0.5),
@@ -305,25 +323,43 @@ class AgentLoop:
             self.model_router.set_preferred("deepseek-v3.1")
 
     def _estimate_complexity(self, task: str) -> float:
-        kw = ["分析", "对比", "设计", "架构", "review", "refactor", "实现", "优化", "诊断", "troubleshoot", "debug", "deploy", "migrate", "安全", "security"]
+        kw = [
+            "分析",
+            "对比",
+            "设计",
+            "架构",
+            "review",
+            "refactor",
+            "实现",
+            "优化",
+            "诊断",
+            "troubleshoot",
+            "debug",
+            "deploy",
+            "migrate",
+            "安全",
+            "security",
+        ]
         score = sum(0.15 for k in kw if k in task.lower())
         return min(score + min(len(task) / 2000, 0.3), 1.0)
 
     # ── 步骤执行 ──────────────────────────────────
 
-    async def _execute_step_sync(self, iteration: int, session_id: str) -> "StepResult":
+    async def _execute_step_sync(self, iteration: int, session_id: str) -> StepResult:
         last_error = None
         for attempt in range(self.config.max_retries_per_step + 1):
             try:
-                return await asyncio.wait_for(self._do_step(iteration, session_id), timeout=self.config.step_timeout_seconds)
-            except asyncio.TimeoutError:
+                return await asyncio.wait_for(
+                    self._do_step(iteration, session_id), timeout=self.config.step_timeout_seconds
+                )
+            except TimeoutError:
                 last_error = StepTimeoutError(f"Step {iteration} timeout")
             except AllModelsFailed as e:
                 last_error = e
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
         raise last_error
 
-    async def _do_step(self, iteration: int, session_id: str) -> "StepResult":
+    async def _do_step(self, iteration: int, session_id: str) -> StepResult:
         ctx = self.context_manager.build_context(
             model_type=self.model_router.model_type,
             tools=self.tool_registry.get_schemas_for_model(self.model_router.model_type),
@@ -333,7 +369,7 @@ class AgentLoop:
         if self.config.enable_auto_paging and self._auto_page_callback:
             usage_ratio = self.context_manager.estimate_context_usage()
             if usage_ratio > self.config.auto_page_threshold:
-                page_count = await self._auto_page_callback(usage_ratio)
+                await self._auto_page_callback(usage_ratio)
 
         # v1.16.6 — rate limiting before model calls
         if self.rate_limiter and not self.rate_limiter.try_acquire("model_call"):
@@ -355,7 +391,9 @@ class AgentLoop:
         if self.config.enable_human_in_the_loop:
             for tc in resp.tool_calls:
                 if self._is_high_risk(tc):
-                    raise HumanInterruptNeeded(f"高风险操作需确认: {tc.name}", {"tool": tc.name, "args": tc.arguments})
+                    raise HumanInterruptNeeded(
+                        f"高风险操作需确认: {tc.name}", {"tool": tc.name, "args": tc.arguments}
+                    )
 
         groups = self._group_independent_calls(resp.tool_calls)
         all_results = []
@@ -407,8 +445,11 @@ class AgentLoop:
             if not self.checkpoint_store:
                 return
             snap = {
-                "session_id": session_id, "iteration": iteration,
-                "messages": [{"role": m.role, "content": m.content} for m in self.context_manager._messages],
+                "session_id": session_id,
+                "iteration": iteration,
+                "messages": [
+                    {"role": m.role, "content": m.content} for m in self.context_manager._messages
+                ],
                 "timestamp": time.time(),
             }
             await self.checkpoint_store.save(session_id, snap)
@@ -416,10 +457,10 @@ class AgentLoop:
 
         # Full checkpoint via CheckpointBackend
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
 
             checkpoint_id = f"ckpt-{session_id}-{iteration:06d}"
-            parent_id = getattr(self, '_last_checkpoint_id', None)
+            parent_id = getattr(self, "_last_checkpoint_id", None)
 
             cp = Checkpoint(
                 metadata=CheckpointMetadata(
@@ -427,10 +468,12 @@ class AgentLoop:
                     checkpoint_id=checkpoint_id,
                     step=iteration,
                     parent_checkpoint_id=parent_id,
-                    created_at=datetime.now(timezone.utc).isoformat(),
+                    created_at=datetime.now(UTC).isoformat(),
                     tags=["auto", f"iter_{iteration}"],
                 ),
-                messages=[{"role": m.role, "content": m.content} for m in self.context_manager._messages],
+                messages=[
+                    {"role": m.role, "content": m.content} for m in self.context_manager._messages
+                ],
                 state={
                     "iteration": iteration,
                     "task": self.context_manager.current_task,
@@ -438,7 +481,11 @@ class AgentLoop:
                     "cost_usd": self.cost_tracker.total_cost,
                     "reflections": len(self._reflection_history),
                     "human_interrupts": self._human_interrupts,
-                    "loop_state": self.context_manager.current_state if hasattr(self.context_manager, 'current_state') else "running",
+                    "loop_state": (
+                        self.context_manager.current_state
+                        if hasattr(self.context_manager, "current_state")
+                        else "running"
+                    ),
                 },
                 tools_result={},
                 next_node="loop",
@@ -502,10 +549,15 @@ class AgentLoop:
         start_time = time.time()
         roles = roles or self.config.swarm_roles
         if not roles:
-            return AgentResult(output="[Swarm] No roles defined", iterations=0, final_state=LoopState.FAILED, error="No roles")
+            return AgentResult(
+                output="[Swarm] No roles defined",
+                iterations=0,
+                final_state=LoopState.FAILED,
+                error="No roles",
+            )
 
         topology = SwarmTopology(self.config.swarm_topology)
-        comm_layer = CommunicationLayer() if self.config.enable_comm_layer else None
+        CommunicationLayer() if self.config.enable_comm_layer else None
 
         swarm = SwarmCoordinator(
             router=self.model_router,
@@ -532,15 +584,14 @@ class AgentLoop:
 
 
 class StepTimeoutError(Exception):
-
     """步骤超时异常。"""
 
-    pass
 
 
 @dataclass
 class StepResult:
     """步骤执行结果。"""
+
     content: str
     is_terminal: bool = False
     tool_results: list | None = None

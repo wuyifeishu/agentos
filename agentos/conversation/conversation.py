@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Callable
+from enum import Enum, StrEnum, auto
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     """消息角色。"""
 
     SYSTEM = "system"
@@ -133,9 +133,7 @@ class ConversationManager:
         """批量添加消息。"""
         return [self.add(role, content) for role, content in messages]
 
-    def get_context(
-        self, include_summary: bool = True, limit: int | None = None
-    ) -> list[dict]:
+    def get_context(self, include_summary: bool = True, limit: int | None = None) -> list[dict]:
         """获取当前对话上下文，返回 OpenAI 兼容格式。"""
         result: list[dict] = []
         if include_summary and self._summary:
@@ -212,8 +210,14 @@ class ConversationManager:
         """按 token 预算裁剪。"""
         budget = int(self.config.max_tokens * self.config.auto_summarize_threshold)
         preserve_last = self.config.preserve_last_n
-        system_count = sum(1 for m in self._messages if m.role == MessageRole.SYSTEM and self.config.preserve_system)
-        while self.stats.total_tokens > budget and len(self._messages) > preserve_last + system_count:
+        system_count = sum(
+            1
+            for m in self._messages
+            if m.role == MessageRole.SYSTEM and self.config.preserve_system
+        )
+        while (
+            self.stats.total_tokens > budget and len(self._messages) > preserve_last + system_count
+        ):
             for i, msg in enumerate(self._messages):
                 if self.config.preserve_system and msg.role == MessageRole.SYSTEM:
                     continue
@@ -310,7 +314,9 @@ class ConversationManager:
 
     def clear(self, keep_system: bool = True):
         """清空对话历史。"""
-        system_msgs = [m for m in self._messages if m.role == MessageRole.SYSTEM] if keep_system else []
+        system_msgs = (
+            [m for m in self._messages if m.role == MessageRole.SYSTEM] if keep_system else []
+        )
         self._messages = system_msgs
         self._summary = ""
         self.stats = ConversationStats()

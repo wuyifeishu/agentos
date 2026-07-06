@@ -13,17 +13,18 @@ from __future__ import annotations
 
 import json
 import os
-import time
 import threading
+import time
 from collections import defaultdict
 from dataclasses import dataclass
 
-from agentos.cost.tracker import CostTracker, PRICING
+from agentos.cost.tracker import PRICING, CostTracker
 
 
 @dataclass
 class CostEntry:
     """单次调用的成本记录。"""
+
     timestamp: float
     model: str
     session_id: str
@@ -36,6 +37,7 @@ class CostEntry:
 @dataclass
 class DailySummary:
     """日成本摘要。"""
+
     date: str
     model: str
     calls: int = 0
@@ -48,6 +50,7 @@ class DailySummary:
 @dataclass
 class CostBreakdown:
     """单次调用的详细成本分解。"""
+
     model: str
     input_tokens: int
     output_tokens: int
@@ -65,6 +68,7 @@ class CostBreakdown:
 @dataclass
 class CostSession:
     """单次会话的成本摘要。"""
+
     session_id: str
     model: str = ""
     calls: int = 0
@@ -79,6 +83,7 @@ class CostSession:
 @dataclass
 class BudgetAlert:
     """预算告警。"""
+
     triggered: bool
     current_cost: float
     budget: float
@@ -117,10 +122,9 @@ class CostAnalytics:
     ):
         """记录一次调用成本。"""
         price = PRICING.get(model, {})
-        cost = (
-            input_tokens / 1_000_000 * price.get("input", 0) +
-            output_tokens / 1_000_000 * price.get("output", 0)
-        )
+        cost = input_tokens / 1_000_000 * price.get(
+            "input", 0
+        ) + output_tokens / 1_000_000 * price.get("output", 0)
         entry = CostEntry(
             timestamp=time.time(),
             model=model,
@@ -142,9 +146,15 @@ class CostAnalytics:
     def by_model(self, hours: float = 24.0) -> list[dict]:
         """最近N小时的模型成本分布。"""
         cutoff = time.time() - hours * 3600
-        agg: dict[str, dict] = defaultdict(lambda: {
-            "model": "", "calls": 0, "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0,
-        })
+        agg: dict[str, dict] = defaultdict(
+            lambda: {
+                "model": "",
+                "calls": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "cost_usd": 0.0,
+            }
+        )
         with self._lock:
             for e in self._entries:
                 if e.timestamp < cutoff:
@@ -164,7 +174,7 @@ class CostAnalytics:
         """最近N天的每日成本明细。"""
         from datetime import datetime
 
-        today = datetime.now().date()
+        datetime.now().date()
         summaries: dict[tuple[str, str], DailySummary] = {}
 
         with self._lock:
@@ -191,7 +201,9 @@ class CostAnalytics:
 
     def by_session(self, top_n: int = 10) -> list[dict]:
         """最贵的N个session。"""
-        agg: dict[str, dict] = defaultdict(lambda: {"session_id": "", "calls": 0, "cost_usd": 0.0, "tokens": 0})
+        agg: dict[str, dict] = defaultdict(
+            lambda: {"session_id": "", "calls": 0, "cost_usd": 0.0, "tokens": 0}
+        )
         with self._lock:
             for e in self._entries:
                 d = agg[e.session_id]
@@ -212,7 +224,9 @@ class CostAnalytics:
         """
         daily = self.daily_breakdown(days=window * 2)
         # Aggregate by date
-        by_date: dict[str, dict] = defaultdict(lambda: {"date": "", "cost": 0.0, "tokens": 0, "calls": 0})
+        by_date: dict[str, dict] = defaultdict(
+            lambda: {"date": "", "cost": 0.0, "tokens": 0, "calls": 0}
+        )
         for s in daily:
             d = by_date[s.date]
             d["date"] = s.date
@@ -220,19 +234,21 @@ class CostAnalytics:
             d["tokens"] += s.total_input_tokens + s.total_output_tokens
             d["calls"] += s.calls
 
-        dates = sorted(by_date.keys())[-window * 2:]
+        dates = sorted(by_date.keys())[-window * 2 :]
         values = [by_date[d].get(metric, 0) for d in dates]
 
         # Simple moving average (window=3)
         trend_data = []
         for i, d in enumerate(dates):
             w_start = max(0, i - 2)
-            w_vals = values[w_start:i + 1]
-            trend_data.append({
-                "date": d,
-                "value": values[i],
-                "sma": sum(w_vals) / len(w_vals),
-            })
+            w_vals = values[w_start : i + 1]
+            trend_data.append(
+                {
+                    "date": d,
+                    "value": values[i],
+                    "sma": sum(w_vals) / len(w_vals),
+                }
+            )
         return trend_data
 
     # ── 预算预警 ─────────────────────────────────
@@ -256,6 +272,7 @@ class CostAnalytics:
             avg_daily = 0
 
         from datetime import datetime
+
         days_left = 31 - datetime.now().day
         projected = avg_daily * max(days_left, 1)
 
@@ -264,8 +281,7 @@ class CostAnalytics:
         if triggered:
             projected_total = current + projected
             message = (
-                f"成本告警: 已消耗 ${current:.4f} ({pct:.0%})，"
-                f"预计月末 ${projected_total:.4f}"
+                f"成本告警: 已消耗 ${current:.4f} ({pct:.0%})，" f"预计月末 ${projected_total:.4f}"
             )
 
         return BudgetAlert(
@@ -324,14 +340,16 @@ class CostAnalytics:
                 price = PRICING.get(e.model, {})
                 input_cost = e.input_tokens / 1_000_000 * price.get("input", 0)
                 output_cost = e.output_tokens / 1_000_000 * price.get("output", 0)
-                results.append(CostBreakdown(
-                    model=e.model,
-                    input_tokens=e.input_tokens,
-                    output_tokens=e.output_tokens,
-                    input_cost_usd=input_cost,
-                    output_cost_usd=output_cost,
-                    total_cost_usd=e.cost_usd,
-                ))
+                results.append(
+                    CostBreakdown(
+                        model=e.model,
+                        input_tokens=e.input_tokens,
+                        output_tokens=e.output_tokens,
+                        input_cost_usd=input_cost,
+                        output_cost_usd=output_cost,
+                        total_cost_usd=e.cost_usd,
+                    )
+                )
         return sorted(results, key=lambda x: x.total_cost_usd, reverse=True)
 
     def get_session(self, session_id: str) -> CostSession | None:
@@ -380,15 +398,17 @@ class CostAnalytics:
             data = []
             with self._lock:
                 for e in self._entries[-10000:]:  # Keep last 10k
-                    data.append({
-                        "ts": e.timestamp,
-                        "model": e.model,
-                        "session_id": e.session_id,
-                        "input_tokens": e.input_tokens,
-                        "output_tokens": e.output_tokens,
-                        "cost_usd": e.cost_usd,
-                        "duration_ms": e.duration_ms,
-                    })
+                    data.append(
+                        {
+                            "ts": e.timestamp,
+                            "model": e.model,
+                            "session_id": e.session_id,
+                            "input_tokens": e.input_tokens,
+                            "output_tokens": e.output_tokens,
+                            "cost_usd": e.cost_usd,
+                            "duration_ms": e.duration_ms,
+                        }
+                    )
             os.makedirs(os.path.dirname(self.persist_path) or ".", exist_ok=True)
             with open(self.persist_path, "w") as f:
                 json.dump(data, f)
@@ -404,7 +424,8 @@ class CostAnalytics:
             with self._lock:
                 self._entries = [
                     CostEntry(
-                        timestamp=d["ts"], model=d["model"],
+                        timestamp=d["ts"],
+                        model=d["model"],
                         session_id=d["session_id"],
                         input_tokens=d["input_tokens"],
                         output_tokens=d["output_tokens"],

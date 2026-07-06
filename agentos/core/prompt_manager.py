@@ -24,17 +24,16 @@ import json
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Tuple
-
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Prompt Template
 # ---------------------------------------------------------------------------
 
 
-class PromptRole(str, Enum):
+class PromptRole(StrEnum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
@@ -43,27 +42,28 @@ class PromptRole(str, Enum):
 @dataclass
 class PromptTemplate:
     """A versioned prompt template."""
+
     name: str
     version: int = 1
     content: str = ""
     role: PromptRole = PromptRole.SYSTEM
-    variables: Set[str] = field(default_factory=set)
+    variables: set[str] = field(default_factory=set)
     description: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     author: str = ""
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     is_active: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     # Variable pattern: {{variable_name}}
     VAR_PATTERN = re.compile(r"\{\{(\w+)\}\}")
 
-    def extract_variables(self) -> Set[str]:
+    def extract_variables(self) -> set[str]:
         """Extract variable names from template content."""
         return set(self.VAR_PATTERN.findall(self.content))
 
-    def render(self, values: Dict[str, str], strict: bool = True) -> str:
+    def render(self, values: dict[str, str], strict: bool = True) -> str:
         """
         Render the template by substituting variables.
 
@@ -93,7 +93,7 @@ class PromptTemplate:
 
         return result
 
-    def validate(self) -> Tuple[bool, List[str]]:
+    def validate(self) -> tuple[bool, list[str]]:
         """
         Validate template structure.
 
@@ -109,18 +109,19 @@ class PromptTemplate:
             pass
         return len(issues) == 0, issues
 
-    def diff(self, other: "PromptTemplate") -> str:
+    def diff(self, other: PromptTemplate) -> str:
         """Generate a unified diff between this and another template."""
         a_lines = self.content.splitlines(keepends=True)
         b_lines = other.content.splitlines(keepends=True)
         diff = difflib.unified_diff(
-            a_lines, b_lines,
+            a_lines,
+            b_lines,
             fromfile=f"{self.name} v{self.version}",
             tofile=f"{other.name} v{other.version}",
         )
         return "".join(diff)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "version": self.version,
@@ -137,7 +138,7 @@ class PromptTemplate:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PromptTemplate":
+    def from_dict(cls, data: dict[str, Any]) -> PromptTemplate:
         return cls(
             name=data["name"],
             version=data.get("version", 1),
@@ -171,10 +172,10 @@ class PromptStore:
     """
 
     def __init__(self):
-        self._templates: Dict[str, Dict[int, PromptTemplate]] = defaultdict(dict)
-        self._latest: Dict[str, int] = {}
-        self._active: Dict[str, int] = {}
-        self._lineage: Dict[str, List[int]] = defaultdict(list)
+        self._templates: dict[str, dict[int, PromptTemplate]] = defaultdict(dict)
+        self._latest: dict[str, int] = {}
+        self._active: dict[str, int] = {}
+        self._lineage: dict[str, list[int]] = defaultdict(list)
 
     def add(self, template: PromptTemplate) -> PromptTemplate:
         """
@@ -194,7 +195,7 @@ class PromptStore:
         if not template.variables:
             template.variables = template.extract_variables()
 
-        template.updated_at = datetime.now(timezone.utc).isoformat()
+        template.updated_at = datetime.now(UTC).isoformat()
         self._templates[name][template.version] = template
         self._latest[name] = template.version
         self._active[name] = template.version
@@ -202,7 +203,7 @@ class PromptStore:
 
         return template
 
-    def get(self, name: str, version: Optional[int] = None) -> Optional[PromptTemplate]:
+    def get(self, name: str, version: int | None = None) -> PromptTemplate | None:
         """Get a template by name and optional version. Defaults to active version."""
         if name not in self._templates:
             return None
@@ -213,7 +214,7 @@ class PromptStore:
         active_ver = self._active.get(name) or self._latest[name]
         return self._templates[name].get(active_ver)
 
-    def get_latest(self, name: str) -> Optional[PromptTemplate]:
+    def get_latest(self, name: str) -> PromptTemplate | None:
         """Get the latest version of a template."""
         if name not in self._latest:
             return None
@@ -230,28 +231,30 @@ class PromptStore:
         """Deactivate a template (no active version)."""
         self._active.pop(name, None)
 
-    def list_templates(self) -> List[Dict[str, Any]]:
+    def list_templates(self) -> list[dict[str, Any]]:
         """List all templates with their versions."""
         result = []
         for name, versions in self._templates.items():
             latest = self._latest[name]
             active = self._active.get(name, latest)
-            result.append({
-                "name": name,
-                "versions": sorted(versions.keys()),
-                "latest": latest,
-                "active": active,
-                "total_versions": len(versions),
-            })
+            result.append(
+                {
+                    "name": name,
+                    "versions": sorted(versions.keys()),
+                    "latest": latest,
+                    "active": active,
+                    "total_versions": len(versions),
+                }
+            )
         return sorted(result, key=lambda x: x["name"])
 
-    def get_history(self, name: str) -> List[PromptTemplate]:
+    def get_history(self, name: str) -> list[PromptTemplate]:
         """Get all versions of a template in chronological order."""
         if name not in self._templates:
             return []
         return [self._templates[name][v] for v in sorted(self._templates[name].keys())]
 
-    def diff_versions(self, name: str, v1: int, v2: int) -> Optional[str]:
+    def diff_versions(self, name: str, v1: int, v2: int) -> str | None:
         """Get diff between two versions of a template."""
         t1 = self.get(name, v1)
         t2 = self.get(name, v2)
@@ -259,7 +262,7 @@ class PromptStore:
             return None
         return t1.diff(t2)
 
-    def remove(self, name: str, version: Optional[int] = None) -> int:
+    def remove(self, name: str, version: int | None = None) -> int:
         """
         Remove template(s). If version is None, remove all versions.
         Returns number of versions removed.
@@ -283,7 +286,7 @@ class PromptStore:
         self._lineage.pop(name, None)
         return count
 
-    def export_json(self, names: Optional[List[str]] = None) -> str:
+    def export_json(self, names: list[str] | None = None) -> str:
         """Export templates as JSON."""
         templates = []
         target = names or list(self._templates.keys())
@@ -311,13 +314,14 @@ class PromptStore:
 @dataclass
 class ABTest:
     """An A/B test comparing two prompt template versions."""
+
     name: str
     template_name: str
     variant_a_version: int
     variant_b_version: int
     split_ratio: float = 0.5  # 0.5 = 50% each
     is_active: bool = True
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
     def route(self, session_id: str) -> int:
         """Route a session to variant A (0) or B (1)."""
@@ -335,8 +339,8 @@ class ABTestManager:
 
     def __init__(self, store: PromptStore):
         self._store = store
-        self._tests: Dict[str, ABTest] = {}
-        self._results: Dict[str, Dict[str, int]] = defaultdict(
+        self._tests: dict[str, ABTest] = {}
+        self._results: dict[str, dict[str, int]] = defaultdict(
             lambda: {"a_served": 0, "b_served": 0}
         )
 
@@ -359,7 +363,7 @@ class ABTestManager:
         self._tests[name] = test
         return test
 
-    def get_template(self, test_name: str, session_id: str) -> Optional[PromptTemplate]:
+    def get_template(self, test_name: str, session_id: str) -> PromptTemplate | None:
         """
         Get the prompt template for a session in an A/B test.
 
@@ -376,7 +380,7 @@ class ABTestManager:
 
         return self._store.get(test.template_name, version)
 
-    def get_results(self, name: str) -> Dict[str, Any]:
+    def get_results(self, name: str) -> dict[str, Any]:
         """Get results for an A/B test."""
         test = self._tests.get(name)
         if test is None:
@@ -402,6 +406,6 @@ class ABTestManager:
         if name in self._tests:
             self._tests[name].is_active = False
 
-    def list_tests(self) -> List[Dict[str, Any]]:
+    def list_tests(self) -> list[dict[str, Any]]:
         """List all A/B tests."""
         return [self.get_results(name) for name in self._tests]

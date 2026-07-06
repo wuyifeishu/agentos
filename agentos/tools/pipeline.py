@@ -12,9 +12,10 @@ Features:
 import threading
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -23,6 +24,7 @@ U = TypeVar("U")
 # ============================================================================
 # Core Types
 # ============================================================================
+
 
 class StageStatus(Enum):
     IDLE = auto()
@@ -35,8 +37,9 @@ class StageStatus(Enum):
 @dataclass
 class PipelineContext:
     """Shared context flowing through the pipeline."""
-    data: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    data: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def get(self, key: str, default: Any = None) -> Any:
         return self.data.get(key, default)
@@ -59,7 +62,7 @@ class Stage(Generic[T, U], ABC):
         self.name = name or self.__class__.__name__
         self.max_retries = max_retries
         self.status: StageStatus = StageStatus.IDLE
-        self._error: Optional[Exception] = None
+        self._error: Exception | None = None
         self._items_processed: int = 0
         self._items_errored: int = 0
 
@@ -92,7 +95,7 @@ class Stage(Generic[T, U], ABC):
                 raise
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "status": self.status.name,
@@ -103,6 +106,7 @@ class Stage(Generic[T, U], ABC):
 
 class LambdaStage(Stage[T, U]):
     """Convenience stage from a callable."""
+
     def __init__(self, fn: Callable[[T, PipelineContext], U], name: str = "", max_retries: int = 0):
         super().__init__(name=name, max_retries=max_retries)
         self._fn = fn
@@ -115,12 +119,13 @@ class LambdaStage(Stage[T, U]):
 # Pipeline
 # ============================================================================
 
+
 class Pipeline(Generic[T, U]):
     """Linear pipeline: a sequence of stages T → ? → ... → U."""
 
     def __init__(self, name: str = "pipeline"):
         self.name = name
-        self._stages: List[Stage] = []
+        self._stages: list[Stage] = []
         self._lock = threading.Lock()
         self._ctx = PipelineContext()
         self.status: StageStatus = StageStatus.IDLE
@@ -130,7 +135,9 @@ class Pipeline(Generic[T, U]):
             self._stages.append(stage)
         return self
 
-    def then(self, fn: Callable[[Any, PipelineContext], Any], name: str = "", max_retries: int = 0) -> "Pipeline":
+    def then(
+        self, fn: Callable[[Any, PipelineContext], Any], name: str = "", max_retries: int = 0
+    ) -> "Pipeline":
         """Fluent API: add a lambda stage."""
         return self.add_stage(LambdaStage(fn, name=name, max_retries=max_retries))
 
@@ -146,7 +153,7 @@ class Pipeline(Generic[T, U]):
             all_idle = all(s.status == StageStatus.IDLE for s in self._stages)
             self.status = StageStatus.IDLE if all_idle else StageStatus.ERROR
 
-    def run_batch(self, items: List[T]) -> List[U]:
+    def run_batch(self, items: list[T]) -> list[U]:
         """Run pipeline on a batch."""
         results = []
         for item in items:
@@ -158,7 +165,7 @@ class Pipeline(Generic[T, U]):
         return self._ctx
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "status": self.status.name,
@@ -170,6 +177,7 @@ class Pipeline(Generic[T, U]):
 # ParallelPipeline — Fan-out / Fan-in
 # ============================================================================
 
+
 class ParallelPipeline(Generic[T, U]):
     """Branches: split input across parallel stages, then merge results.
 
@@ -179,8 +187,8 @@ class ParallelPipeline(Generic[T, U]):
 
     def __init__(self, name: str = "parallel_pipeline"):
         self.name = name
-        self._branches: List[Pipeline] = []
-        self._merge: Optional[Callable[[List[Any], PipelineContext], U]] = None
+        self._branches: list[Pipeline] = []
+        self._merge: Callable[[list[Any], PipelineContext], U] | None = None
         self._lock = threading.Lock()
         self._ctx = PipelineContext()
 
@@ -189,7 +197,7 @@ class ParallelPipeline(Generic[T, U]):
             self._branches.append(pipeline)
         return self
 
-    def merge(self, fn: Callable[[List[Any], PipelineContext], U]) -> "ParallelPipeline":
+    def merge(self, fn: Callable[[list[Any], PipelineContext], U]) -> "ParallelPipeline":
         self._merge = fn
         return self
 
@@ -198,8 +206,7 @@ class ParallelPipeline(Generic[T, U]):
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(self._branches)) as pool:
             futures = {
-                pool.submit(branch.run, input_item): i
-                for i, branch in enumerate(self._branches)
+                pool.submit(branch.run, input_item): i for i, branch in enumerate(self._branches)
             }
             results = [None] * len(self._branches)
             for future in concurrent.futures.as_completed(futures):
@@ -219,9 +226,16 @@ class ParallelPipeline(Generic[T, U]):
 # Stage helpers
 # ============================================================================
 
+
 class FilterStage(Stage[T, T]):
     """Pass-through stage that filters items."""
-    def __init__(self, predicate: Callable[[T, PipelineContext], bool], name: str = "filter", max_retries: int = 0):
+
+    def __init__(
+        self,
+        predicate: Callable[[T, PipelineContext], bool],
+        name: str = "filter",
+        max_retries: int = 0,
+    ):
         super().__init__(name=name, max_retries=max_retries)
         self._predicate = predicate
 
@@ -230,7 +244,7 @@ class FilterStage(Stage[T, T]):
             raise FilterDrop()
         return item
 
-    def on_error(self, item: T, error: Exception, ctx: PipelineContext) -> Optional[T]:
+    def on_error(self, item: T, error: Exception, ctx: PipelineContext) -> T | None:
         if isinstance(error, FilterDrop):
             return None
         return super().on_error(item, error, ctx)
@@ -238,16 +252,23 @@ class FilterStage(Stage[T, T]):
 
 class FilterDrop(Exception):
     """Signal that an item should be filtered out."""
-    pass
 
 
-class BatchStage(Stage[List[T], List[U]]):
+
+class BatchStage(Stage[list[T], list[U]]):
     """Accumulates items into batches before processing."""
-    def __init__(self, batch_size: int, fn: Callable[[List[T], PipelineContext], List[U]], name: str = "batch", max_retries: int = 0):
+
+    def __init__(
+        self,
+        batch_size: int,
+        fn: Callable[[list[T], PipelineContext], list[U]],
+        name: str = "batch",
+        max_retries: int = 0,
+    ):
         super().__init__(name=name, max_retries=max_retries)
         self.batch_size = batch_size
-        self._buffer: List[T] = []
+        self._buffer: list[T] = []
         self._fn = fn
 
-    def process(self, item: List[T], ctx: PipelineContext) -> List[U]:
+    def process(self, item: list[T], ctx: PipelineContext) -> list[U]:
         return self._fn(item, ctx)

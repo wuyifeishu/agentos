@@ -15,18 +15,19 @@ from __future__ import annotations
 import secrets
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional
-
+from typing import Any
 
 # ============================================================================
 # Key State
 # ============================================================================
 
+
 class KeyState(Enum):
     CURRENT = "current"
-    PENDING = "pending"      # newly rotated, still in grace
+    PENDING = "pending"  # newly rotated, still in grace
     EXPIRED = "expired"
 
 
@@ -35,12 +36,13 @@ class KeyEntry:
     key: str
     state: KeyState
     created_at: float
-    expires_at: Optional[float] = None
+    expires_at: float | None = None
 
 
 # ============================================================================
 # KeyRotation
 # ============================================================================
+
 
 class KeyRotation:
     """Automated secret key rotation with grace periods.
@@ -71,14 +73,14 @@ class KeyRotation:
         self._interval = rotation_interval
         self._grace_period = grace_period
         self._key_length = key_length
-        self._keys: List[KeyEntry] = []
+        self._keys: list[KeyEntry] = []
         self._lock = threading.RLock()
-        self._timer: Optional[threading.Timer] = None
+        self._timer: threading.Timer | None = None
         self._running = False
 
         # Hooks
-        self._pre_rotate: List[Callable[[], None]] = []
-        self._post_rotate: List[Callable[[str, str], None]] = []  # (old_key, new_key)
+        self._pre_rotate: list[Callable[[], None]] = []
+        self._post_rotate: list[Callable[[str, str], None]] = []  # (old_key, new_key)
 
         # Seed with initial key
         self._rotate_now()
@@ -151,7 +153,7 @@ class KeyRotation:
     # ---------- Key Access ----------
 
     @property
-    def current_key(self) -> Optional[str]:
+    def current_key(self) -> str | None:
         with self._lock:
             for entry in self._keys:
                 if entry.state == KeyState.CURRENT:
@@ -159,14 +161,14 @@ class KeyRotation:
         return None
 
     @property
-    def active_keys(self) -> List[str]:
+    def active_keys(self) -> list[str]:
         """All currently valid keys (CURRENT + PENDING)."""
         with self._lock:
             self._cleanup_expired()
             return [e.key for e in self._keys if e.state in (KeyState.CURRENT, KeyState.PENDING)]
 
     @property
-    def pending_keys(self) -> List[str]:
+    def pending_keys(self) -> list[str]:
         """Keys in grace period only."""
         with self._lock:
             self._cleanup_expired()
@@ -179,9 +181,9 @@ class KeyRotation:
     def _cleanup_expired(self) -> None:
         now = time.time()
         self._keys = [
-            e for e in self._keys
-            if e.state != KeyState.EXPIRED
-            and (e.expires_at is None or e.expires_at > now)
+            e
+            for e in self._keys
+            if e.state != KeyState.EXPIRED and (e.expires_at is None or e.expires_at > now)
         ]
 
     # ---------- Hooks ----------
@@ -199,7 +201,7 @@ class KeyRotation:
             except Exception:
                 pass
 
-    def _notify_post_rotate(self, old_key: Optional[str], new_key: str) -> None:
+    def _notify_post_rotate(self, old_key: str | None, new_key: str) -> None:
         for cb in self._post_rotate:
             try:
                 cb(old_key, new_key)
@@ -209,7 +211,7 @@ class KeyRotation:
     # ---------- Info ----------
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             self._cleanup_expired()
             return {

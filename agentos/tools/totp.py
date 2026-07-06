@@ -16,13 +16,12 @@ import hashlib
 import hmac
 import struct
 import time
-from typing import Optional, Tuple
 from urllib.parse import quote, urlencode
-
 
 # ============================================================================
 # TOTP / HOTP
 # ============================================================================
+
 
 class TOTP:
     """Time-based One-Time Password generator (RFC 6238).
@@ -83,7 +82,7 @@ class TOTP:
         self,
         code: str,
         drift: int = 1,
-        timestamp: Optional[int] = None,
+        timestamp: int | None = None,
     ) -> bool:
         """Verify a TOTP code with optional drift tolerance.
 
@@ -100,7 +99,7 @@ class TOTP:
 
     # ---------- URI ----------
 
-    def to_uri(self, account: str, issuer: Optional[str] = None) -> str:
+    def to_uri(self, account: str, issuer: str | None = None) -> str:
         """Generate otpauth:// URI for QR code.
 
         Args:
@@ -131,8 +130,8 @@ class TOTP:
         msg = struct.pack(">Q", counter)
         h = hmac.new(key, msg, self._hash_func).digest()
         offset = h[-1] & 0x0F
-        binary = struct.unpack(">I", h[offset:offset + 4])[0] & 0x7FFFFFFF
-        mod = 10 ** self._digits
+        binary = struct.unpack(">I", h[offset : offset + 4])[0] & 0x7FFFFFFF
+        mod = 10**self._digits
         return str(binary % mod).zfill(self._digits)
 
     @staticmethod
@@ -150,6 +149,7 @@ class TOTP:
     def generate_secret(cls, length: int = 32) -> str:
         """Generate a random base32 secret."""
         import secrets
+
         raw = secrets.token_bytes(length)
         return base64.b32encode(raw).decode("ascii").rstrip("=")
 
@@ -179,7 +179,7 @@ class HOTP(TOTP):
         code: str,
         counter: int,
         look_ahead: int = 10,
-    ) -> Tuple[bool, Optional[int]]:
+    ) -> tuple[bool, int | None]:
         """Verify HOTP code, returns (is_valid, matched_counter)."""
         for c in range(counter, counter + look_ahead + 1):
             if self.at(c) == code:

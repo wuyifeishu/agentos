@@ -23,8 +23,7 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Cache Entry
@@ -34,11 +33,12 @@ from typing import Any, Dict, List, Optional, Tuple
 @dataclass
 class CacheEntry:
     """A single cache entry."""
+
     key: str
     value: Any
     size_bytes: int
     created_at: float = field(default_factory=time.time)
-    ttl_seconds: Optional[float] = None
+    ttl_seconds: float | None = None
     hit_count: int = 0
     last_access: float = field(default_factory=time.time)
 
@@ -89,7 +89,7 @@ class EvictionPolicy:
         while self._total_size > self.max_size_bytes and len(self._entries) > 1:
             self._evict_lru()
 
-    def get(self, key: str) -> Optional[CacheEntry]:
+    def get(self, key: str) -> CacheEntry | None:
         """Get entry, moving to end (LRU update)."""
         entry = self._entries.get(key)
         if entry is None:
@@ -157,7 +157,7 @@ class ResponseCache:
 
     def __init__(
         self,
-        ttl_seconds: Optional[float] = 3600,
+        ttl_seconds: float | None = 3600,
         max_entries: int = 10000,
         max_size_mb: int = 512,
         similarity_threshold: float = 0.92,
@@ -168,14 +168,16 @@ class ResponseCache:
         self._similarity_threshold = similarity_threshold
 
         if by_model:
-            self._policies: Dict[str, EvictionPolicy] = {}
+            self._policies: dict[str, EvictionPolicy] = {}
         else:
-            self._policies: Dict[str, EvictionPolicy] = {"default": EvictionPolicy(max_entries, max_size_mb)}
+            self._policies: dict[str, EvictionPolicy] = {
+                "default": EvictionPolicy(max_entries, max_size_mb)
+            }
 
         self._max_entries = max_entries
         self._max_size_mb = max_size_mb
 
-        self._stats: Dict[str, Any] = {
+        self._stats: dict[str, Any] = {
             "hits": 0,
             "misses": 0,
             "total_requests": 0,
@@ -188,7 +190,9 @@ class ResponseCache:
     @staticmethod
     def _make_key(model: str, prompt: str, **kwargs) -> str:
         """Generate a deterministic cache key."""
-        normalized = json.dumps({"model": model, "prompt": prompt.strip(), **kwargs}, sort_keys=True)
+        normalized = json.dumps(
+            {"model": model, "prompt": prompt.strip(), **kwargs}, sort_keys=True
+        )
         return hashlib.sha256(normalized.encode()).hexdigest()
 
     @staticmethod
@@ -200,7 +204,7 @@ class ResponseCache:
 
     # -- Core operations --
 
-    def get(self, model: str, prompt: str, **kwargs) -> Optional[Any]:
+    def get(self, model: str, prompt: str, **kwargs) -> Any | None:
         """Look up a cached response. Returns None on miss."""
         key = self._make_key(model, prompt, **kwargs)
         policy_key = model if self._by_model else "default"
@@ -228,7 +232,7 @@ class ResponseCache:
         model: str,
         prompt: str,
         response: Any,
-        ttl_seconds: Optional[float] = None,
+        ttl_seconds: float | None = None,
         **kwargs,
     ) -> None:
         """Cache a response."""
@@ -237,9 +241,7 @@ class ResponseCache:
 
         with self._lock:
             if policy_key not in self._policies:
-                self._policies[policy_key] = EvictionPolicy(
-                    self._max_entries, self._max_size_mb
-                )
+                self._policies[policy_key] = EvictionPolicy(self._max_entries, self._max_size_mb)
 
             entry = CacheEntry(
                 key=key,
@@ -275,7 +277,7 @@ class ResponseCache:
 
     # -- Statistics --
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Return cache statistics."""
         with self._lock:
             total = max(1, self._stats["total_requests"])
@@ -289,7 +291,7 @@ class ResponseCache:
             stats["model_caches"] = {m: p.size for m, p in self._policies.items()}
             return stats
 
-    def get_per_model_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_per_model_stats(self) -> dict[str, dict[str, Any]]:
         """Return per-model cache stats."""
         with self._lock:
             return {
@@ -300,7 +302,7 @@ class ResponseCache:
                 for model, policy in self._policies.items()
             }
 
-    def warmup(self, entries: List[Tuple[str, str, Any, Optional[float]]]) -> int:
+    def warmup(self, entries: list[tuple[str, str, Any, float | None]]) -> int:
         """
         Pre-warm the cache with known frequent prompts.
 

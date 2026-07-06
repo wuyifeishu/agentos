@@ -17,7 +17,7 @@ Learning strategies:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 from agentos.evolution.engine import EvolutionEngine, EvolutionProposal
 from agentos.evolution.signals import (
@@ -31,7 +31,9 @@ from agentos.evolution.signals import (
 class LearningInsight:
     """A single insight derived from behavior signals."""
 
-    category: str  # tool_recommendation, param_tuning, format_adaptation, prompt_refinement, workflow
+    category: (
+        str  # tool_recommendation, param_tuning, format_adaptation, prompt_refinement, workflow
+    )
     title: str
     description: str
     confidence: float  # 0.0 - 1.0
@@ -110,7 +112,7 @@ class Learner:
 
     # ── Insight → Proposal ──
 
-    def propose_from_insight(self, insight: LearningInsight) -> Optional[EvolutionProposal]:
+    def propose_from_insight(self, insight: LearningInsight) -> EvolutionProposal | None:
         """Convert a learning insight into an evolution proposal."""
         proposal = self._engine.propose(
             agent_name="marvis",
@@ -141,31 +143,36 @@ class Learner:
 
     # ── Private Analyzers ──
 
-    def _analyze_tool_patterns(self, summary: SignalSummary,
-                                signals: list[BehaviorSignal]) -> list[LearningInsight]:
+    def _analyze_tool_patterns(
+        self, summary: SignalSummary, signals: list[BehaviorSignal]
+    ) -> list[LearningInsight]:
         """Analyze tool usage to suggest new tools or deprecate unused ones."""
         insights = []
 
         # Low tool success rate → suggest alternatives
         if summary.tool_success_rate < 0.7 and summary.total_signals > 10:
             failing = [t for t, _ in summary.top_tools[:3]]
-            insights.append(LearningInsight(
-                category="tool_recommendation",
-                title="Tool Success Rate Low",
-                description=f"Tools {failing} have low success rate ({summary.tool_success_rate:.0%}). Consider alternatives or improve error handling.",
-                confidence=0.75,
-                evidence_count=summary.total_signals,
-            ))
+            insights.append(
+                LearningInsight(
+                    category="tool_recommendation",
+                    title="Tool Success Rate Low",
+                    description=f"Tools {failing} have low success rate ({summary.tool_success_rate:.0%}). Consider alternatives or improve error handling.",
+                    confidence=0.75,
+                    evidence_count=summary.total_signals,
+                )
+            )
 
         # High undo rate → tool is confusing
         if summary.undo_count >= 3:
-            insights.append(LearningInsight(
-                category="tool_recommendation",
-                title="High Undo Rate Detected",
-                description=f"Users undo actions frequently ({summary.undo_count} times). Tool UX may need improvement.",
-                confidence=0.65,
-                evidence_count=summary.undo_count,
-            ))
+            insights.append(
+                LearningInsight(
+                    category="tool_recommendation",
+                    title="High Undo Rate Detected",
+                    description=f"Users undo actions frequently ({summary.undo_count} times). Tool UX may need improvement.",
+                    confidence=0.65,
+                    evidence_count=summary.undo_count,
+                )
+            )
 
         return insights
 
@@ -180,22 +187,26 @@ class Learner:
         ratio = summary.positive_feedback / max(total_feedback, 1)
 
         if ratio < 0.4:
-            insights.append(LearningInsight(
-                category="param_tuning",
-                title="Low Satisfaction Ratio",
-                description=f"Positive feedback ratio is {ratio:.0%}. Consider adjusting agent temperature or personality.",
-                confidence=0.8,
-                evidence_count=total_feedback,
-            ))
+            insights.append(
+                LearningInsight(
+                    category="param_tuning",
+                    title="Low Satisfaction Ratio",
+                    description=f"Positive feedback ratio is {ratio:.0%}. Consider adjusting agent temperature or personality.",
+                    confidence=0.8,
+                    evidence_count=total_feedback,
+                )
+            )
 
         if ratio > 0.9:
-            insights.append(LearningInsight(
-                category="param_tuning",
-                title="High Satisfaction — Lock Settings",
-                description=f"Positive feedback ratio is {ratio:.0%}. Current settings work well; consider locking as default.",
-                confidence=0.7,
-                evidence_count=total_feedback,
-            ))
+            insights.append(
+                LearningInsight(
+                    category="param_tuning",
+                    title="High Satisfaction — Lock Settings",
+                    description=f"Positive feedback ratio is {ratio:.0%}. Current settings work well; consider locking as default.",
+                    confidence=0.7,
+                    evidence_count=total_feedback,
+                )
+            )
 
         return insights
 
@@ -212,13 +223,15 @@ class Learner:
 
         top = max(format_counts, key=format_counts.get)
         if format_counts[top] >= 3:
-            return [LearningInsight(
-                category="format_adaptation",
-                title=f"Format Preference: {top}",
-                description=f"User prefers {top} format ({format_counts[top]} signals). Default to this format.",
-                confidence=0.85,
-                evidence_count=format_counts[top],
-            )]
+            return [
+                LearningInsight(
+                    category="format_adaptation",
+                    title=f"Format Preference: {top}",
+                    description=f"User prefers {top} format ({format_counts[top]} signals). Default to this format.",
+                    confidence=0.85,
+                    evidence_count=format_counts[top],
+                )
+            ]
 
         return []
 
@@ -229,13 +242,15 @@ class Learner:
             return []
 
         # Group corrections by topic
-        return [LearningInsight(
-            category="prompt_refinement",
-            title="Frequent Corrections Detected",
-            description=f"User made {len(corrections)} corrections. Review agent responses for accuracy improvements.",
-            confidence=0.7,
-            evidence_count=len(corrections),
-        )]
+        return [
+            LearningInsight(
+                category="prompt_refinement",
+                title="Frequent Corrections Detected",
+                description=f"User made {len(corrections)} corrections. Review agent responses for accuracy improvements.",
+                confidence=0.7,
+                evidence_count=len(corrections),
+            )
+        ]
 
     def _analyze_workflow_patterns(self, signals: list[BehaviorSignal]) -> list[LearningInsight]:
         """Detect repeated tool sequences to suggest workflow shortcuts."""
@@ -252,17 +267,20 @@ class Learner:
             return []
 
         from collections import Counter
+
         seq_counter = Counter(tool_sequences)
         top_seq = seq_counter.most_common(1)[0]
 
         if top_seq[1] >= 3:
-            return [LearningInsight(
-                category="workflow",
-                title="Repeated Tool Sequence",
-                description=f"Sequence {' → '.join(top_seq[0])} repeated {top_seq[1]} times. Consider creating a shortcut or composite tool.",
-                confidence=0.65,
-                evidence_count=top_seq[1],
-            )]
+            return [
+                LearningInsight(
+                    category="workflow",
+                    title="Repeated Tool Sequence",
+                    description=f"Sequence {' → '.join(top_seq[0])} repeated {top_seq[1]} times. Consider creating a shortcut or composite tool.",
+                    confidence=0.65,
+                    evidence_count=top_seq[1],
+                )
+            ]
 
         return []
 
@@ -271,13 +289,15 @@ class Learner:
         insights = []
 
         if summary.re_prompt_count >= 3:
-            insights.append(LearningInsight(
-                category="prompt_refinement",
-                title="Clarify Intent Better",
-                description=f"User re-asked {summary.re_prompt_count} times. First responses may not understand user intent.",
-                confidence=0.6,
-                evidence_count=summary.re_prompt_count,
-            ))
+            insights.append(
+                LearningInsight(
+                    category="prompt_refinement",
+                    title="Clarify Intent Better",
+                    description=f"User re-asked {summary.re_prompt_count} times. First responses may not understand user intent.",
+                    confidence=0.6,
+                    evidence_count=summary.re_prompt_count,
+                )
+            )
 
         return insights
 

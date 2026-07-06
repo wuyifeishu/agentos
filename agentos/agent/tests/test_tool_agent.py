@@ -3,13 +3,12 @@
 import json
 
 from agentos.agent.tool_agent import (
-    ToolExecutor,
     AgentConfig,
-    AgentStep,
     AgentResult,
+    AgentStep,
+    ToolExecutor,
 )
-from agentos.llm.base import Tool, ToolParameter, ToolCall
-
+from agentos.llm.base import Tool, ToolCall, ToolParameter
 
 # ── 工具定义 ──────────────────────────────────────────────────────
 
@@ -21,6 +20,7 @@ MOCK_TOOL = Tool.from_function(
 
 
 # ── ToolExecutor ─────────────────────────────────────────────────
+
 
 class TestToolExecutor:
 
@@ -62,6 +62,7 @@ class TestToolExecutor:
 
 # ── AgentConfig ──────────────────────────────────────────────────
 
+
 class TestAgentConfig:
 
     def test_defaults(self):
@@ -80,6 +81,7 @@ class TestAgentConfig:
 
 
 # ── AgentStep ────────────────────────────────────────────────────
+
 
 class TestAgentStep:
 
@@ -112,10 +114,18 @@ class TestAgentStep:
 
 # ── AgentResult ──────────────────────────────────────────────────
 
+
 class TestAgentResult:
 
     def test_success_result(self):
-        r = AgentResult(success=True, final_answer="答案是 42", total_steps=2, total_tokens=500, total_cost_usd=0.001, total_duration_ms=1200)
+        r = AgentResult(
+            success=True,
+            final_answer="答案是 42",
+            total_steps=2,
+            total_tokens=500,
+            total_cost_usd=0.001,
+            total_duration_ms=1200,
+        )
         assert r.success is True
         assert r.final_answer == "答案是 42"
         assert r.total_steps == 2

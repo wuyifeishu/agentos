@@ -125,9 +125,7 @@ class SQLiteCheckpointer(CheckpointBackend):
             ).fetchone()
         return self._row_to_checkpoint(row) if row else None
 
-    async def list_threads(
-        self, limit: int = 50, offset: int = 0
-    ) -> list[CheckpointMetadata]:
+    async def list_threads(self, limit: int = 50, offset: int = 0) -> list[CheckpointMetadata]:
         with self._get_conn() as conn:
             rows = conn.execute(
                 """SELECT * FROM checkpoints

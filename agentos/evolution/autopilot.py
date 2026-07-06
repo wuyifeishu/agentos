@@ -28,26 +28,28 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any
 
 from agentos.evolution.engine import EvolutionEngine, EvolutionProposal, EvolutionStatus
 from agentos.evolution.learner import Learner
 
-
 # ── Types ───────────────────────────────────────────────────────────
 
-class AutoPilotMode(str, Enum):
+
+class AutoPilotMode(StrEnum):
     """AutoPilot operating mode."""
-    SUGGEST_ONLY = "suggest_only"    # Only generate proposals, don't apply
-    ASK_BEFORE = "ask_before"        # Generate + ask user before applying
-    CONFIDENCE_GATED = "confidence"   # Auto-apply if confidence > threshold
-    FULL_AUTO = "full_auto"          # Auto-apply everything (⚠️ use with guardrails)
+
+    SUGGEST_ONLY = "suggest_only"  # Only generate proposals, don't apply
+    ASK_BEFORE = "ask_before"  # Generate + ask user before applying
+    CONFIDENCE_GATED = "confidence"  # Auto-apply if confidence > threshold
+    FULL_AUTO = "full_auto"  # Auto-apply everything (⚠️ use with guardrails)
 
 
-class ChangeResult(str, Enum):
+class ChangeResult(StrEnum):
     """Result of an auto-applied change."""
+
     SUCCESS = "success"
     FAILED = "failed"
     REGRESSION = "regression"
@@ -58,19 +60,22 @@ class ChangeResult(str, Enum):
 @dataclass
 class CodeChange:
     """A code change generated from an evolution proposal."""
+
     proposal_id: str
     file_path: str
     description: str
-    diff: str                    # Unified diff
-    old_content: str = ""        # Pre-change content (for rollback)
-    new_content: str = ""        # Post-change content
+    diff: str  # Unified diff
+    old_content: str = ""  # Pre-change content (for rollback)
+    new_content: str = ""  # Post-change content
     language: str = "python"
-    risk_level: str = "medium"   # low / medium / high
+    risk_level: str = "medium"  # low / medium / high
     test_results: dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class EvolutionRun:
     """Record of a single evolution execution."""
+
     run_id: str
     proposal: EvolutionProposal
     changes: list[CodeChange] = field(default_factory=list)
@@ -83,6 +88,7 @@ class EvolutionRun:
 
 
 # ── Code Generator ──────────────────────────────────────────────────
+
 
 class CodeGenerator:
     """Generate code changes from evolution proposals using LLM.
@@ -99,7 +105,9 @@ Focus on: correctness, backward compatibility, performance, readability."""
     def __init__(self, llm_client=None):
         self._llm = llm_client
 
-    async def generate(self, proposal: EvolutionProposal, codebase: dict[str, str]) -> list[CodeChange]:
+    async def generate(
+        self, proposal: EvolutionProposal, codebase: dict[str, str]
+    ) -> list[CodeChange]:
         """Generate code changes for a proposal.
 
         Args:
@@ -124,15 +132,17 @@ Focus on: correctness, backward compatibility, performance, readability."""
 
             if diff:
                 new_content = self._apply_diff(content, diff)
-                changes.append(CodeChange(
-                    proposal_id=proposal.id,
-                    file_path=target_file,
-                    description=proposal.description,
-                    diff=diff,
-                    old_content=content,
-                    new_content=new_content,
-                    risk_level=proposal.risk_level,
-                ))
+                changes.append(
+                    CodeChange(
+                        proposal_id=proposal.id,
+                        file_path=target_file,
+                        description=proposal.description,
+                        diff=diff,
+                        old_content=content,
+                        new_content=new_content,
+                        risk_level=proposal.risk_level,
+                    )
+                )
 
         return changes
 
@@ -140,13 +150,15 @@ Focus on: correctness, backward compatibility, performance, readability."""
         """Skeleton code generation for proposals (no LLM available)."""
         changes = []
         for target_file in proposal.target_files:
-            changes.append(CodeChange(
-                proposal_id=proposal.id,
-                file_path=target_file,
-                description=proposal.description,
-                diff=f"# SKELETON: {proposal.description}\n# File: {target_file}",
-                risk_level=proposal.risk_level,
-            ))
+            changes.append(
+                CodeChange(
+                    proposal_id=proposal.id,
+                    file_path=target_file,
+                    description=proposal.description,
+                    diff=f"# SKELETON: {proposal.description}\n# File: {target_file}",
+                    risk_level=proposal.risk_level,
+                )
+            )
         return changes
 
     def _build_prompt(self, proposal: EvolutionProposal, target_file: str, content: str) -> str:
@@ -192,6 +204,7 @@ Generate a unified diff to implement this change. Focus only on {target_file}.""
 
 # ── Auto Tester ─────────────────────────────────────────────────────
 
+
 class AutoTester:
     """Run test suite to validate changes."""
 
@@ -208,7 +221,9 @@ class AutoTester:
         try:
             result = subprocess.run(
                 ["python3", "-m", "pytest", str(self._test_dir)] + self._pytest_args.split(),
-                capture_output=True, text=True, timeout=120,
+                capture_output=True,
+                text=True,
+                timeout=120,
                 cwd=str(self._test_dir.parent) if self._test_dir.parent else None,
             )
             passed = "passed" in result.stdout.lower() or result.returncode == 0
@@ -220,7 +235,13 @@ class AutoTester:
                 "duration": 0,
             }
         except FileNotFoundError:
-            return {"passed": True, "total": 0, "failures": 0, "output": "pytest not installed", "duration": 0}
+            return {
+                "passed": True,
+                "total": 0,
+                "failures": 0,
+                "output": "pytest not installed",
+                "duration": 0,
+            }
         except Exception as e:
             return {"passed": False, "total": 0, "failures": 1, "output": str(e), "duration": 0}
 
@@ -237,11 +258,14 @@ class AutoTester:
 
 # ── Rollback Manager ─────────────────────────────────────────────────
 
+
 class RollbackManager:
     """Instant undo of any auto-applied change."""
 
     def __init__(self, backup_dir: str = ""):
-        self._backup_dir = Path(backup_dir) if backup_dir else Path.home() / ".agentos" / "evolution" / "backups"
+        self._backup_dir = (
+            Path(backup_dir) if backup_dir else Path.home() / ".agentos" / "evolution" / "backups"
+        )
         self._backup_dir.mkdir(parents=True, exist_ok=True)
         self._history: list[dict[str, Any]] = []
 
@@ -250,12 +274,14 @@ class RollbackManager:
         snapshot_id = hashlib.sha256(f"{file_path}:{time.time()}".encode()).hexdigest()[:12]
         snapshot_path = self._backup_dir / f"{snapshot_id}.bak"
         snapshot_path.write_text(content, encoding="utf-8")
-        self._history.append({
-            "snapshot_id": snapshot_id,
-            "file_path": file_path,
-            "timestamp": time.time(),
-            "size": len(content),
-        })
+        self._history.append(
+            {
+                "snapshot_id": snapshot_id,
+                "file_path": file_path,
+                "timestamp": time.time(),
+                "size": len(content),
+            }
+        )
         return snapshot_id
 
     def rollback(self, snapshot_id: str) -> bool:
@@ -278,6 +304,7 @@ class RollbackManager:
 
 
 # ── A/B Evaluator ───────────────────────────────────────────────────
+
 
 class ABEvaluator:
     """Compare agent performance before and after evolution changes."""
@@ -321,7 +348,9 @@ class ABEvaluator:
             try:
                 result = await agent.run(case.get("input", ""))
                 passed = case.get("expected", "") in str(result)
-                results.append({"case": case.get("id", ""), "passed": passed, "output": str(result)[:500]})
+                results.append(
+                    {"case": case.get("id", ""), "passed": passed, "output": str(result)[:500]}
+                )
             except Exception as e:
                 results.append({"case": case.get("id", ""), "passed": False, "error": str(e)})
         return results
@@ -329,11 +358,16 @@ class ABEvaluator:
 
 # ── Evolution Journal ───────────────────────────────────────────────
 
+
 class EvolutionJournal:
     """Complete audit trail of every evolution step."""
 
     def __init__(self, journal_path: str = ""):
-        self._path = Path(journal_path) if journal_path else Path.home() / ".agentos" / "evolution" / "journal.jsonl"
+        self._path = (
+            Path(journal_path)
+            if journal_path
+            else Path.home() / ".agentos" / "evolution" / "journal.jsonl"
+        )
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
     def log(self, entry: dict[str, Any]):
@@ -347,7 +381,7 @@ class EvolutionJournal:
         if not self._path.exists():
             return []
         entries = []
-        with open(self._path, "r", encoding="utf-8") as f:
+        with open(self._path, encoding="utf-8") as f:
             for line in f:
                 entries.append(json.loads(line))
         return entries[-limit:]
@@ -362,7 +396,9 @@ class EvolutionJournal:
         by_result: dict[str, int] = {}
         for entry in entries:
             by_type[entry.get("type", "unknown")] = by_type.get(entry.get("type", "unknown"), 0) + 1
-            by_result[entry.get("result", "unknown")] = by_result.get(entry.get("result", "unknown"), 0) + 1
+            by_result[entry.get("result", "unknown")] = (
+                by_result.get(entry.get("result", "unknown"), 0) + 1
+            )
 
         return {
             "total_entries": len(entries),
@@ -374,6 +410,7 @@ class EvolutionJournal:
 
 
 # ── AutoPilot ───────────────────────────────────────────────────────
+
 
 class AutoPilot:
     """Closed-loop self-evolution engine.
@@ -400,11 +437,11 @@ class AutoPilot:
         learner: Learner,
         mode: AutoPilotMode = AutoPilotMode.CONFIDENCE_GATED,
         confidence_threshold: float = 0.7,
-        code_generator: Optional[CodeGenerator] = None,
-        tester: Optional[AutoTester] = None,
-        rollback: Optional[RollbackManager] = None,
-        evaluator: Optional[ABEvaluator] = None,
-        journal: Optional[EvolutionJournal] = None,
+        code_generator: CodeGenerator | None = None,
+        tester: AutoTester | None = None,
+        rollback: RollbackManager | None = None,
+        evaluator: ABEvaluator | None = None,
+        journal: EvolutionJournal | None = None,
     ):
         self.engine = engine
         self.learner = learner
@@ -450,14 +487,16 @@ class AutoPilot:
             self._run_history.append(run)
 
         # Step 4: Journal results
-        self.journal.log({
-            "type": "evolution_cycle",
-            "insights": len(insights),
-            "proposals": len(proposals),
-            "applied": sum(1 for r in runs if r.result == ChangeResult.SUCCESS),
-            "failed": sum(1 for r in runs if r.result == ChangeResult.FAILED),
-            "rolled_back": sum(1 for r in runs if r.result == ChangeResult.ROLLED_BACK),
-        })
+        self.journal.log(
+            {
+                "type": "evolution_cycle",
+                "insights": len(insights),
+                "proposals": len(proposals),
+                "applied": sum(1 for r in runs if r.result == ChangeResult.SUCCESS),
+                "failed": sum(1 for r in runs if r.result == ChangeResult.FAILED),
+                "rolled_back": sum(1 for r in runs if r.result == ChangeResult.ROLLED_BACK),
+            }
+        )
 
         return runs
 

@@ -5,8 +5,8 @@ Actions: complexity, functions, imports, todo_fixme, lines
 """
 
 import re
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 
 def run(action: str = "overview", file_path: str = "", code: str = "", **kwargs: Any) -> str:
@@ -29,30 +29,35 @@ def run(action: str = "overview", file_path: str = "", code: str = "", **kwargs:
         code_lines = len([l for l in lines if l.strip() and not l.strip().startswith("#")])
         comment_lines = len([l for l in lines if l.strip().startswith("#")])
         blank_lines = len([l for l in lines if not l.strip()])
-        return f"Total: {total}, Code: {code_lines}, Comments: {comment_lines}, Blank: {blank_lines}"
+        return (
+            f"Total: {total}, Code: {code_lines}, Comments: {comment_lines}, Blank: {blank_lines}"
+        )
 
     if action == "functions":
-        funcs = re.findall(r'^\s*(?:def|async def)\s+(\w+)', content, re.MULTILINE)
-        classes = re.findall(r'^\s*class\s+(\w+)', content, re.MULTILINE)
+        funcs = re.findall(r"^\s*(?:def|async def)\s+(\w+)", content, re.MULTILINE)
+        classes = re.findall(r"^\s*class\s+(\w+)", content, re.MULTILINE)
         result = f"Functions ({len(funcs)}): {', '.join(funcs[:20])}\n"
         result += f"Classes ({len(classes)}): {', '.join(classes[:10])}"
         return result
 
     if action == "imports":
-        imports = re.findall(r'^(?:import\s+(\S+)|from\s+(\S+)\s+import)', content, re.MULTILINE)
+        imports = re.findall(r"^(?:import\s+(\S+)|from\s+(\S+)\s+import)", content, re.MULTILINE)
         deps = set()
         for m in imports:
             deps.add(m[0] or m[1])
         return f"Imports ({len(deps)}): {', '.join(sorted(deps))}"
 
     if action == "todo_fixme":
-        todos = re.findall(r'.*?(TODO|FIXME|HACK|XXX)[: ]*(.*)', content)
+        todos = re.findall(r".*?(TODO|FIXME|HACK|XXX)[: ]*(.*)", content)
         if not todos:
             return "[code-review] No TODOs found."
-        return "TODOs/FIXMEs:\n" + "\n".join(f"  L{content[:content.index(t[1])].count(chr(10))+1}: {t[0]}: {t[1].strip()}" for t in todos)
+        return "TODOs/FIXMEs:\n" + "\n".join(
+            f"  L{content[:content.index(t[1])].count(chr(10))+1}: {t[0]}: {t[1].strip()}"
+            for t in todos
+        )
 
     if action == "complexity":
-        func_pattern = re.compile(r'^\s*(?:def|async def)\s+(\w+)', re.MULTILINE)
+        func_pattern = re.compile(r"^\s*(?:def|async def)\s+(\w+)", re.MULTILINE)
         funcs = {}
         current_func = None
         for i, line in enumerate(lines):
@@ -62,7 +67,7 @@ def run(action: str = "overview", file_path: str = "", code: str = "", **kwargs:
                 funcs[current_func] = {"start": i, "lines": 0, "branches": 0}
             elif current_func:
                 funcs[current_func]["lines"] += 1
-                if re.search(r'\b(if|elif|for|while|except|and|or)\b', line):
+                if re.search(r"\b(if|elif|for|while|except|and|or)\b", line):
                     funcs[current_func]["branches"] += 1
         result = []
         for name, f in sorted(funcs.items(), key=lambda x: -x[1]["branches"]):
@@ -73,9 +78,9 @@ def run(action: str = "overview", file_path: str = "", code: str = "", **kwargs:
 
     # Default: overview
     total = len(lines)
-    func_count = len(re.findall(r'^\s*(?:def|async def)\s+', content, re.MULTILINE))
-    class_count = len(re.findall(r'^\s*class\s+', content, re.MULTILINE))
-    import_count = len(re.findall(r'^(?:import|from\s+\S+\s+import)', content, re.MULTILINE))
+    func_count = len(re.findall(r"^\s*(?:def|async def)\s+", content, re.MULTILINE))
+    class_count = len(re.findall(r"^\s*class\s+", content, re.MULTILINE))
+    import_count = len(re.findall(r"^(?:import|from\s+\S+\s+import)", content, re.MULTILINE))
     return f"[code-review] {total} lines, {func_count} functions, {class_count} classes, {import_count} imports"
 
 

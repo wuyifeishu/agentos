@@ -31,7 +31,17 @@ class DocumentLoader:
         chunk_overlap: 块间重叠字符数
     """
 
-    SUPPORTED_SUFFIXES = {".pdf", ".docx", ".txt", ".md", ".markdown", ".py", ".json", ".yaml", ".yml"}
+    SUPPORTED_SUFFIXES = {
+        ".pdf",
+        ".docx",
+        ".txt",
+        ".md",
+        ".markdown",
+        ".py",
+        ".json",
+        ".yaml",
+        ".yml",
+    }
 
     def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200):
         self.chunk_size = chunk_size
@@ -49,7 +59,7 @@ class DocumentLoader:
         elif suffix == ".docx":
             text = self._read_docx(path)
         else:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
+            with open(path, encoding="utf-8", errors="replace") as f:
                 text = f.read()
 
         return self._chunk(text, source=path)
@@ -74,6 +84,7 @@ class DocumentLoader:
         """读取 PDF 文本。"""
         try:
             import pypdf
+
             reader = pypdf.PdfReader(path)
             pages = []
             for page in reader.pages:
@@ -88,6 +99,7 @@ class DocumentLoader:
         """读取 DOCX 文本。"""
         try:
             from docx import Document as DocxDocument
+
             doc = DocxDocument(path)
             paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
             return "\n".join(paragraphs)
@@ -112,13 +124,16 @@ class DocumentLoader:
 
 # ── 便捷函数 ──────────────────────────────────────────────────
 
+
 def load_file(path: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> list[Document]:
     """便捷函数：加载单个文件。"""
     loader = DocumentLoader(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return loader.load_file(path)
 
 
-def load_directory(dir_path: str, recursive: bool = True, chunk_size: int = 1000, chunk_overlap: int = 200) -> list[Document]:
+def load_directory(
+    dir_path: str, recursive: bool = True, chunk_size: int = 1000, chunk_overlap: int = 200
+) -> list[Document]:
     """便捷函数：加载目录。"""
     loader = DocumentLoader(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return loader.load_directory(dir_path, recursive=recursive)

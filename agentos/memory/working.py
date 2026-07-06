@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 @dataclass
 class MemoryItem:
     """工作记忆项。"""
+
     key: str
     content: str
     ttl: str = "session"  # session | days | permanent

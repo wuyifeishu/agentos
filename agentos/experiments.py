@@ -1,11 +1,29 @@
 from dataclasses import dataclass
-class ExperimentRunner: pass
+
+
+class ExperimentRunner:
+    pass
+
+
 @dataclass
-class ExperimentConfig: name:str=''
+class ExperimentConfig:
+    name: str = ""
+
+
 @dataclass
-class ExperimentReport: pass
+class ExperimentReport:
+    pass
+
+
 @dataclass
-class PromptVariant: name:str=''
+class PromptVariant:
+    name: str = ""
+
+
 @dataclass
-class TrialResult: score:float=0.0
-class Evaluator: pass
+class TrialResult:
+    score: float = 0.0
+
+
+class Evaluator:
+    pass

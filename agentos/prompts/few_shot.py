@@ -5,15 +5,16 @@ Supports similarity-based, random, diversity-maximizing, and
 custom selection algorithms for constructing optimal few-shot prompts.
 """
 
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Iterable, Optional, Sequence
 import hashlib
 import random
 import re
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field
+from enum import StrEnum
+from typing import Any
 
 
-class SelectionStrategy(str, Enum):
+class SelectionStrategy(StrEnum):
     """Strategy for selecting few-shot examples."""
 
     RANDOM = "random"
@@ -37,9 +38,7 @@ class Example:
 
     def __post_init__(self):
         if not self.id:
-            self.id = hashlib.md5(
-                f"{self.input}{self.output}".encode()
-            ).hexdigest()[:12]
+            self.id = hashlib.md5(f"{self.input}{self.output}".encode()).hexdigest()[:12]
 
 
 class FewShotSelector:
@@ -72,7 +71,7 @@ class FewShotSelector:
         self.example_format = example_format or self.DEFAULT_FORMAT
         random.seed(seed)
 
-    def select(self, query: str, k: Optional[int] = None) -> list[Example]:
+    def select(self, query: str, k: int | None = None) -> list[Example]:
         """Select top-k examples for the given query."""
         k = k or self.max_examples
         if not self.examples:
@@ -92,7 +91,7 @@ class FewShotSelector:
         self,
         query: str,
         base_instruction: str = "",
-        k: Optional[int] = None,
+        k: int | None = None,
     ) -> str:
         """Build a complete few-shot prompt string."""
         selected = self.select(query, k)
@@ -125,10 +124,7 @@ class FewShotSelector:
     def _select_similarity(self, query: str, k: int) -> list[Example]:
         """Jaccard-based token similarity for fast selection."""
         query_tokens = set(_tokenize(query))
-        scored = [
-            (ex, self._jaccard(query_tokens, ex))
-            for ex in self.examples
-        ]
+        scored = [(ex, self._jaccard(query_tokens, ex)) for ex in self.examples]
         scored.sort(key=lambda x: x[1], reverse=True)
         return [ex for ex, _ in scored[:k]]
 
@@ -143,10 +139,7 @@ class FewShotSelector:
             # Pick the example least similar to any already selected
             best = max(
                 remaining,
-                key=lambda ex: min(
-                    self._jaccard(set(_tokenize(ex.input)), s)
-                    for s in selected
-                ),
+                key=lambda ex: min(self._jaccard(set(_tokenize(ex.input)), s) for s in selected),
             )
             selected.append(best)
             remaining.remove(best)

@@ -11,18 +11,17 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import signal
 import subprocess
 import tempfile
-import shlex
 from dataclasses import dataclass, field
 
 from agentos.system.permissions import (
-    SystemPermissionManager,
-    PermissionTier,
     PermissionDenied,
+    PermissionTier,
+    SystemPermissionManager,
 )
-
 
 # ── Shell 策略 ─────────────────────────────────────────────────
 
@@ -30,19 +29,21 @@ from agentos.system.permissions import (
 @dataclass
 class ShellPolicy:
     """Shell 执行策略。"""
-    allowed_commands: list[str] = field(default_factory=list)   # 命令白名单
-    blocked_commands: list[str] = field(default_factory=list)   # 命令黑名单
-    blocked_patterns: list[str] = field(default_factory=list)   # 参数黑名单模式
-    timeout_seconds: int = 30                                    # 超时时间
-    max_output_bytes: int = 1024 * 100                           # 最大输出字节
-    sandbox_dir: str = ""                                        # 沙箱工作目录
-    allow_pipes: bool = False                                    # 是否允许管道
-    allow_redirects: bool = False                                # 是否允许重定向
+
+    allowed_commands: list[str] = field(default_factory=list)  # 命令白名单
+    blocked_commands: list[str] = field(default_factory=list)  # 命令黑名单
+    blocked_patterns: list[str] = field(default_factory=list)  # 参数黑名单模式
+    timeout_seconds: int = 30  # 超时时间
+    max_output_bytes: int = 1024 * 100  # 最大输出字节
+    sandbox_dir: str = ""  # 沙箱工作目录
+    allow_pipes: bool = False  # 是否允许管道
+    allow_redirects: bool = False  # 是否允许重定向
 
 
 @dataclass
 class ShellResult:
     """Shell 执行结果。"""
+
     success: bool
     command: str
     stdout: str
@@ -58,14 +59,58 @@ class ShellResult:
 
 READONLY_POLICY = ShellPolicy(
     allowed_commands=[
-        "ls", "cat", "head", "tail", "find", "ps", "df", "du",
-        "whoami", "pwd", "env", "echo", "date", "wc", "stat",
-        "file", "which", "uname", "uptime", "id", "groups",
-        "free", "top", "grep", "awk", "sed", "sort", "uniq",
-        "cut", "tr", "tee", "xargs", "basename", "dirname",
-        "readlink", "realpath", "md5sum", "sha256sum", "diff",
-        "curl", "wget", "ping", "hostname", "ip", "ss",
-        "python3", "python", "pip", "pip3", "git", "node", "npm",
+        "ls",
+        "cat",
+        "head",
+        "tail",
+        "find",
+        "ps",
+        "df",
+        "du",
+        "whoami",
+        "pwd",
+        "env",
+        "echo",
+        "date",
+        "wc",
+        "stat",
+        "file",
+        "which",
+        "uname",
+        "uptime",
+        "id",
+        "groups",
+        "free",
+        "top",
+        "grep",
+        "awk",
+        "sed",
+        "sort",
+        "uniq",
+        "cut",
+        "tr",
+        "tee",
+        "xargs",
+        "basename",
+        "dirname",
+        "readlink",
+        "realpath",
+        "md5sum",
+        "sha256sum",
+        "diff",
+        "curl",
+        "wget",
+        "ping",
+        "hostname",
+        "ip",
+        "ss",
+        "python3",
+        "python",
+        "pip",
+        "pip3",
+        "git",
+        "node",
+        "npm",
     ],
     timeout_seconds=30,
     allow_pipes=True,
@@ -74,19 +119,35 @@ READONLY_POLICY = ShellPolicy(
 
 STANDARD_POLICY = ShellPolicy(
     blocked_commands=[
-        "rm", "shutdown", "reboot", "halt", "poweroff",
-        "mkfs", "dd", "fdisk", "parted", "mount", "umount",
-        "chmod", "chown", "useradd", "userdel", "passwd",
-        "iptables", "ufw", "systemctl", "service",
+        "rm",
+        "shutdown",
+        "reboot",
+        "halt",
+        "poweroff",
+        "mkfs",
+        "dd",
+        "fdisk",
+        "parted",
+        "mount",
+        "umount",
+        "chmod",
+        "chown",
+        "useradd",
+        "userdel",
+        "passwd",
+        "iptables",
+        "ufw",
+        "systemctl",
+        "service",
     ],
     blocked_patterns=[
-        r"rm\s+(-rf?|--recursive)\s+/",     # rm -rf /
-        r">\s*/dev/",                          # 覆盖设备
-        r"mkfs\.",                            # 格式化
-        r"dd\s+if=",                          # dd 操作
-        r"curl.*\|.*sh",                      # curl pipe sh
-        r"wget.*\|.*sh",                      # wget pipe sh
-        r">\s*/etc/",                         # 写入 /etc/
+        r"rm\s+(-rf?|--recursive)\s+/",  # rm -rf /
+        r">\s*/dev/",  # 覆盖设备
+        r"mkfs\.",  # 格式化
+        r"dd\s+if=",  # dd 操作
+        r"curl.*\|.*sh",  # curl pipe sh
+        r"wget.*\|.*sh",  # wget pipe sh
+        r">\s*/etc/",  # 写入 /etc/
     ],
     timeout_seconds=60,
     max_output_bytes=1024 * 500,
@@ -124,8 +185,18 @@ class ShellSandbox:
 
     def filtered_env(self) -> dict[str, str]:
         """返回过滤后的环境变量（移除敏感变量）。"""
-        blocked = {"AWS_", "SECRET_", "TOKEN", "PASSWORD", "PASSWD",
-                    "KEY", "CREDENTIAL", "PRIVATE", "CERT", "AUTH"}
+        blocked = {
+            "AWS_",
+            "SECRET_",
+            "TOKEN",
+            "PASSWORD",
+            "PASSWD",
+            "KEY",
+            "CREDENTIAL",
+            "PRIVATE",
+            "CERT",
+            "AUTH",
+        }
         env = {}
         for k, v in os.environ.items():
             if not any(b in k.upper() for b in blocked):
@@ -138,6 +209,7 @@ class ShellSandbox:
     def cleanup(self) -> None:
         """清理沙箱目录。"""
         import shutil
+
         try:
             shutil.rmtree(self._work_dir, ignore_errors=True)
         except Exception:
@@ -188,27 +260,29 @@ class ShellExecutor:
         try:
             self._pm.require(self._sid, PermissionTier.SHELL_FULL, command)
             policy = FULL_POLICY
-            tier = PermissionTier.SHELL_FULL
         except PermissionDenied:
             try:
                 self._pm.require(self._sid, PermissionTier.SHELL_STANDARD, command)
                 policy = STANDARD_POLICY
-                tier = PermissionTier.SHELL_STANDARD
             except PermissionDenied:
                 try:
                     self._pm.require(self._sid, PermissionTier.SHELL_READONLY, command)
                     policy = READONLY_POLICY
-                    tier = PermissionTier.SHELL_READONLY
                 except PermissionDenied as e:
                     return ShellResult(
-                        success=False, command=command,
-                        stdout="", stderr="", permission_denied=True, error=str(e),
+                        success=False,
+                        command=command,
+                        stdout="",
+                        stderr="",
+                        permission_denied=True,
+                        error=str(e),
                     )
 
         return self._execute_with_policy(command, policy, sandbox_name)
 
-    def execute_checked(self, command: str, required_tier: PermissionTier,
-                        sandbox_name: str = "default") -> ShellResult:
+    def execute_checked(
+        self, command: str, required_tier: PermissionTier, sandbox_name: str = "default"
+    ) -> ShellResult:
         """以指定权限级别执行命令。"""
         self._pm.require(self._sid, required_tier, command)
         if required_tier == PermissionTier.SHELL_READONLY:
@@ -221,8 +295,9 @@ class ShellExecutor:
 
     # ── 内部实现 ──
 
-    def _execute_with_policy(self, command: str, policy: ShellPolicy,
-                              sandbox_name: str) -> ShellResult:
+    def _execute_with_policy(
+        self, command: str, policy: ShellPolicy, sandbox_name: str
+    ) -> ShellResult:
         """按策略执行命令。"""
         import time
 
@@ -230,8 +305,11 @@ class ShellExecutor:
         safety_check = self._safety_check(command, policy)
         if safety_check:
             return ShellResult(
-                success=False, command=command,
-                stdout="", stderr=safety_check, error=safety_check,
+                success=False,
+                command=command,
+                stdout="",
+                stderr=safety_check,
+                error=safety_check,
             )
 
         sandbox = self.get_sandbox(sandbox_name)
@@ -282,8 +360,11 @@ class ShellExecutor:
 
         except Exception as e:
             return ShellResult(
-                success=False, command=command,
-                stdout="", stderr="", error=str(e),
+                success=False,
+                command=command,
+                stdout="",
+                stderr="",
+                error=str(e),
             )
 
     def _safety_check(self, command: str, policy: ShellPolicy) -> str:
@@ -297,7 +378,10 @@ class ShellExecutor:
 
         # 白名单检查
         if policy.allowed_commands:
-            if main_cmd not in policy.allowed_commands and cmd_parts[0] not in policy.allowed_commands:
+            if (
+                main_cmd not in policy.allowed_commands
+                and cmd_parts[0] not in policy.allowed_commands
+            ):
                 return f"命令 '{main_cmd}' 不在允许列表中。允许的命令: {', '.join(policy.allowed_commands[:20])}"
 
         # 黑名单检查

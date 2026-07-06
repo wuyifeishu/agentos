@@ -33,10 +33,11 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import (
-    Any, Callable, Dict, List, Optional,
+    Any,
 )
 
 # ── Ray Optional Import ────────────────────
@@ -44,6 +45,7 @@ from typing import (
 _HAS_RAY = False
 try:
     import ray
+
     _HAS_RAY = True
 except ImportError:
     ray = None  # type: ignore
@@ -60,17 +62,19 @@ def _require_ray():
 
 # ── Data Models ─────────────────────────────
 
+
 @dataclass
 class AgentPlacementSpec:
     """Agent placement specification for distributed deployment."""
+
     cpu: float = 1.0
     gpu: float = 0.0
     memory_mb: int = 512
-    node_affinity: Optional[str] = None
+    node_affinity: str | None = None
     strategy: str = "spread"  # spread | pack | custom
 
 
-class DistTaskStatus(str, Enum):
+class DistTaskStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -78,13 +82,13 @@ class DistTaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class DistAgentStatus(str, Enum):
+class DistAgentStatus(StrEnum):
     IDLE = "idle"
     BUSY = "busy"
     OFFLINE = "offline"
 
 
-class PlacementStrategy(str, Enum):
+class PlacementStrategy(StrEnum):
     SPREAD = "spread"
     PACK = "pack"
     RANDOM = "random"
@@ -94,6 +98,7 @@ class PlacementStrategy(str, Enum):
 @dataclass
 class DistSwarmConfig:
     """Configuration for distributed swarm orchestrator."""
+
     num_workers: int = 4
     cpus_per_worker: float = 1.0
     gpus_per_worker: float = 0.0
@@ -106,31 +111,33 @@ class DistSwarmConfig:
 @dataclass
 class DistTaskRecord:
     """Record of a distributed task."""
+
     task_id: str
     status: DistTaskStatus = DistTaskStatus.PENDING
-    assigned_actor: Optional[str] = None
+    assigned_actor: str | None = None
     created_at: float = 0.0
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
+    started_at: float | None = None
+    completed_at: float | None = None
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class CrossNodeMailbox:
     """Mailbox for cross-node message passing."""
+
     def __init__(self, mailbox_id: str = ""):
         self.mailbox_id = mailbox_id or uuid.uuid4().hex[:8]
-        self._messages: List[Dict[str, Any]] = []
+        self._messages: list[dict[str, Any]] = []
 
-    async def send(self, message: Dict[str, Any]) -> None:
+    async def send(self, message: dict[str, Any]) -> None:
         self._messages.append(message)
 
-    async def receive(self, timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+    async def receive(self, timeout: float = 5.0) -> dict[str, Any] | None:
         if self._messages:
             return self._messages.pop(0)
         return None
 
-    async def receive_all(self) -> List[Dict[str, Any]]:
+    async def receive_all(self) -> list[dict[str, Any]]:
         msgs = list(self._messages)
         self._messages.clear()
         return msgs
@@ -138,20 +145,21 @@ class CrossNodeMailbox:
 
 class CrossNodeBus:
     """Cross-node message bus for distributed communication."""
+
     def __init__(self, bus_id: str = ""):
         self.bus_id = bus_id or uuid.uuid4().hex[:8]
-        self._mailboxes: Dict[str, CrossNodeMailbox] = {}
-        self._subscribers: Dict[str, List[Callable]] = {}
+        self._mailboxes: dict[str, CrossNodeMailbox] = {}
+        self._subscribers: dict[str, list[Callable]] = {}
 
     def create_mailbox(self, name: str = "") -> CrossNodeMailbox:
         mbox = CrossNodeMailbox(name)
         self._mailboxes[mbox.mailbox_id] = mbox
         return mbox
 
-    def get_mailbox(self, mailbox_id: str) -> Optional[CrossNodeMailbox]:
+    def get_mailbox(self, mailbox_id: str) -> CrossNodeMailbox | None:
         return self._mailboxes.get(mailbox_id)
 
-    async def broadcast(self, topic: str, payload: Dict[str, Any]) -> None:
+    async def broadcast(self, topic: str, payload: dict[str, Any]) -> None:
         for cb in self._subscribers.get(topic, []):
             try:
                 await cb(payload)
@@ -169,6 +177,7 @@ if _HAS_RAY:
     @ray.remote
     class RayAgentActor:
         """Ray Actor wrapping an Agent instance for distributed execution."""
+
         def __init__(self, actor_name: str = "", node_id: str = ""):
             self.name = actor_name or uuid.uuid4().hex[:8]
             self.node_id = node_id or ray.get_runtime_context().get_node_id()
@@ -177,7 +186,7 @@ if _HAS_RAY:
             self.tasks_failed: int = 0
             self._shutdown: bool = False
 
-        def get_status(self) -> Dict[str, Any]:
+        def get_status(self) -> dict[str, Any]:
             return {
                 "name": self.name,
                 "node_id": self.node_id,
@@ -186,9 +195,7 @@ if _HAS_RAY:
                 "tasks_failed": self.tasks_failed,
             }
 
-        async def execute(
-            self, task_id: str, payload: Dict[str, Any]
-        ) -> Dict[str, Any]:
+        async def execute(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
             self.status = DistAgentStatus.BUSY
             try:
                 result = {"task_id": task_id, "status": "ok", "data": payload}
@@ -213,16 +220,16 @@ else:
 
 # ── Distributed Task Queue ──────────────────
 
+
 class DistTaskQueue:
     """Distributed task queue with load balancing."""
+
     def __init__(self, max_size: int = 1000):
         self.max_size = max_size
-        self._queue: List[DistTaskRecord] = []
-        self._results: Dict[str, Any] = {}
+        self._queue: list[DistTaskRecord] = []
+        self._results: dict[str, Any] = {}
 
-    def submit(
-        self, payload: Dict[str, Any], timeout: float = 300.0
-    ) -> DistTaskRecord:
+    def submit(self, payload: dict[str, Any], timeout: float = 300.0) -> DistTaskRecord:
         task_id = uuid.uuid4().hex[:16]
         record = DistTaskRecord(
             task_id=task_id,
@@ -242,21 +249,23 @@ class DistTaskQueue:
                 rec.result = result
                 rec.completed_at = time.time()
 
-    def list_pending(self) -> List[DistTaskRecord]:
+    def list_pending(self) -> list[DistTaskRecord]:
         return [r for r in self._queue if r.status == DistTaskStatus.PENDING]
 
 
 # ── Distributed Swarm Coordinator ───────────
 
+
 class DistSwarmCoordinator:
     """Coordinates a distributed swarm of agent actors."""
+
     def __init__(
         self,
-        config: Optional[DistSwarmConfig] = None,
+        config: DistSwarmConfig | None = None,
         num_workers: int = 4,
     ):
         self.config = config or DistSwarmConfig(num_workers=num_workers)
-        self._actors: List[Any] = []
+        self._actors: list[Any] = []
         self.bus = CrossNodeBus()
         self._started: bool = False
 
@@ -280,9 +289,7 @@ class DistSwarmCoordinator:
         self._actors.clear()
         self._started = False
 
-    async def submit(
-        self, payload: Dict[str, Any], timeout: float = 300.0
-    ) -> Any:
+    async def submit(self, payload: dict[str, Any], timeout: float = 300.0) -> Any:
         _require_ray()
         if not self._actors:
             await self.start()

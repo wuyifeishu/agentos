@@ -13,17 +13,19 @@ Supports: dot-path access, schema validation, file watching for hot reload.
 import json
 import os
 import threading
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Union
-
+from typing import Any
 
 # ============================================================================
 # Schema Validation
 # ============================================================================
 
+
 class ConfigSchemaError(Exception):
     """Validation error with path and message."""
+
     def __init__(self, path: str, message: str):
         self.path = path
         self.message = message
@@ -34,7 +36,7 @@ class ConfigSchema:
     """Declarative schema for config validation."""
 
     def __init__(self):
-        self._fields: Dict[str, Dict[str, Any]] = {}
+        self._fields: dict[str, dict[str, Any]] = {}
 
     def field(
         self,
@@ -42,9 +44,9 @@ class ConfigSchema:
         type_: type = str,
         required: bool = False,
         default: Any = None,
-        choices: Optional[List[Any]] = None,
-        min_val: Optional[float] = None,
-        max_val: Optional[float] = None,
+        choices: list[Any] | None = None,
+        min_val: float | None = None,
+        max_val: float | None = None,
         description: str = "",
     ) -> "ConfigSchema":
         self._fields[name] = {
@@ -58,7 +60,7 @@ class ConfigSchema:
         }
         return self
 
-    def validate(self, config: Dict[str, Any], prefix: str = "") -> List[ConfigSchemaError]:
+    def validate(self, config: dict[str, Any], prefix: str = "") -> list[ConfigSchemaError]:
         errors = []
         for name, spec in self._fields.items():
             path = f"{prefix}.{name}" if prefix else name
@@ -68,12 +70,16 @@ class ConfigSchema:
                     errors.append(ConfigSchemaError(path, "required field missing"))
                 continue
             if not isinstance(value, spec["type"]):
-                errors.append(ConfigSchemaError(path,
-                    f"expected {spec['type'].__name__}, got {type(value).__name__}"))
+                errors.append(
+                    ConfigSchemaError(
+                        path, f"expected {spec['type'].__name__}, got {type(value).__name__}"
+                    )
+                )
                 continue
             if spec["choices"] and value not in spec["choices"]:
-                errors.append(ConfigSchemaError(path,
-                    f"invalid choice '{value}', allowed: {spec['choices']}"))
+                errors.append(
+                    ConfigSchemaError(path, f"invalid choice '{value}', allowed: {spec['choices']}")
+                )
             if spec["min"] is not None and value < spec["min"]:
                 errors.append(ConfigSchemaError(path, f"value {value} below min {spec['min']}"))
             if spec["max"] is not None and value > spec["max"]:
@@ -84,6 +90,7 @@ class ConfigSchema:
 # ============================================================================
 # ConfigManager
 # ============================================================================
+
 
 class ConfigManager:
     """Layered configuration manager.
@@ -97,21 +104,21 @@ class ConfigManager:
 
     def __init__(
         self,
-        defaults: Optional[Dict[str, Any]] = None,
-        schema: Optional[ConfigSchema] = None,
+        defaults: dict[str, Any] | None = None,
+        schema: ConfigSchema | None = None,
     ):
         self._defaults = deepcopy(defaults) if defaults else {}
-        self._file_layer: Dict[str, Any] = {}
-        self._env_layer: Dict[str, Any] = {}
-        self._runtime_layer: Dict[str, Any] = {}
+        self._file_layer: dict[str, Any] = {}
+        self._env_layer: dict[str, Any] = {}
+        self._runtime_layer: dict[str, Any] = {}
         self._schema = schema
         self._lock = threading.RLock()
-        self._watchers: Dict[str, float] = {}  # path → mtime
-        self._on_change: List[Callable[[str, Any, Any], None]] = []
+        self._watchers: dict[str, float] = {}  # path → mtime
+        self._on_change: list[Callable[[str, Any, Any], None]] = []
 
     # ---------- file loading ----------
 
-    def load_file(self, path: Union[str, Path]) -> None:
+    def load_file(self, path: str | Path) -> None:
         """Load config from YAML or JSON file."""
         path = Path(path)
         if not path.exists():
@@ -126,9 +133,10 @@ class ConfigManager:
             if str(path) not in self._watchers:
                 self._watchers[str(path)] = path.stat().st_mtime
 
-    def _parse_yaml(self, content: str) -> Dict[str, Any]:
+    def _parse_yaml(self, content: str) -> dict[str, Any]:
         try:
             import yaml
+
             return yaml.safe_load(content) or {}
         except ImportError:
             raise ImportError("PyYAML required for YAML config files. pip install pyyaml")
@@ -140,7 +148,7 @@ class ConfigManager:
         with self._lock:
             for key, value in os.environ.items():
                 if not prefix or key.startswith(prefix):
-                    config_key = key[len(prefix):].lower() if prefix else key.lower()
+                    config_key = key[len(prefix) :].lower() if prefix else key.lower()
                     # Try to parse numbers/booleans
                     parsed = self._parse_value(value)
                     self._env_layer[config_key] = parsed
@@ -196,7 +204,7 @@ class ConfigManager:
                 return default
         return current
 
-    def all(self) -> Dict[str, Any]:
+    def all(self) -> dict[str, Any]:
         """Return merged config dict."""
         with self._lock:
             result = deepcopy(self._defaults)
@@ -219,7 +227,7 @@ class ConfigManager:
 
     # ---------- validation ----------
 
-    def validate(self) -> List[ConfigSchemaError]:
+    def validate(self) -> list[ConfigSchemaError]:
         if not self._schema:
             return []
         return self._schema.validate(self.all())
@@ -239,7 +247,7 @@ class ConfigManager:
     # ---------- internal ----------
 
     @staticmethod
-    def _deep_merge(base: Dict, overlay: Dict) -> Dict:
+    def _deep_merge(base: dict, overlay: dict) -> dict:
         result = deepcopy(base)
         for k, v in overlay.items():
             if k in result and isinstance(result[k], dict) and isinstance(v, dict):

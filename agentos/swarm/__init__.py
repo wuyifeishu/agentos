@@ -1,95 +1,95 @@
 """Swarm module - Swarm coordinator, collaboration patterns, v1.9.8 tool registry + routing"""
 
-from agentos.swarm.coordinator import (
-    SmartSwarmCoordinator,
-    SwarmCoordinator,  # backward-compat alias
-    SwarmTopology,
-    SwarmMessage,
-    SwarmResult,
-    ExecutionMode,
-    # Migrated from orchestration/swarm_coordinator.py (v1.16.2)
-    SwarmAgentRole,
-    TaskPriority,
-    TaskStatus,
-    SwarmAgentInfo,
-    SwarmTask,
-    TaskAllocator,
-    ConflictResolver,
-    ConflictType,
-)
-from agentos.swarm.patterns import (
-    SwarmPatterns,
-    Topology,
-    CollaborationConfig,
-    CollaborationResult,
-)
-from agentos.swarm.task_decomposer import (
-    TaskDecomposer,
-    SubTask,
-    Decomposition,
-)
-from agentos.swarm.result_fusion import (
-    ResultFusion,
-    FusedResult,
-)
-from agentos.swarm.eval_feedback_loop import (
-    EvalFeedbackLoop,
-    LoopResult,
-    FeedbackSignal,
-    RetryConfig,
-)
-from agentos.swarm.code_sandbox import (
-    CodeSandbox,
-    SandboxResult,
-    TestCase,
-    CodeFeedbackExtractor,
-)
-from agentos.swarm.human_loop import (
-    HITLManager,
-    HITLConfig,
-    Breakpoint,
-    BreakpointType,
-    HumanDecision,
+from agentos.swarm.agent_memory import (
+    AgentMemory,
+    ContextBudget,
+    ContextWindowManager,
+    LongTermMemory,
+    MemoryEntry,
+    ShortTermMemory,
+    WorkingMemory,
 )
 from agentos.swarm.agent_monitor import (
     AgentMonitor,
-    QualityGate,
-    MonitorReport,
+    GateAction,
     GateResult,
     GateStatus,
-    GateAction,
-    output_not_empty,
-    output_length_range,
-    no_error_output,
+    MonitorReport,
+    QualityGate,
+    confidence_min,
     contains_keywords,
     latency_max,
-    confidence_min,
+    no_error_output,
+    output_length_range,
+    output_not_empty,
+)
+from agentos.swarm.code_sandbox import (
+    CodeFeedbackExtractor,
+    CodeSandbox,
+    SandboxResult,
+    TestCase,
+)
+from agentos.swarm.coordinator import (
+    ConflictResolver,
+    ConflictType,
+    ExecutionMode,
+    SmartSwarmCoordinator,
+    SwarmAgentInfo,
+    # Migrated from orchestration/swarm_coordinator.py (v1.16.2)
+    SwarmAgentRole,
+    SwarmCoordinator,  # backward-compat alias
+    SwarmMessage,
+    SwarmResult,
+    SwarmTask,
+    SwarmTopology,
+    TaskAllocator,
+    TaskPriority,
+    TaskStatus,
+)
+from agentos.swarm.eval_feedback_loop import (
+    EvalFeedbackLoop,
+    FeedbackSignal,
+    LoopResult,
+    RetryConfig,
 )
 from agentos.swarm.execution_trace import (
     ExecutionTrace,
-    TraceSpan,
-    TraceEvent,
     TraceCollector,
+    TraceEvent,
+    TraceSpan,
 )
-from agentos.swarm.agent_memory import (
-    AgentMemory,
-    WorkingMemory,
-    ShortTermMemory,
-    LongTermMemory,
-    ContextWindowManager,
-    ContextBudget,
-    MemoryEntry,
+from agentos.swarm.human_loop import (
+    Breakpoint,
+    BreakpointType,
+    HITLConfig,
+    HITLManager,
+    HumanDecision,
+)
+from agentos.swarm.patterns import (
+    CollaborationConfig,
+    CollaborationResult,
+    SwarmPatterns,
+    Topology,
+)
+from agentos.swarm.result_fusion import (
+    FusedResult,
+    ResultFusion,
+)
+from agentos.swarm.task_decomposer import (
+    Decomposition,
+    SubTask,
+    TaskDecomposer,
 )
 from agentos.swarm.tool_registry import (
+    RoutingContext,
+    RoutingDecision,
+    ToolCategory,
+    ToolExecutionError,
+    ToolExecutor,
+    ToolParam,
     ToolRegistry,
     ToolRouter,
-    ToolExecutor,
     ToolSchema,
-    ToolParam,
-    ToolCategory,
-    RoutingDecision,
-    RoutingContext,
-    ToolExecutionError,
     create_tool,
 )
 

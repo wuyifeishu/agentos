@@ -1,3 +1,10 @@
-class AgentMarket: pass
-class AgentSkill: pass
-class AgentCategory: pass
+class AgentMarket:
+    pass
+
+
+class AgentSkill:
+    pass
+
+
+class AgentCategory:
+    pass

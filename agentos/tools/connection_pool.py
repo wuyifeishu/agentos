@@ -6,8 +6,9 @@ Generic connection pool, rate limiter, resource quota manager, and health-checke
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -15,6 +16,7 @@ T = TypeVar("T")
 # ============================================================================
 # ConnectionPool
 # ============================================================================
+
 
 @dataclass
 class _PooledConn(Generic[T]):
@@ -33,8 +35,8 @@ class ConnectionPool(Generic[T]):
     def __init__(
         self,
         factory: Callable[[], T],
-        health_check: Optional[Callable[[T], bool]] = None,
-        closer: Optional[Callable[[T], None]] = None,
+        health_check: Callable[[T], bool] | None = None,
+        closer: Callable[[T], None] | None = None,
         min_size: int = 2,
         max_size: int = 20,
         max_idle: int = 10,
@@ -76,7 +78,7 @@ class ConnectionPool(Generic[T]):
             self._total_failed_health += 1
             return False
 
-    def acquire(self, timeout: Optional[float] = None) -> T:
+    def acquire(self, timeout: float | None = None) -> T:
         """Borrow a connection from the pool. Blocks until available or timeout."""
         if timeout is None:
             timeout = self._checkout_timeout
@@ -89,7 +91,7 @@ class ConnectionPool(Generic[T]):
                     raise RuntimeError("ConnectionPool is closed")
 
                 # Find a valid idle connection; evict unhealthy ones
-                unhealthy: List[_PooledConn[T]] = []
+                unhealthy: list[_PooledConn[T]] = []
                 for pc in self._pool:
                     if pc.borrowed:
                         continue
@@ -182,7 +184,7 @@ class ConnectionPool(Generic[T]):
             self._condition.notify_all()
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             active = sum(1 for pc in self._pool if pc.borrowed)
             idle = sum(1 for pc in self._pool if not pc.borrowed)
@@ -208,6 +210,7 @@ class ConnectionPool(Generic[T]):
 # RateLimiter
 # ============================================================================
 
+
 class RateLimiter:
     """Thread-safe token bucket rate limiter with burst support."""
 
@@ -221,7 +224,7 @@ class RateLimiter:
         self._total_acquired: int = 0
         self._total_rejected: int = 0
 
-    def acquire(self, count: int = 1, timeout: Optional[float] = None) -> bool:
+    def acquire(self, count: int = 1, timeout: float | None = None) -> bool:
         """Try to acquire N tokens. Blocks up to timeout if not enough."""
         deadline = time.monotonic() + timeout if timeout else None
 
@@ -276,7 +279,7 @@ class RateLimiter:
             return self._tokens
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             self._refill()
             return {
@@ -292,12 +295,13 @@ class RateLimiter:
 # ResourceQuota
 # ============================================================================
 
+
 class ResourceQuota:
     """Track and enforce resource usage quotas per component."""
 
     def __init__(self, global_limit: int = 1024):
         self._global_limit = global_limit
-        self._allocations: Dict[str, int] = {}
+        self._allocations: dict[str, int] = {}
         self._lock = threading.Lock()
 
     def allocate(self, component: str, amount: int = 1) -> bool:
@@ -334,7 +338,7 @@ class ResourceQuota:
         return self._global_limit - self.total_used
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "global_limit": self._global_limit,
@@ -348,10 +352,11 @@ class ResourceQuota:
 # Convenience Functions
 # ============================================================================
 
+
 def create_connection_pool(
     factory: Callable[[], T],
-    health_check: Optional[Callable[[T], bool]] = None,
-    closer: Optional[Callable[[T], None]] = None,
+    health_check: Callable[[T], bool] | None = None,
+    closer: Callable[[T], None] | None = None,
     min_size: int = 2,
     max_size: int = 20,
 ) -> ConnectionPool[T]:

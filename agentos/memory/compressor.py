@@ -48,7 +48,7 @@ class ContextCompressor:
         """L1: 保留system消息 + 最近N条消息。"""
         system_msgs = [m for m in messages if m.role == "system"]
         others = [m for m in messages if m.role != "system"]
-        return system_msgs + others[-self.window_size:]
+        return system_msgs + others[-self.window_size :]
 
     def _summarize_tool_outputs(self, messages: list[Message]) -> list[Message]:
         """L2: 截断过长的工具输出。"""

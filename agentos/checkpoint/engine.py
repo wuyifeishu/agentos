@@ -34,13 +34,13 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 
 from agentos.checkpoint.base import (
     Checkpoint,
-    CheckpointMetadata,
     CheckpointBackend,
+    CheckpointMetadata,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,35 +49,40 @@ logger = logging.getLogger(__name__)
 # ── Types ────────────────────────────────────
 
 
-class SnapshotTrigger(str, Enum):
+class SnapshotTrigger(StrEnum):
     """快照触发点。"""
-    TOOL_CALL = "tool_call"           # 工具调用前后
-    LLM_CALL = "llm_call"             # LLM 调用前后
-    STATE_CHANGE = "state_change"     # Agent 状态变更
-    TASK_BOUNDARY = "task_boundary"   # 任务开始/结束
-    MANUAL = "manual"                 # 显式调用
-    INTERVAL = "interval"             # 定时快照
+
+    TOOL_CALL = "tool_call"  # 工具调用前后
+    LLM_CALL = "llm_call"  # LLM 调用前后
+    STATE_CHANGE = "state_change"  # Agent 状态变更
+    TASK_BOUNDARY = "task_boundary"  # 任务开始/结束
+    MANUAL = "manual"  # 显式调用
+    INTERVAL = "interval"  # 定时快照
 
 
-class CheckpointGC(str, Enum):
+class CheckpointGC(StrEnum):
     """检查点垃圾回收策略。"""
+
     KEEP_ALL = "keep_all"
     KEEP_LAST_N = "keep_last_n"
-    KEEP_AGE = "keep_age"           # 仅保留 N 秒内
+    KEEP_AGE = "keep_age"  # 仅保留 N 秒内
     KEEP_MILESTONES = "keep_milestones"  # 仅保留首尾 + N 个分位点
 
 
 @dataclass
 class SnapshotConfig:
     """快照配置。"""
-    triggers: Set[SnapshotTrigger] = field(default_factory=lambda: {
-        SnapshotTrigger.MANUAL,
-        SnapshotTrigger.TOOL_CALL,
-        SnapshotTrigger.LLM_CALL,
-        SnapshotTrigger.STATE_CHANGE,
-    })
+
+    triggers: set[SnapshotTrigger] = field(
+        default_factory=lambda: {
+            SnapshotTrigger.MANUAL,
+            SnapshotTrigger.TOOL_CALL,
+            SnapshotTrigger.LLM_CALL,
+            SnapshotTrigger.STATE_CHANGE,
+        }
+    )
     gc_policy: CheckpointGC = CheckpointGC.KEEP_LAST_N
-    gc_param: int = 100           # keep_last_n 的 n 或 keep_age 的秒数
+    gc_param: int = 100  # keep_last_n 的 n 或 keep_age 的秒数
     delta_snapshots: bool = True  # 是否使用增量快照（减少存储）
     max_snapshot_size_mb: float = 10.0
 
@@ -85,10 +90,11 @@ class SnapshotConfig:
 @dataclass
 class TimeTravelResult:
     """时间旅行操作结果。"""
+
     checkpoint: Checkpoint
     thread_id: str
-    rewind_depth: int              # 回退了几个 checkpoint
-    snapshot_count_before: int     # 重放前的快照数
+    rewind_depth: int  # 回退了几个 checkpoint
+    snapshot_count_before: int  # 重放前的快照数
     can_replay: bool = True
 
 
@@ -104,23 +110,23 @@ class CheckpointEngine:
     def __init__(
         self,
         checkpointer: CheckpointBackend,
-        config: Optional[SnapshotConfig] = None,
+        config: SnapshotConfig | None = None,
     ):
         self._checkpointer = checkpointer
         self._config = config or SnapshotConfig()
-        self._snapshot_counters: Dict[str, int] = {}  # thread_id → step counter
-        self._last_delta: Dict[str, Dict[str, Any]] = {}  # thread_id → last full state
+        self._snapshot_counters: dict[str, int] = {}  # thread_id → step counter
+        self._last_delta: dict[str, dict[str, Any]] = {}  # thread_id → last full state
 
     # ── Snapshot API ────────────────────────
 
     async def snapshot(
         self,
         thread_id: str,
-        messages: List[Dict[str, Any]],
-        state: Dict[str, Any],
-        tools_result: Dict[str, Any],
+        messages: list[dict[str, Any]],
+        state: dict[str, Any],
+        tools_result: dict[str, Any],
         trigger: SnapshotTrigger = SnapshotTrigger.MANUAL,
-        parent_checkpoint_id: Optional[str] = None,
+        parent_checkpoint_id: str | None = None,
         next_node: str = "",
     ) -> str:
         """创建一次快照。返回 checkpoint_id。"""
@@ -159,18 +165,23 @@ class CheckpointEngine:
     async def snapshot_safe(
         self,
         thread_id: str,
-        messages: List[Dict[str, Any]],
-        state: Dict[str, Any],
-        tools_result: Dict[str, Any],
+        messages: list[dict[str, Any]],
+        state: dict[str, Any],
+        tools_result: dict[str, Any],
         trigger: SnapshotTrigger = SnapshotTrigger.MANUAL,
-        parent_checkpoint_id: Optional[str] = None,
+        parent_checkpoint_id: str | None = None,
         next_node: str = "",
     ) -> str:
         """安全快照：失败不抛异常，不影响主流程。"""
         try:
             return await self.snapshot(
-                thread_id, messages, state, tools_result,
-                trigger, parent_checkpoint_id, next_node,
+                thread_id,
+                messages,
+                state,
+                tools_result,
+                trigger,
+                parent_checkpoint_id,
+                next_node,
             )
         except Exception as e:
             logger.error(f"Snapshot failed (non-blocking): {e}")
@@ -221,7 +232,7 @@ class CheckpointEngine:
         self,
         thread_id: str,
         step: int,
-    ) -> Optional[TimeTravelResult]:
+    ) -> TimeTravelResult | None:
         """按步骤号时间旅行。"""
         checkpoints = await self._checkpointer.list_checkpoints(thread_id, limit=500)
 
@@ -237,7 +248,7 @@ class CheckpointEngine:
         self,
         thread_id: str,
         limit: int = 50,
-    ) -> List[CheckpointMetadata]:
+    ) -> list[CheckpointMetadata]:
         """列出所有可回溯的时间点。"""
         return await self._checkpointer.list_checkpoints(thread_id, limit=limit)
 
@@ -253,7 +264,9 @@ class CheckpointEngine:
         if not source:
             raise ValueError(f"Source checkpoint {from_checkpoint_id} not found")
 
-        branch_thread_id = f"{source.metadata.thread_id}-branch-{branch_name}-{uuid.uuid4().hex[:4]}"
+        branch_thread_id = (
+            f"{source.metadata.thread_id}-branch-{branch_name}-{uuid.uuid4().hex[:4]}"
+        )
 
         # 在新分支中创建起始 checkpoint（引用源 checkpoint 状态）
         branch_checkpoint = Checkpoint(
@@ -311,6 +324,7 @@ class CheckpointEngine:
             @engine.snapshot_on(SnapshotTrigger.TOOL_CALL)
             async def search_database(query: str): ...
         """
+
         def decorator(func):
             @functools.wraps(func)
             async def wrapper(*args, **kwargs):
@@ -338,14 +352,16 @@ class CheckpointEngine:
                 )
 
                 return result
+
             return wrapper
+
         return decorator
 
     @asynccontextmanager
     async def snapshot_scope(
         self,
         thread_id: str,
-        state: Dict[str, Any],
+        state: dict[str, Any],
         trigger: SnapshotTrigger = SnapshotTrigger.STATE_CHANGE,
     ):
         """上下文管理器：进入和退出作用域时自动快照。
@@ -374,35 +390,37 @@ class CheckpointEngine:
 
     # ── Query API ───────────────────────────
 
-    async def get_latest(self, thread_id: str) -> Optional[Checkpoint]:
+    async def get_latest(self, thread_id: str) -> Checkpoint | None:
         return await self._checkpointer.get_latest(thread_id)
 
-    async def get_checkpoint_tree(
-        self, thread_id: str, limit: int = 200
-    ) -> Dict[str, Any]:
+    async def get_checkpoint_tree(self, thread_id: str, limit: int = 200) -> dict[str, Any]:
         """获取线程的 checkpoint 树结构（用于可视化）。"""
         checkpoints = await self._checkpointer.list_checkpoints(thread_id, limit=limit)
 
-        nodes: List[Dict] = []
-        edges: List[Dict] = []
-        by_id: Dict[str, CheckpointMetadata] = {}
+        nodes: list[dict] = []
+        edges: list[dict] = []
+        by_id: dict[str, CheckpointMetadata] = {}
 
         for cp in checkpoints:
             by_id[cp.checkpoint_id] = cp
-            nodes.append({
-                "id": cp.checkpoint_id,
-                "step": cp.step,
-                "tags": cp.tags,
-                "summary": cp.summary,
-                "created_at": cp.created_at,
-            })
+            nodes.append(
+                {
+                    "id": cp.checkpoint_id,
+                    "step": cp.step,
+                    "tags": cp.tags,
+                    "summary": cp.summary,
+                    "created_at": cp.created_at,
+                }
+            )
 
         for cp in checkpoints:
             if cp.parent_checkpoint_id and cp.parent_checkpoint_id in by_id:
-                edges.append({
-                    "from": cp.parent_checkpoint_id,
-                    "to": cp.checkpoint_id,
-                })
+                edges.append(
+                    {
+                        "from": cp.parent_checkpoint_id,
+                        "to": cp.checkpoint_id,
+                    }
+                )
 
         return {
             "thread_id": thread_id,
@@ -413,9 +431,7 @@ class CheckpointEngine:
 
     # ── Internal ────────────────────────────
 
-    def _auto_summary(
-        self, messages: List[Dict[str, Any]], state: Dict[str, Any]
-    ) -> str:
+    def _auto_summary(self, messages: list[dict[str, Any]], state: dict[str, Any]) -> str:
         """自动生成 checkpoint 摘要。"""
         if messages:
             last = messages[-1]
@@ -434,7 +450,7 @@ class CheckpointEngine:
         if self._config.gc_policy == CheckpointGC.KEEP_LAST_N:
             if len(checkpoints) > self._config.gc_param:
                 to_delete = sorted(checkpoints, key=lambda c: c.step)[
-                    :len(checkpoints) - self._config.gc_param
+                    : len(checkpoints) - self._config.gc_param
                 ]
                 for cp in to_delete:
                     await self._checkpointer.delete_before(thread_id, cp.step + 1)
@@ -445,7 +461,9 @@ class CheckpointEngine:
             deleted = 0
             for cp in checkpoints:
                 try:
-                    created = __import__('datetime').datetime.fromisoformat(cp.created_at).timestamp()
+                    created = (
+                        __import__("datetime").datetime.fromisoformat(cp.created_at).timestamp()
+                    )
                     if created < cutoff:
                         await self._checkpointer.delete_thread(cp.thread_id)
                         deleted += 1

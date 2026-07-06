@@ -7,8 +7,8 @@
 
 from agentos.vectorstore.db import (
     BaseVectorStore,
-    FAISSVectorStore,
     ChromaVectorStore,
+    FAISSVectorStore,
     VectorEntry,
 )
 

@@ -11,13 +11,13 @@ import re
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 # ── Severity ──────────────────────────────────────────────────────────────────
 
 
 class AuditSeverity(Enum):
     """Severity level for security audit findings."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -41,13 +41,14 @@ class AuditFinding:
         recommendation: Suggested remediation.
         cve: Optional CVE identifier if known.
     """
+
     id: str
     category: str
     severity: AuditSeverity
     message: str
     location: str = ""
     recommendation: str = ""
-    cve: Optional[str] = None
+    cve: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -70,6 +71,7 @@ class AuditReport:
         scanned_files: Number of files scanned.
         scanned_deps: Number of dependencies checked.
     """
+
     findings: list[AuditFinding] = field(default_factory=list)
     scanned_files: int = 0
     scanned_deps: int = 0
@@ -116,6 +118,7 @@ class AuditReport:
 
     def to_json(self) -> str:
         import json
+
         return json.dumps(self.to_dict(), indent=2, default=str)
 
     def to_markdown(self) -> str:
@@ -157,26 +160,68 @@ _VULN_PATTERNS: list[dict] = [
 
 # Dangerous AST patterns
 _DANGEROUS_PATTERNS: list[dict] = [
-    {"name": "eval-use", "node": "Call", "attr": "func.id", "match": "eval", "severity": "CRITICAL",
-     "msg": "eval() detected — arbitrary code execution risk"},
-    {"name": "exec-use", "node": "Call", "attr": "func.id", "match": "exec", "severity": "CRITICAL",
-     "msg": "exec() detected — arbitrary code execution risk"},
-    {"name": "pickle-load", "node": "Call", "attr": "func.attr", "match": "loads",
-     "parent_attr": "func.value.id", "parent_match": "pickle", "severity": "HIGH",
-     "msg": "pickle.loads() on untrusted data may execute arbitrary code"},
-    {"name": "hardcoded-secret", "node": "Assign", "attr": "targets[0].id",
-     "match_re": r"(?i)(password|secret|api_key|token|access_key)\s*$", "severity": "HIGH",
-     "msg": "Potential hard-coded secret"},
-    {"name": "shell-true", "node": "Call", "attr": "keywords",
-     "match_expr": "subprocess.Popen(… shell=True) or os.system() — command injection risk",
-     "severity": "HIGH",
-     "msg": "shell=True detected — command injection risk when input is untrusted"},
-    {"name": "insecure-deserialization", "node": "Call", "attr": "func.attr", "match": "loads",
-     "parent_attr": "func.value.id", "parent_match": "yaml", "severity": "HIGH",
-     "msg": "yaml.load() without SafeLoader — arbitrary code execution risk"},
-    {"name": "md5-hash", "node": "Call", "attr": "func.attr", "match": "md5",
-     "parent_attr": "func.value.id", "parent_match": "hashlib", "severity": "LOW",
-     "msg": "MD5 is cryptographically broken; use SHA-256"},
+    {
+        "name": "eval-use",
+        "node": "Call",
+        "attr": "func.id",
+        "match": "eval",
+        "severity": "CRITICAL",
+        "msg": "eval() detected — arbitrary code execution risk",
+    },
+    {
+        "name": "exec-use",
+        "node": "Call",
+        "attr": "func.id",
+        "match": "exec",
+        "severity": "CRITICAL",
+        "msg": "exec() detected — arbitrary code execution risk",
+    },
+    {
+        "name": "pickle-load",
+        "node": "Call",
+        "attr": "func.attr",
+        "match": "loads",
+        "parent_attr": "func.value.id",
+        "parent_match": "pickle",
+        "severity": "HIGH",
+        "msg": "pickle.loads() on untrusted data may execute arbitrary code",
+    },
+    {
+        "name": "hardcoded-secret",
+        "node": "Assign",
+        "attr": "targets[0].id",
+        "match_re": r"(?i)(password|secret|api_key|token|access_key)\s*$",
+        "severity": "HIGH",
+        "msg": "Potential hard-coded secret",
+    },
+    {
+        "name": "shell-true",
+        "node": "Call",
+        "attr": "keywords",
+        "match_expr": "subprocess.Popen(… shell=True) or os.system() — command injection risk",
+        "severity": "HIGH",
+        "msg": "shell=True detected — command injection risk when input is untrusted",
+    },
+    {
+        "name": "insecure-deserialization",
+        "node": "Call",
+        "attr": "func.attr",
+        "match": "loads",
+        "parent_attr": "func.value.id",
+        "parent_match": "yaml",
+        "severity": "HIGH",
+        "msg": "yaml.load() without SafeLoader — arbitrary code execution risk",
+    },
+    {
+        "name": "md5-hash",
+        "node": "Call",
+        "attr": "func.attr",
+        "match": "md5",
+        "parent_attr": "func.value.id",
+        "parent_match": "hashlib",
+        "severity": "LOW",
+        "msg": "MD5 is cryptographically broken; use SHA-256",
+    },
 ]
 
 
@@ -248,10 +293,11 @@ def scan_dependencies(req_path: str | Path) -> AuditReport:
 
 class _DangerousVisitor(ast.NodeVisitor):
     """AST visitor that flags dangerous code patterns (exec, eval, subprocess, etc.)."""
+
     def __init__(self) -> None:
         self.findings: list[AuditFinding] = []
 
-    def _match(self, node: ast.AST, pattern: dict, lineno: int) -> Optional[AuditFinding]:
+    def _match(self, node: ast.AST, pattern: dict, lineno: int) -> AuditFinding | None:
         name = pattern["name"]
         severity = AuditSeverity(pattern["severity"].lower())
 
@@ -364,18 +410,18 @@ def scan_source(source_dir: str | Path) -> AuditReport:
 class SecurityAuditor:
     """High-level security auditor that orchestrates dependency and source scanning."""
 
-    def __init__(self, req_path: Optional[str | Path] = None, source_dir: Optional[str | Path] = None):
-        self.req_path: Optional[Path] = Path(req_path) if req_path else None
-        self.source_dir: Optional[Path] = Path(source_dir) if source_dir else None
+    def __init__(self, req_path: str | Path | None = None, source_dir: str | Path | None = None):
+        self.req_path: Path | None = Path(req_path) if req_path else None
+        self.source_dir: Path | None = Path(source_dir) if source_dir else None
 
-    def scan_dependencies(self, req_path: Optional[str | Path] = None) -> AuditReport:
+    def scan_dependencies(self, req_path: str | Path | None = None) -> AuditReport:
         """Scan dependencies for known vulnerabilities."""
         path = Path(req_path) if req_path else self.req_path
         if not path or not path.exists():
             return AuditReport()
         return scan_dependencies(path)
 
-    def scan_source(self, paths: Optional[list[str | Path]] = None) -> AuditReport:
+    def scan_source(self, paths: list[str | Path] | None = None) -> AuditReport:
         """AST-based source code security scan."""
         if paths:
             report = AuditReport()
@@ -388,7 +434,9 @@ class SecurityAuditor:
             return AuditReport()
         return scan_source(self.source_dir)
 
-    def full_audit(self, source_dir: Optional[str | Path] = None, req_path: Optional[str | Path] = None) -> AuditReport:
+    def full_audit(
+        self, source_dir: str | Path | None = None, req_path: str | Path | None = None
+    ) -> AuditReport:
         """Run dependency + source audit and merge results."""
         sd = source_dir or self.source_dir
         rp = req_path or self.req_path

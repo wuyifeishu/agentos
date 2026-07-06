@@ -15,15 +15,20 @@ Copyright 2026 AgentOS. All rights reserved.
 from __future__ import annotations
 
 import json
+import logging
 import os
-from dataclasses import dataclass, fields, is_dataclass, MISSING
+from collections.abc import Callable
+from dataclasses import MISSING, dataclass, fields, is_dataclass
 from enum import Enum
 from pathlib import Path
 from typing import (
-    Any, Callable, Dict, List, Optional, Set, Tuple, Type, TypeVar, Union,
-    get_args, get_origin, get_type_hints,
+    Any,
+    TypeVar,
+    Union,
+    get_args,
+    get_origin,
+    get_type_hints,
 )
-import logging
 
 logger = logging.getLogger("agentos.config")
 
@@ -32,6 +37,7 @@ T = TypeVar("T")
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
+
 
 class ConfigError(Exception):
     """Base configuration error."""
@@ -59,6 +65,7 @@ class ConfigSourceError(ConfigError):
 # Source Types
 # ---------------------------------------------------------------------------
 
+
 class SourceType(Enum):
     ENV = "env"
     DOTENV = "dotenv"
@@ -71,32 +78,35 @@ class SourceType(Enum):
 @dataclass
 class ConfigSource:
     """Configuration source with precedence (lower number = higher priority)."""
+
     source_type: SourceType
-    data: Dict[str, Any]
+    data: dict[str, Any]
     precedence: int = 100
     description: str = ""
 
     @classmethod
-    def from_env(cls, prefix: str = "", precedence: int = 200) -> "ConfigSource":
-        data: Dict[str, Any] = {}
+    def from_env(cls, prefix: str = "", precedence: int = 200) -> ConfigSource:
+        data: dict[str, Any] = {}
         for key, val in os.environ.items():
             if prefix and not key.startswith(prefix):
                 continue
-            clean_key = key[len(prefix):] if prefix else key
+            clean_key = key[len(prefix) :] if prefix else key
             # parse simple types
             data[clean_key.lower()] = _parse_env_value(val)
         return cls(SourceType.ENV, data, precedence, f"env(prefix={prefix!r})")
 
     @classmethod
-    def from_dotenv(cls, path: Union[str, Path], precedence: int = 300,
-                    override: bool = False) -> "ConfigSource":
+    def from_dotenv(
+        cls, path: str | Path, precedence: int = 300, override: bool = False
+    ) -> ConfigSource:
         from pathlib import Path as P
+
         path = P(path)
         if not path.exists():
             if override:
                 return cls(SourceType.DOTENV, {}, precedence, f"dotenv({path})")
             raise ConfigSourceError(f".env file not found: {path}")
-        data: Dict[str, Any] = {}
+        data: dict[str, Any] = {}
         for line in path.read_text().splitlines():
             line = line.strip()
             if not line or line.startswith("#"):
@@ -110,8 +120,9 @@ class ConfigSource:
         return cls(SourceType.DOTENV, data, precedence, f"dotenv({path})")
 
     @classmethod
-    def from_yaml(cls, path: Union[str, Path], precedence: int = 400) -> "ConfigSource":
+    def from_yaml(cls, path: str | Path, precedence: int = 400) -> ConfigSource:
         import yaml
+
         path = Path(path)
         if not path.exists():
             raise ConfigSourceError(f"YAML file not found: {path}")
@@ -120,7 +131,7 @@ class ConfigSource:
         return cls(SourceType.YAML, data, precedence, f"yaml({path})")
 
     @classmethod
-    def from_toml(cls, path: Union[str, Path], precedence: int = 400) -> "ConfigSource":
+    def from_toml(cls, path: str | Path, precedence: int = 400) -> ConfigSource:
         path = Path(path)
         if not path.exists():
             raise ConfigSourceError(f"TOML file not found: {path}")
@@ -133,7 +144,7 @@ class ConfigSource:
         return cls(SourceType.TOML, data, precedence, f"toml({path})")
 
     @classmethod
-    def from_json(cls, path: Union[str, Path], precedence: int = 400) -> "ConfigSource":
+    def from_json(cls, path: str | Path, precedence: int = 400) -> ConfigSource:
         path = Path(path)
         if not path.exists():
             raise ConfigSourceError(f"JSON file not found: {path}")
@@ -142,14 +153,16 @@ class ConfigSource:
         return cls(SourceType.JSON, data, precedence, f"json({path})")
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any], precedence: int = 500,
-                  description: str = "dict") -> "ConfigSource":
+    def from_dict(
+        cls, d: dict[str, Any], precedence: int = 500, description: str = "dict"
+    ) -> ConfigSource:
         return cls(SourceType.DICT, dict(d), precedence, description)
 
 
 # ---------------------------------------------------------------------------
 # Config Manager
 # ---------------------------------------------------------------------------
+
 
 class ConfigManager:
     """Central configuration manager with source merging and typed access.
@@ -175,10 +188,10 @@ class ConfigManager:
     """
 
     def __init__(self, auto_env: bool = True, env_prefix: str = "AGENTOS_"):
-        self._sources: List[ConfigSource] = []
-        self._merged: Optional[Dict[str, Any]] = None
-        self._listeners: List[Callable[[str, Any, Any], None]] = []
-        self._secrets: Set[str] = set()
+        self._sources: list[ConfigSource] = []
+        self._merged: dict[str, Any] | None = None
+        self._listeners: list[Callable[[str, Any, Any], None]] = []
+        self._secrets: set[str] = set()
         if auto_env:
             self.add_source(ConfigSource.from_env(env_prefix))
 
@@ -192,21 +205,21 @@ class ConfigManager:
     def mark_secret(self, key: str) -> None:
         self._secrets.add(key.lower())
 
-    def mark_secrets(self, keys: List[str]) -> None:
+    def mark_secrets(self, keys: list[str]) -> None:
         for k in keys:
             self._secrets.add(k.lower())
 
     # -- Merge --
 
-    def _merge_sources(self) -> Dict[str, Any]:
-        result: Dict[str, Any] = {}
+    def _merge_sources(self) -> dict[str, Any]:
+        result: dict[str, Any] = {}
         # Lower precedence = higher priority → iterate reversed so high-priority overrides
         for source in reversed(self._sources):
             for key, val in source.data.items():
                 result[key] = val
         return result
 
-    def _ensure_merged(self) -> Dict[str, Any]:
+    def _ensure_merged(self) -> dict[str, Any]:
         if self._merged is None:
             self._merged = self._merge_sources()
         return self._merged
@@ -241,7 +254,7 @@ class ConfigManager:
             return val.lower() in ("true", "1", "yes", "on")
         return bool(val)
 
-    def get_list(self, key: str, default: Any = MISSING, separator: str = ",") -> List[str]:
+    def get_list(self, key: str, default: Any = MISSING, separator: str = ",") -> list[str]:
         val = self.get(key, default)
         if isinstance(val, list):
             return [str(v) for v in val]
@@ -249,16 +262,16 @@ class ConfigManager:
             return [v.strip() for v in val.split(separator) if v.strip()]
         return [str(val)]
 
-    def get_dict(self, key: str, default: Any = MISSING) -> Dict[str, Any]:
+    def get_dict(self, key: str, default: Any = MISSING) -> dict[str, Any]:
         val = self.get(key, default)
         if isinstance(val, dict):
             return val
         raise ConfigValidationError(key, val, "expected dict")
 
-    def keys(self) -> List[str]:
+    def keys(self) -> list[str]:
         return sorted(self._ensure_merged().keys())
 
-    def to_dict(self, mask_secrets: bool = True) -> Dict[str, Any]:
+    def to_dict(self, mask_secrets: bool = True) -> dict[str, Any]:
         d = dict(self._ensure_merged())
         if mask_secrets:
             for sk in self._secrets:
@@ -268,10 +281,10 @@ class ConfigManager:
 
     # -- Bind to dataclass --
 
-    def bind(self, cls: Type[T]) -> T:
+    def bind(self, cls: type[T]) -> T:
         """Bind merged configuration to a dataclass instance."""
         hints = get_type_hints(cls)
-        kwargs: Dict[str, Any] = {}
+        kwargs: dict[str, Any] = {}
         for fld in fields(cls):
             key = fld.name.lower()
             field_type = hints.get(fld.name, str)
@@ -316,6 +329,7 @@ class ConfigManager:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _parse_env_value(val: str) -> Any:
     """Parse string environment value to native types."""
     v = val.strip()
@@ -346,22 +360,23 @@ def _parse_env_value(val: str) -> Any:
     return v
 
 
-def _flatten_dict(d: Dict[str, Any], parent_key: str = "",
-                  sep: str = "_") -> Dict[str, Any]:
+def _flatten_dict(d: dict[str, Any], parent_key: str = "", sep: str = "_") -> dict[str, Any]:
     """Flatten nested dicts into dot-separated keys."""
-    items: List[Tuple[str, Any]] = []
+    items: list[tuple[str, Any]] = []
     for k, v in d.items():
         new_key = f"{parent_key}{sep}{k}".lower() if parent_key else k.lower()
-        if isinstance(v, dict) and not any(
-            isinstance(v, t) for t in (list, tuple, set)
-        ) and not (k.isupper() and all(c.isupper() or c == "_" for c in k)):
+        if (
+            isinstance(v, dict)
+            and not any(isinstance(v, t) for t in (list, tuple, set))
+            and not (k.isupper() and all(c.isupper() or c == "_" for c in k))
+        ):
             items.extend(_flatten_dict(v, new_key, sep).items())
         else:
             items.append((new_key, v))
     return dict(items)
 
 
-def _coerce(value: Any, target_type: Type) -> Any:
+def _coerce(value: Any, target_type: type) -> Any:
     """Coerce a value to the target type."""
     if value is None:
         return None

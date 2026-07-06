@@ -7,41 +7,70 @@ AgentOS v0.60 State Machine — Agent 生命周期状态管理。
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Callable
+from enum import StrEnum
 
 
-class AgentState(str, Enum):
-
+class AgentState(StrEnum):
     """Agent 状态枚举。"""
 
-    IDLE = "idle"               # 空闲，等待任务
+    IDLE = "idle"  # 空闲，等待任务
     INITIALIZING = "initializing"  # 加载配置/工具
-    THINKING = "thinking"       # 推理/规划
-    ACTING = "acting"           # 执行工具/调用模型
-    OBSERVING = "observing"     # 处理工具返回/反思
-    WAITING = "waiting"         # 等待外部输入(HITL)
-    PAUSED = "paused"           # 手动暂停
-    COMPLETED = "completed"     # 任务完成
-    FAILED = "failed"           # 任务失败
-    CANCELLED = "cancelled"     # 被取消
-    ERROR = "error"             # 系统错误
+    THINKING = "thinking"  # 推理/规划
+    ACTING = "acting"  # 执行工具/调用模型
+    OBSERVING = "observing"  # 处理工具返回/反思
+    WAITING = "waiting"  # 等待外部输入(HITL)
+    PAUSED = "paused"  # 手动暂停
+    COMPLETED = "completed"  # 任务完成
+    FAILED = "failed"  # 任务失败
+    CANCELLED = "cancelled"  # 被取消
+    ERROR = "error"  # 系统错误
 
 
 # 合法状态转换表
 VALID_TRANSITIONS: dict[AgentState, set[AgentState]] = {
-    AgentState.IDLE:         {AgentState.INITIALIZING, AgentState.CANCELLED},
-    AgentState.INITIALIZING: {AgentState.IDLE, AgentState.THINKING, AgentState.FAILED, AgentState.ERROR},
-    AgentState.THINKING:     {AgentState.ACTING, AgentState.WAITING, AgentState.COMPLETED, AgentState.FAILED, AgentState.PAUSED, AgentState.ERROR},
-    AgentState.ACTING:       {AgentState.OBSERVING, AgentState.FAILED, AgentState.ERROR},
-    AgentState.OBSERVING:    {AgentState.THINKING, AgentState.ACTING, AgentState.COMPLETED, AgentState.FAILED, AgentState.ERROR},
-    AgentState.WAITING:      {AgentState.THINKING, AgentState.ACTING, AgentState.CANCELLED, AgentState.PAUSED, AgentState.ERROR},
-    AgentState.PAUSED:       {AgentState.THINKING, AgentState.ACTING, AgentState.OBSERVING, AgentState.CANCELLED, AgentState.ERROR},
-    AgentState.COMPLETED:    set(),  # 终态
-    AgentState.FAILED:       {AgentState.IDLE, AgentState.ERROR},
-    AgentState.CANCELLED:    {AgentState.IDLE, AgentState.ERROR},
-    AgentState.ERROR:        {AgentState.IDLE, AgentState.FAILED},
+    AgentState.IDLE: {AgentState.INITIALIZING, AgentState.CANCELLED},
+    AgentState.INITIALIZING: {
+        AgentState.IDLE,
+        AgentState.THINKING,
+        AgentState.FAILED,
+        AgentState.ERROR,
+    },
+    AgentState.THINKING: {
+        AgentState.ACTING,
+        AgentState.WAITING,
+        AgentState.COMPLETED,
+        AgentState.FAILED,
+        AgentState.PAUSED,
+        AgentState.ERROR,
+    },
+    AgentState.ACTING: {AgentState.OBSERVING, AgentState.FAILED, AgentState.ERROR},
+    AgentState.OBSERVING: {
+        AgentState.THINKING,
+        AgentState.ACTING,
+        AgentState.COMPLETED,
+        AgentState.FAILED,
+        AgentState.ERROR,
+    },
+    AgentState.WAITING: {
+        AgentState.THINKING,
+        AgentState.ACTING,
+        AgentState.CANCELLED,
+        AgentState.PAUSED,
+        AgentState.ERROR,
+    },
+    AgentState.PAUSED: {
+        AgentState.THINKING,
+        AgentState.ACTING,
+        AgentState.OBSERVING,
+        AgentState.CANCELLED,
+        AgentState.ERROR,
+    },
+    AgentState.COMPLETED: set(),  # 终态
+    AgentState.FAILED: {AgentState.IDLE, AgentState.ERROR},
+    AgentState.CANCELLED: {AgentState.IDLE, AgentState.ERROR},
+    AgentState.ERROR: {AgentState.IDLE, AgentState.FAILED},
 }
 
 
@@ -60,12 +89,12 @@ class StateTransition:
 class StateMachineConfig:
     """状态机运行时配置。"""
 
-    max_thinking_time: float = 300.0    # 推理超时（秒）
-    max_acting_time: float = 120.0      # 执行超时
-    max_observing_time: float = 60.0    # 观察超时
-    max_total_time: float = 3600.0      # 总超时
-    max_transitions: int = 500          # 最大状态转换次数
-    auto_recover: bool = True           # 错误后自动恢复
+    max_thinking_time: float = 300.0  # 推理超时（秒）
+    max_acting_time: float = 120.0  # 执行超时
+    max_observing_time: float = 60.0  # 观察超时
+    max_total_time: float = 3600.0  # 总超时
+    max_transitions: int = 500  # 最大状态转换次数
+    auto_recover: bool = True  # 错误后自动恢复
     max_retries_after_error: int = 3
 
 
@@ -140,8 +169,9 @@ class AgentStateMachine:
         if limit and self.elapsed_in_state > limit:
             raise StateTimeoutError(self._state, self.elapsed_in_state, limit)
 
-    def transition(self, to_state: AgentState, reason: str = "",
-                   metadata: dict | None = None) -> StateTransition:
+    def transition(
+        self, to_state: AgentState, reason: str = "", metadata: dict | None = None
+    ) -> StateTransition:
         """执行状态转换。"""
         self._check_timeout()
         self._guard(to_state)
@@ -160,10 +190,12 @@ class AgentStateMachine:
 
     def on_transition(self, from_state: AgentState, to_state: AgentState):
         """装饰器：注册状态转换钩子。"""
+
         def decorator(fn):
             key = (from_state, to_state)
             self._on_transition_hooks.setdefault(key, []).append(fn)
             return fn
+
         return decorator
 
     def _fire_hooks(self, transition: StateTransition):

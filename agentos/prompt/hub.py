@@ -13,26 +13,26 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-
 # ── Enums & Data Classes ──────────────────────────────────────────
 
-class PromptType(str, Enum):
-    SYSTEM = "system"               # System prompt
-    USER = "user"                   # User message template
-    ASSISTANT = "assistant"         # Assistant response template
-    FEW_SHOT = "few_shot"           # Few-shot example template
-    CHAIN_OF_THOUGHT = "cot"        # Chain-of-thought template
-    TOOL_CALL = "tool_call"         # Tool-calling template
-    EVAL = "eval"                   # Evaluation rubric template
+
+class PromptType(StrEnum):
+    SYSTEM = "system"  # System prompt
+    USER = "user"  # User message template
+    ASSISTANT = "assistant"  # Assistant response template
+    FEW_SHOT = "few_shot"  # Few-shot example template
+    CHAIN_OF_THOUGHT = "cot"  # Chain-of-thought template
+    TOOL_CALL = "tool_call"  # Tool-calling template
+    EVAL = "eval"  # Evaluation rubric template
     CUSTOM = "custom"
 
 
-class PromptTag(str, Enum):
+class PromptTag(StrEnum):
     PRODUCTION = "production"
     STAGING = "staging"
     EXPERIMENTAL = "experimental"
@@ -43,6 +43,7 @@ class PromptTag(str, Enum):
 @dataclass
 class PromptVersion:
     """A versioned instance of a prompt template."""
+
     version: int
     content: str
     rendered_example: str = ""
@@ -53,7 +54,7 @@ class PromptVersion:
 
     def __post_init__(self):
         if not self.created_at:
-            self.created_at = datetime.now(timezone.utc).isoformat()
+            self.created_at = datetime.now(UTC).isoformat()
 
 
 @dataclass
@@ -72,7 +73,7 @@ class PromptTemplate:
 
     name: str
     type: PromptType
-    content: str                          # Jinja2 template string
+    content: str  # Jinja2 template string
     variables: dict[str, Any] = field(default_factory=dict)
     description: str = ""
     tags: list[str] = field(default_factory=list)
@@ -81,16 +82,19 @@ class PromptTemplate:
 
     def __post_init__(self):
         if not self.versions:
-            self.versions = [PromptVersion(
-                version=1,
-                content=self.content,
-                change_summary="Initial version",
-            )]
+            self.versions = [
+                PromptVersion(
+                    version=1,
+                    content=self.content,
+                    change_summary="Initial version",
+                )
+            ]
 
     def render(self, **kwargs) -> str:
         """Render the template with Jinja2 variables."""
         try:
-            from jinja2 import Template, StrictUndefined
+            from jinja2 import StrictUndefined, Template
+
             tpl = Template(self.content, undefined=StrictUndefined)
             return tpl.render(**{**self.variables, **kwargs})
         except ImportError:
@@ -168,6 +172,7 @@ class PromptTemplate:
 
 
 # ── Prompt Hub ────────────────────────────────────────────────────
+
 
 class PromptHub:
     """Central prompt registry with search, import/export, A/B testing.
@@ -267,7 +272,9 @@ class PromptHub:
                 json.dumps({name: tpl.to_dict()}, indent=2, ensure_ascii=False)
             )
 
-    def ab_test_set(self, prompt_name: str, variant_a: str, variant_b: str, active: str = "a") -> None:
+    def ab_test_set(
+        self, prompt_name: str, variant_a: str, variant_b: str, active: str = "a"
+    ) -> None:
         """Set up A/B test between two prompt variants."""
         self._ab_active[prompt_name] = active
 
@@ -357,16 +364,20 @@ def create_default_hub() -> PromptHub:
     """Create a prompt hub pre-loaded with built-in templates."""
     hub = PromptHub()
     for name, cfg in BUILTIN_PROMPTS.items():
-        hub.register(PromptTemplate(
-            name=name,
-            type=cfg["type"],
-            content=cfg["content"],
-            variables=cfg.get("variables", {}),
-            tags=cfg.get("tags", []),
-        ))
+        hub.register(
+            PromptTemplate(
+                name=name,
+                type=cfg["type"],
+                content=cfg["content"],
+                variables=cfg.get("variables", {}),
+                tags=cfg.get("tags", []),
+            )
+        )
     return hub
 
 
 # ── Auto-generated compat stubs ──
 
-class BUILTIN_PROMPTS: pass
+
+class BUILTIN_PROMPTS:
+    pass

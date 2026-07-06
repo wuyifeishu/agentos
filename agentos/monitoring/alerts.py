@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import time
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Callable, Optional
+from enum import StrEnum
 
 
-class AlertSeverity(str, Enum):
+class AlertSeverity(StrEnum):
     """告警实例。"""
 
     """告警严重级别。"""
@@ -20,8 +20,7 @@ class AlertSeverity(str, Enum):
     INFO = "info"
 
 
-class AlertState(str, Enum):
-
+class AlertState(StrEnum):
     """告警状态。"""
 
     FIRING = "firing"
@@ -31,10 +30,11 @@ class AlertState(str, Enum):
 @dataclass
 class AlertRule:
     """告警规则。"""
+
     name: str
     description: str
     severity: AlertSeverity = AlertSeverity.WARNING
-    condition: Optional[Callable[[], bool]] = None
+    condition: Callable[[], bool] | None = None
     cooldown_seconds: int = 300
     _last_fired: float = field(default=0.0, repr=False)
 
@@ -76,6 +76,7 @@ class Alert:
 @dataclass
 class MonitoringConfig:
     """监控配置。"""
+
     enabled: bool = True
     evaluation_interval: int = 60
     max_alerts_per_interval: int = 10
@@ -84,6 +85,7 @@ class MonitoringConfig:
 @dataclass
 class WebhookConfig:
     """Webhook 配置。"""
+
     url: str = ""
     method: str = "POST"
     headers: dict = field(default_factory=dict)
@@ -94,7 +96,7 @@ class WebhookConfig:
 class WebhookDispatcher:
     """Dispatches Alerts to configured webhook endpoints."""
 
-    def __init__(self, config: Optional[WebhookConfig] = None):
+    def __init__(self, config: WebhookConfig | None = None):
         self.config = config or WebhookConfig()
 
     def send(self, alert: Alert) -> bool:
@@ -121,7 +123,7 @@ class WebhookDispatcher:
 class AlertEvaluator:
     """Evaluates AlertRules and generates Alerts."""
 
-    def __init__(self, config: Optional[MonitoringConfig] = None):
+    def __init__(self, config: MonitoringConfig | None = None):
         self.config = config or MonitoringConfig()
         self.rules: list[AlertRule] = []
 
@@ -137,10 +139,12 @@ class AlertEvaluator:
             if count >= self.config.max_alerts_per_interval:
                 break
             if rule.evaluate():
-                alerts.append(Alert(
-                    rule_name=rule.name,
-                    severity=rule.severity,
-                    message=f"Alert: {rule.description}",
-                ))
+                alerts.append(
+                    Alert(
+                        rule_name=rule.name,
+                        severity=rule.severity,
+                        message=f"Alert: {rule.description}",
+                    )
+                )
                 count += 1
         return alerts

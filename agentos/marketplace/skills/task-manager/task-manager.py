@@ -84,7 +84,9 @@ def run(action: str = "list", title: str = "", query: str = "", **kwargs: Any) -
         matches = [t for t in tasks if q in t["title"].lower()]
         if not matches:
             return f"[task-manager] No tasks matching '{q}'."
-        return "\n".join(f"  [#{t['id']}] [{'x' if t['done'] else ' '}] {t['title']}" for t in matches)
+        return "\n".join(
+            f"  [#{t['id']}] [{'x' if t['done'] else ' '}] {t['title']}" for t in matches
+        )
 
     return f"[task-manager] Unknown action: {action}. Available: add, list, done, delete, clear_done, search"
 

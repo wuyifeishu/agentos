@@ -16,15 +16,16 @@ from __future__ import annotations
 import json
 import threading
 import time
-from dataclasses import dataclass, field, asdict
+from collections.abc import Callable
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
-
+from typing import Any
 
 # ============================================================================
 # Severity
 # ============================================================================
+
 
 class Severity(Enum):
     INFO = 10
@@ -33,7 +34,7 @@ class Severity(Enum):
     CRITICAL = 40
 
     @classmethod
-    def from_str(cls, s: str) -> "Severity":
+    def from_str(cls, s: str) -> Severity:
         return getattr(cls, s.upper(), cls.INFO)
 
 
@@ -41,25 +42,27 @@ class Severity(Enum):
 # AuditEvent
 # ============================================================================
 
+
 @dataclass
 class AuditEvent:
     """Single audit log entry."""
-    actor: str = ""          # who performed the action
-    action: str = ""         # what was done (e.g., "user.delete", "config.update")
-    resource: str = ""       # what was acted upon (e.g., "user:123", "/etc/config.yaml")
-    outcome: str = ""        # "success", "failure", "denied"
+
+    actor: str = ""  # who performed the action
+    action: str = ""  # what was done (e.g., "user.delete", "config.update")
+    resource: str = ""  # what was acted upon (e.g., "user:123", "/etc/config.yaml")
+    outcome: str = ""  # "success", "failure", "denied"
     severity: Severity = Severity.INFO
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
         d["severity"] = self.severity.name
         d["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(self.timestamp))
         return d
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "AuditEvent":
+    def from_dict(cls, d: dict[str, Any]) -> AuditEvent:
         return cls(
             actor=d.get("actor", ""),
             action=d.get("action", ""),
@@ -74,6 +77,7 @@ class AuditEvent:
 # ============================================================================
 # AuditLogger
 # ============================================================================
+
 
 class AuditLogger:
     """Ring-buffer audit logger.
@@ -108,9 +112,9 @@ class AuditLogger:
         if capacity <= 0:
             raise ValueError("capacity must be positive")
         self._capacity = capacity
-        self._buffer: List[AuditEvent] = []
+        self._buffer: list[AuditEvent] = []
         self._lock = threading.RLock()
-        self._subscribers: List[Callable[[AuditEvent], None]] = []
+        self._subscribers: list[Callable[[AuditEvent], None]] = []
 
     # ---------- log ----------
 
@@ -121,7 +125,7 @@ class AuditLogger:
         resource: str = "",
         outcome: str = "",
         severity: Severity = Severity.INFO,
-        details: Optional[Dict[str, Any]] = None,
+        details: dict[str, Any] | None = None,
         event: AuditEvent | None = None,
     ) -> AuditEvent:
         """Record an audit event. Accepts either field args or an AuditEvent object."""
@@ -149,16 +153,16 @@ class AuditLogger:
 
     def query(
         self,
-        actor: Optional[str] = None,
-        action: Optional[str] = None,
-        resource: Optional[str] = None,
-        outcome: Optional[str] = None,
-        min_severity: Optional[Severity] = None,
-        max_severity: Optional[Severity] = None,
-        since: Optional[float] = None,
-        until: Optional[float] = None,
-        limit: Optional[int] = None,
-    ) -> List[AuditEvent]:
+        actor: str | None = None,
+        action: str | None = None,
+        resource: str | None = None,
+        outcome: str | None = None,
+        min_severity: Severity | None = None,
+        max_severity: Severity | None = None,
+        since: float | None = None,
+        until: float | None = None,
+        limit: int | None = None,
+    ) -> list[AuditEvent]:
         """Query audit events with optional filters."""
         with self._lock:
             results = list(self._buffer)
@@ -185,14 +189,14 @@ class AuditLogger:
 
         return results
 
-    def recent(self, count: int = 20) -> List[AuditEvent]:
+    def recent(self, count: int = 20) -> list[AuditEvent]:
         """Return the most recent N events."""
         with self._lock:
             return self._buffer[-count:] if count < len(self._buffer) else list(self._buffer)
 
     # ---------- export ----------
 
-    def export_json(self, path: Optional[str] = None) -> str:
+    def export_json(self, path: str | None = None) -> str:
         """Export all events as JSON. If path given, writes to file."""
         with self._lock:
             data = [e.to_dict() for e in self._buffer]

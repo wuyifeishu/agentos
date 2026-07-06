@@ -10,18 +10,19 @@ from __future__ import annotations
 import warnings
 
 from agentos.plugins import (
-    PluginRegistry,
-    PluginManifest,
-    PluginStatus,
-    BasePlugin,
-    PluginFileWatcher,
     AuditLoggerPlugin,
+    BasePlugin,
     HealthCheckPlugin,
+    PluginFileWatcher,
+    PluginManifest,
+    PluginRegistry,
+    PluginStatus,
     create_registry_with_builtins,
 )
 
 # ── 兼容性导出 ────────────────────────────
 # 保留旧 PluginManager 接口但内部委托到 PluginRegistry
+
 
 class PluginManager:
     """兼容性包装：旧 PluginManager API 委托到 PluginRegistry。
@@ -83,17 +84,18 @@ class PluginManager:
 
     @property
     def loaded_plugins(self) -> list[str]:
-        return [n for n, p in self._registry._plugins.items()
-                if p.status == PluginStatus.ACTIVE]
+        return [n for n, p in self._registry._plugins.items() if p.status == PluginStatus.ACTIVE]
 
 
 # ── 兼容类型 ───────────────────────────────
 
 from dataclasses import dataclass
 
+
 @dataclass
 class PluginInfo:
     """旧版 PluginInfo 兼容类型。"""
+
     name: str
     version: str
     description: str

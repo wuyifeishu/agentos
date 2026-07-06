@@ -9,14 +9,15 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, AsyncIterator, Callable, Optional
+from enum import StrEnum
+from typing import Any
 
 from agentos.protocols.a2a import A2ATask, TaskState
 
 
-class A2AStreamEvent(str, Enum):
+class A2AStreamEvent(StrEnum):
     """A2A-specific streaming event types."""
 
     TASK_CREATED = "task.created"
@@ -49,19 +50,23 @@ class A2AStreamSession:
         self.task_id = task.task_id
         self._subscribers: list[asyncio.Queue[dict]] = []
         self._closed = False
-        self._heartbeat_task: Optional[asyncio.Task] = None
+        self._heartbeat_task: asyncio.Task | None = None
 
     async def start(self, heartbeat_s: float = 30.0):
         """Start heartbeat loop."""
+
         async def _pulse():
             while not self._closed:
                 await asyncio.sleep(heartbeat_s)
                 if not self._closed:
-                    await self._broadcast({
-                        "event": A2AStreamEvent.HEARTBEAT,
-                        "task_id": self.task_id,
-                        "timestamp": time.time(),
-                    })
+                    await self._broadcast(
+                        {
+                            "event": A2AStreamEvent.HEARTBEAT,
+                            "task_id": self.task_id,
+                            "timestamp": time.time(),
+                        }
+                    )
+
         self._heartbeat_task = asyncio.create_task(_pulse())
 
     def subscribe(self) -> asyncio.Queue[dict]:
@@ -152,7 +157,7 @@ class A2AStreamManager:
 
     def __init__(self):
         self._sessions: dict[str, A2AStreamSession] = {}
-        self._on_state_change: Optional[Callable] = None
+        self._on_state_change: Callable | None = None
 
     def on_state_change(self, callback: Callable[[A2ATask, TaskState, TaskState], Any]):
         """Register a hook called on every state transition (old_state, new_state)."""
@@ -164,7 +169,7 @@ class A2AStreamManager:
         self._sessions[task.task_id] = session
         return session
 
-    def get_session(self, task_id: str) -> Optional[A2AStreamSession]:
+    def get_session(self, task_id: str) -> A2AStreamSession | None:
         return self._sessions.get(task_id)
 
     async def notify_state_change(self, task: A2ATask, old_state: TaskState):
@@ -181,11 +186,14 @@ class A2AStreamManager:
             TaskState.CANCELLED: A2AStreamEvent.TASK_CANCELLED,
         }
         event = event_map.get(task.state, A2AStreamEvent.TASK_PROGRESS)
-        await session.emit(event, {
-            "previous_state": old_state.value,
-            "current_state": task.state.value,
-            "error": task.error,
-        })
+        await session.emit(
+            event,
+            {
+                "previous_state": old_state.value,
+                "current_state": task.state.value,
+                "error": task.error,
+            },
+        )
 
         if task.is_terminal():
             await session.close()
@@ -195,9 +203,12 @@ class A2AStreamManager:
         """Called when an artifact is added to a task."""
         session = self._sessions.get(task_id)
         if session:
-            await session.emit(A2AStreamEvent.ARTIFACT_ADDED, {
-                "artifact_name": artifact_name,
-            })
+            await session.emit(
+                A2AStreamEvent.ARTIFACT_ADDED,
+                {
+                    "artifact_name": artifact_name,
+                },
+            )
 
     async def notify_progress(
         self,
@@ -207,12 +218,15 @@ class A2AStreamManager:
         """Push a progress update to subscribers."""
         session = self._sessions.get(task_id)
         if session:
-            await session.emit(A2AStreamEvent.TASK_PROGRESS, {
-                "percent": progress.percent,
-                "message": progress.message,
-                "step": progress.step,
-                "metadata": progress.metadata,
-            })
+            await session.emit(
+                A2AStreamEvent.TASK_PROGRESS,
+                {
+                    "percent": progress.percent,
+                    "message": progress.message,
+                    "step": progress.step,
+                    "metadata": progress.metadata,
+                },
+            )
 
     async def shutdown(self):
         """Gracefully close all sessions."""

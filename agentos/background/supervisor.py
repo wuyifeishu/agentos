@@ -28,31 +28,34 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Coroutine
-
+from enum import StrEnum
+from typing import Any
 
 # ── Enums ────────────────────────────────────────────────────────
 
-class SupervisionEventType(str, Enum):
+
+class SupervisionEventType(StrEnum):
     """Types of supervision events."""
+
     SPAWNED = "spawned"
     STARTED = "started"
     HEARTBEAT = "heartbeat"
     PROGRESS = "progress"
-    QUOTA_WARNING = "quota_warning"    # Nearing quota limit
+    QUOTA_WARNING = "quota_warning"  # Nearing quota limit
     QUOTA_EXCEEDED = "quota_exceeded"  # Quota hit, killed
-    HEARTBEAT_LOST = "heartbeat_lost"   # Child unresponsive
+    HEARTBEAT_LOST = "heartbeat_lost"  # Child unresponsive
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
-    KILLED = "killed"                   # Killed by supervisor
+    KILLED = "killed"  # Killed by supervisor
 
 
 @dataclass
 class SupervisionEvent:
     """Event emitted by the supervision tree."""
+
     type: SupervisionEventType
     child_id: str
     child_name: str
@@ -62,31 +65,37 @@ class SupervisionEvent:
 
     def to_dict(self) -> dict:
         return {
-            "type": self.type.value, "child_id": self.child_id,
-            "child_name": self.child_name, "timestamp": self.timestamp,
-            "data": self.data, "message": self.message,
+            "type": self.type.value,
+            "child_id": self.child_id,
+            "child_name": self.child_name,
+            "timestamp": self.timestamp,
+            "data": self.data,
+            "message": self.message,
         }
 
 
 # ── Data Models ──────────────────────────────────────────────────
 
+
 @dataclass
 class AgentQuota:
     """Resource limits for a supervised agent."""
-    max_duration_seconds: float = 3600.0      # Wall-clock time budget
-    max_cost_usd: float = 10.0                # Cost budget
-    max_tokens: int = 1_000_000               # Token budget
-    max_iterations: int = 500                 # Max loop iterations
-    heartbeat_interval: float = 10.0          # Seconds between heartbeats
-    heartbeat_timeout: float = 30.0           # Seconds before considered dead
-    max_retries: int = 0                      # Auto-restart on failure (0=no restart)
-    retry_delay: float = 5.0                  # Delay before restart
-    cooldown_period: float = 60.0             # Rate limit on restarts
+
+    max_duration_seconds: float = 3600.0  # Wall-clock time budget
+    max_cost_usd: float = 10.0  # Cost budget
+    max_tokens: int = 1_000_000  # Token budget
+    max_iterations: int = 500  # Max loop iterations
+    heartbeat_interval: float = 10.0  # Seconds between heartbeats
+    heartbeat_timeout: float = 30.0  # Seconds before considered dead
+    max_retries: int = 0  # Auto-restart on failure (0=no restart)
+    retry_delay: float = 5.0  # Delay before restart
+    cooldown_period: float = 60.0  # Rate limit on restarts
 
 
 @dataclass
 class AgentQuotaUsage:
     """Current resource consumption of a supervised agent."""
+
     elapsed_seconds: float = 0.0
     cost_usd: float = 0.0
     tokens_used: int = 0
@@ -107,20 +116,24 @@ class AgentQuotaUsage:
     def to_dict(self) -> dict:
         return {
             "elapsed_seconds": self.elapsed_seconds,
-            "cost_usd": self.cost_usd, "tokens_used": self.tokens_used,
-            "iterations": self.iterations, "heartbeats_received": self.heartbeats_received,
-            "last_heartbeat": self.last_heartbeat, "restarts": self.restarts,
+            "cost_usd": self.cost_usd,
+            "tokens_used": self.tokens_used,
+            "iterations": self.iterations,
+            "heartbeats_received": self.heartbeats_received,
+            "last_heartbeat": self.last_heartbeat,
+            "restarts": self.restarts,
         }
 
 
 @dataclass
 class SupervisedAgent:
     """An agent running under supervision."""
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     name: str = ""
     quotas: AgentQuota = field(default_factory=AgentQuota)
     usage: AgentQuotaUsage = field(default_factory=AgentQuotaUsage)
-    status: str = "pending"           # pending/running/paused/completed/failed/killed
+    status: str = "pending"  # pending/running/paused/completed/failed/killed
     started_at: float = 0.0
     finished_at: float = 0.0
     result: Any = None
@@ -144,7 +157,8 @@ class SupervisedAgent:
 
     def to_dict(self) -> dict:
         return {
-            "id": self.id, "name": self.name,
+            "id": self.id,
+            "name": self.name,
             "quotas": {
                 "max_duration_seconds": self.quotas.max_duration_seconds,
                 "max_cost_usd": self.quotas.max_cost_usd,
@@ -152,8 +166,10 @@ class SupervisedAgent:
                 "max_iterations": self.quotas.max_iterations,
             },
             "usage": self.usage.to_dict(),
-            "status": self.status, "started_at": self.started_at,
-            "finished_at": self.finished_at, "error": self.error,
+            "status": self.status,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "error": self.error,
             "metadata": self.metadata,
         }
 
@@ -161,9 +177,10 @@ class SupervisedAgent:
 @dataclass
 class SupervisorConfig:
     """Global supervisor configuration."""
+
     max_children: int = 20
-    monitor_interval: float = 1.0       # Seconds between health checks
-    event_history_size: int = 500       # Max events to retain
+    monitor_interval: float = 1.0  # Seconds between health checks
+    event_history_size: int = 500  # Max events to retain
     auto_kill_on_quota: bool = True
     log_events: bool = True
 
@@ -174,6 +191,7 @@ EventCallback = Callable[[SupervisionEvent], None]
 
 
 # ── Agent Supervisor ─────────────────────────────────────────────
+
 
 class AgentSupervisor:
     """
@@ -224,7 +242,8 @@ class AgentSupervisor:
                 raise RuntimeError(f"Max children ({self.config.max_children}) reached")
 
             child = SupervisedAgent(
-                name=name, quotas=quotas or AgentQuota(),
+                name=name,
+                quotas=quotas or AgentQuota(),
                 metadata=metadata or {},
             )
             child._pause_event = asyncio.Event()
@@ -240,14 +259,10 @@ class AgentSupervisor:
 
         # Start heartbeat task
         if on_heartbeat:
-            child._heartbeat_task = asyncio.create_task(
-                self._heartbeat_loop(child, on_heartbeat)
-            )
+            child._heartbeat_task = asyncio.create_task(self._heartbeat_loop(child, on_heartbeat))
 
         # Start execution
-        child._task = asyncio.create_task(
-            self._run_child(child, task, loop_factory, agent_loop)
-        )
+        child._task = asyncio.create_task(self._run_child(child, task, loop_factory, agent_loop))
 
         return child.id
 
@@ -269,7 +284,7 @@ class AgentSupervisor:
 
         try:
             return await asyncio.wait_for(child._task, timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Kill the child on timeout
             await self.kill_child(child_id, reason="await timeout")
             raise
@@ -290,8 +305,9 @@ class AgentSupervisor:
             return False
         child._pause_event.set()
         child.status = "running"
-        self._emit(SupervisionEvent(SupervisionEventType.PROGRESS, child.id, child.name,
-                                    message="Resumed"))
+        self._emit(
+            SupervisionEvent(SupervisionEventType.PROGRESS, child.id, child.name, message="Resumed")
+        )
         return True
 
     async def kill_child(self, child_id: str, reason: str = "") -> bool:
@@ -309,10 +325,14 @@ class AgentSupervisor:
         child.finished_at = time.time()
         child.error = reason
 
-        self._emit(SupervisionEvent(
-            SupervisionEventType.KILLED, child.id, child.name,
-            message=reason,
-        ))
+        self._emit(
+            SupervisionEvent(
+                SupervisionEventType.KILLED,
+                child.id,
+                child.name,
+                message=reason,
+            )
+        )
         return True
 
     async def aggregate_progress(self) -> dict[str, Any]:
@@ -354,13 +374,15 @@ class AgentSupervisor:
                 remaining = max(0, deadline - time.time())
                 try:
                     await asyncio.wait_for(child._task, timeout=remaining)
-                except (asyncio.TimeoutError, asyncio.CancelledError):
+                except (TimeoutError, asyncio.CancelledError):
                     pass
 
     # ── Internal ─────────────────────────────────────────────────
 
     async def _run_child(
-        self, child: SupervisedAgent, task: str,
+        self,
+        child: SupervisedAgent,
+        task: str,
         loop_factory: Callable[[], Any] | None,
         agent_loop: Any,
     ):
@@ -378,7 +400,7 @@ class AgentSupervisor:
                 raise ValueError("Must provide loop_factory or agent_loop")
 
             # Wrap loop to check for pause/kill signals
-            original_on_iteration = getattr(loop, 'on_iteration', None)
+            original_on_iteration = getattr(loop, "on_iteration", None)
 
             async def supervised_on_iteration(iteration: int, tool_results: list):
                 # Check kill signal
@@ -397,12 +419,16 @@ class AgentSupervisor:
                 if child.usage.elapsed_seconds > child.quotas.max_duration_seconds:
                     if self.config.auto_kill_on_quota:
                         child._kill_event.set()
-                        raise asyncio.TimeoutError("Duration quota exceeded")
+                        raise TimeoutError("Duration quota exceeded")
                     else:
-                        self._emit(SupervisionEvent(
-                            SupervisionEventType.QUOTA_WARNING, child.id, child.name,
-                            message=f"Duration at {child.usage.elapsed_seconds:.0f}s / {child.quotas.max_duration_seconds}s",
-                        ))
+                        self._emit(
+                            SupervisionEvent(
+                                SupervisionEventType.QUOTA_WARNING,
+                                child.id,
+                                child.name,
+                                message=f"Duration at {child.usage.elapsed_seconds:.0f}s / {child.quotas.max_duration_seconds}s",
+                            )
+                        )
 
                 if original_on_iteration:
                     original_on_iteration(iteration, tool_results)
@@ -413,14 +439,16 @@ class AgentSupervisor:
             for attempt in range(child.quotas.max_retries + 1):
                 try:
                     result = await loop.run(task, session_id=child.id)
-                    child.result = result.output if hasattr(result, 'output') else result
-                    child.usage.cost_usd = getattr(result, 'cost_usd', 0.0)
-                    child.usage.tokens_used = sum(getattr(result, 'tokens_used', {}).values())
+                    child.result = result.output if hasattr(result, "output") else result
+                    child.usage.cost_usd = getattr(result, "cost_usd", 0.0)
+                    child.usage.tokens_used = sum(getattr(result, "tokens_used", {}).values())
                     child.status = "completed"
                     child.finished_at = time.time()
-                    self._emit(SupervisionEvent(SupervisionEventType.COMPLETED, child.id, child.name))
+                    self._emit(
+                        SupervisionEvent(SupervisionEventType.COMPLETED, child.id, child.name)
+                    )
                     return child.result
-                except (asyncio.CancelledError, asyncio.TimeoutError):
+                except (TimeoutError, asyncio.CancelledError):
                     raise
                 except Exception as e:
                     if attempt < child.quotas.max_retries:
@@ -435,10 +463,14 @@ class AgentSupervisor:
                     child.status = "failed"
                     child.finished_at = time.time()
                     child.error = str(e)
-                    self._emit(SupervisionEvent(
-                        SupervisionEventType.FAILED, child.id, child.name,
-                        message=str(e),
-                    ))
+                    self._emit(
+                        SupervisionEvent(
+                            SupervisionEventType.FAILED,
+                            child.id,
+                            child.name,
+                            message=str(e),
+                        )
+                    )
                     raise
 
         except asyncio.CancelledError:
@@ -448,13 +480,18 @@ class AgentSupervisor:
             child.status = "failed"
             child.finished_at = time.time()
             child.error = str(e)
-            self._emit(SupervisionEvent(
-                SupervisionEventType.FAILED, child.id, child.name,
-                message=str(e),
-            ))
+            self._emit(
+                SupervisionEvent(
+                    SupervisionEventType.FAILED,
+                    child.id,
+                    child.name,
+                    message=str(e),
+                )
+            )
 
     async def _heartbeat_loop(
-        self, child: SupervisedAgent,
+        self,
+        child: SupervisedAgent,
         on_heartbeat: Callable[[], Coroutine],
     ):
         """Send periodic heartbeats and update usage."""
@@ -467,10 +504,14 @@ class AgentSupervisor:
                 await on_heartbeat()
                 child.usage.heartbeats_received += 1
                 child.usage.last_heartbeat = time.time()
-                self._emit(SupervisionEvent(
-                    SupervisionEventType.HEARTBEAT, child.id, child.name,
-                    data={"heartbeats": child.usage.heartbeats_received},
-                ))
+                self._emit(
+                    SupervisionEvent(
+                        SupervisionEventType.HEARTBEAT,
+                        child.id,
+                        child.name,
+                        data={"heartbeats": child.usage.heartbeats_received},
+                    )
+                )
             except asyncio.CancelledError:
                 break
             except Exception:
@@ -488,22 +529,32 @@ class AgentSupervisor:
                         continue
 
                     # Heartbeat timeout check
-                    if (child.quotas.heartbeat_timeout > 0 and
-                        child.usage.last_heartbeat > 0 and
-                        now - child.usage.last_heartbeat > child.quotas.heartbeat_timeout):
-                        self._emit(SupervisionEvent(
-                            SupervisionEventType.HEARTBEAT_LOST, child.id, child.name,
-                            message=f"No heartbeat for {now - child.usage.last_heartbeat:.0f}s",
-                        ))
+                    if (
+                        child.quotas.heartbeat_timeout > 0
+                        and child.usage.last_heartbeat > 0
+                        and now - child.usage.last_heartbeat > child.quotas.heartbeat_timeout
+                    ):
+                        self._emit(
+                            SupervisionEvent(
+                                SupervisionEventType.HEARTBEAT_LOST,
+                                child.id,
+                                child.name,
+                                message=f"No heartbeat for {now - child.usage.last_heartbeat:.0f}s",
+                            )
+                        )
                         await self.kill_child(child.id, reason="heartbeat lost")
 
                     # Duration check
                     elapsed = now - child.started_at if child.started_at else 0
                     if elapsed > child.quotas.max_duration_seconds * 0.9:
-                        self._emit(SupervisionEvent(
-                            SupervisionEventType.QUOTA_WARNING, child.id, child.name,
-                            message=f"90% duration used: {elapsed:.0f}s / {child.quotas.max_duration_seconds}s",
-                        ))
+                        self._emit(
+                            SupervisionEvent(
+                                SupervisionEventType.QUOTA_WARNING,
+                                child.id,
+                                child.name,
+                                message=f"90% duration used: {elapsed:.0f}s / {child.quotas.max_duration_seconds}s",
+                            )
+                        )
 
             except asyncio.CancelledError:
                 break
@@ -515,7 +566,7 @@ class AgentSupervisor:
         if self.config.log_events:
             self._events.append(event)
             if len(self._events) > self.config.event_history_size:
-                self._events = self._events[-self.config.event_history_size:]
+                self._events = self._events[-self.config.event_history_size :]
 
         if self._on_event:
             try:

@@ -16,17 +16,12 @@ import asyncio
 import logging
 import time
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import (
     Any,
-    AsyncIterator,
-    Callable,
-    Dict,
-    List,
-    Optional,
-    Tuple,
     TypeVar,
 )
 
@@ -39,7 +34,8 @@ T = TypeVar("T")
 # Data types
 # ============================================================================
 
-class ResourceState(str, Enum):
+
+class ResourceState(StrEnum):
     CREATED = "created"
     ACTIVE = "active"
     CLOSING = "closing"
@@ -47,7 +43,7 @@ class ResourceState(str, Enum):
     ERROR = "error"
 
 
-class ResourceType(str, Enum):
+class ResourceType(StrEnum):
     CONNECTION = "connection"
     POOL = "pool"
     FILE = "file"
@@ -72,6 +68,7 @@ class ResourceInfo:
 # Abstract Resource
 # ============================================================================
 
+
 class AbstractResource(ABC):
     """Interface for managed resources."""
 
@@ -92,18 +89,21 @@ class AbstractResource(ABC):
 # Managed Resource wrapper
 # ============================================================================
 
+
 class ManagedResource(AbstractResource):
     """Wraps any async-closeable object into a managed resource."""
 
     def __init__(
         self,
         resource: Any,
-        close_fn: Optional[Callable[[Any], Any]] = None,
+        close_fn: Callable[[Any], Any] | None = None,
         name: str = "unnamed",
         resource_type: ResourceType = ResourceType.OTHER,
     ):
         self._resource = resource
-        self._close_fn = close_fn or getattr(resource, "close", None) or getattr(resource, "aclose", None)
+        self._close_fn = (
+            close_fn or getattr(resource, "close", None) or getattr(resource, "aclose", None)
+        )
         self.info = ResourceInfo(name=name, resource_type=resource_type)
         self.info.acquired_at = time.monotonic()
         self.info.state = ResourceState.ACTIVE
@@ -134,7 +134,9 @@ class ManagedResource(AbstractResource):
     async def health_check(self) -> bool:
         if self.info.state == ResourceState.CLOSED:
             return False
-        health_fn = getattr(self._resource, "health_check", None) or getattr(self._resource, "ping", None)
+        health_fn = getattr(self._resource, "health_check", None) or getattr(
+            self._resource, "ping", None
+        )
         if health_fn is not None:
             try:
                 result = health_fn()
@@ -149,6 +151,7 @@ class ManagedResource(AbstractResource):
 # ============================================================================
 # Resource Pool
 # ============================================================================
+
 
 class ResourcePool(AbstractResource):
     """Generic async resource pool with health-checked lend/return.
@@ -176,11 +179,11 @@ class ResourcePool(AbstractResource):
         self._name = name
 
         self._available: asyncio.Queue = asyncio.Queue(maxsize=max_size)
-        self._in_use: Dict[int, Any] = {}  # id(resource) → resource
+        self._in_use: dict[int, Any] = {}  # id(resource) → resource
         self._total: int = 0
         self._lock = asyncio.Lock()
         self._closed = False
-        self._health_task: Optional[asyncio.Task] = None
+        self._health_task: asyncio.Task | None = None
 
     async def _prefill(self):
         """Pre-create min_size connections."""
@@ -243,7 +246,7 @@ class ResourcePool(AbstractResource):
         while not self._closed:
             await asyncio.sleep(self._health_check_interval)
             # Drain and re-check
-            healthy: List[Any] = []
+            healthy: list[Any] = []
             while not self._available.empty():
                 try:
                     resource = self._available.get_nowait()
@@ -281,7 +284,7 @@ class ResourcePool(AbstractResource):
         except Exception:
             return False
 
-    def _close_resource(self, resource: Any, errors: List[Exception]):
+    def _close_resource(self, resource: Any, errors: list[Exception]):
         """Attempt to close a single resource, collecting errors."""
         close_fn = (
             getattr(resource, "close", None)
@@ -298,7 +301,7 @@ class ResourcePool(AbstractResource):
                 errors.append(exc)
 
     @staticmethod
-    async def _await_close(coro, errors: List[Exception]):
+    async def _await_close(coro, errors: list[Exception]):
         try:
             await coro
         except Exception as exc:
@@ -318,7 +321,7 @@ class ResourcePool(AbstractResource):
                 pass
 
         # Close all resources
-        errors: List[Exception] = []
+        errors: list[Exception] = []
 
         # Close in-use
         for rid, resource in list(self._in_use.items()):
@@ -336,15 +339,13 @@ class ResourcePool(AbstractResource):
                 errors.append(exc)
 
         if errors:
-            logger.error(
-                "Pool '%s': %d errors during close", self._name, len(errors)
-            )
+            logger.error("Pool '%s': %d errors during close", self._name, len(errors))
 
     async def health_check(self) -> bool:
         return not self._closed
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         """Pool statistics."""
         return {
             "name": self._name,
@@ -360,6 +361,7 @@ class ResourcePool(AbstractResource):
 # Resource Manager (central registry)
 # ============================================================================
 
+
 class ResourceManager:
     """Central resource lifecycle manager.
 
@@ -374,21 +376,23 @@ class ResourceManager:
     """
 
     def __init__(self, leak_warn_threshold: float = 300.0):
-        self._resources: List[Tuple[str, AbstractResource]] = []
+        self._resources: list[tuple[str, AbstractResource]] = []
         self._lock = asyncio.Lock()
         self._leak_threshold = leak_warn_threshold
         self._shutting_down = False
-        self._finalizers: List[Callable[[], Any]] = []
+        self._finalizers: list[Callable[[], Any]] = []
 
     async def register(self, name: str, resource: AbstractResource) -> AbstractResource:
         """Register a resource for lifecycle management."""
         async with self._lock:
             if self._shutting_down:
-                raise RuntimeError("ResourceManager is shutting down — cannot register new resources")
+                raise RuntimeError(
+                    "ResourceManager is shutting down — cannot register new resources"
+                )
             self._resources.append((name, resource))
         return resource
 
-    async def unregister(self, name: str) -> Optional[AbstractResource]:
+    async def unregister(self, name: str) -> AbstractResource | None:
         """Remove a resource from management (without closing)."""
         async with self._lock:
             for i, (n, r) in enumerate(self._resources):
@@ -401,20 +405,20 @@ class ResourceManager:
         """Register a finalizer to run during shutdown."""
         self._finalizers.append(fn)
 
-    async def get(self, name: str) -> Optional[AbstractResource]:
+    async def get(self, name: str) -> AbstractResource | None:
         """Find a managed resource by name."""
         for n, r in self._resources:
             if n == name:
                 return r
         return None
 
-    async def shutdown(self, timeout: float = 30.0) -> List[str]:
+    async def shutdown(self, timeout: float = 30.0) -> list[str]:
         """Ordered shutdown — LIFO order, with timeout per resource.
 
         Returns list of resource names that failed to close.
         """
         self._shutting_down = True
-        failures: List[str] = []
+        failures: list[str] = []
 
         # Close resources in reverse order
         async with self._lock:
@@ -425,7 +429,7 @@ class ResourceManager:
             try:
                 await asyncio.wait_for(resource.close(), timeout=timeout)
                 logger.debug("Closed resource: %s", name)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 failures.append(f"{name} (timeout)")
                 logger.error("Resource '%s' close timed out after %.0fs", name, timeout)
             except Exception as exc:
@@ -443,9 +447,9 @@ class ResourceManager:
 
         return failures
 
-    async def health_report(self) -> Dict[str, bool]:
+    async def health_report(self) -> dict[str, bool]:
         """Health check all registered resources."""
-        report: Dict[str, bool] = {}
+        report: dict[str, bool] = {}
         async with self._lock:
             for name, resource in self._resources:
                 try:
@@ -454,10 +458,10 @@ class ResourceManager:
                     report[name] = False
         return report
 
-    def check_leaks(self) -> List[str]:
+    def check_leaks(self) -> list[str]:
         """Check for resources held beyond leak threshold."""
         now = time.monotonic()
-        leaks: List[str] = []
+        leaks: list[str] = []
         for name, resource in self._resources:
             if hasattr(resource, "info") and hasattr(resource.info, "acquired_at"):
                 age = now - resource.info.acquired_at
@@ -474,7 +478,7 @@ class ResourceManager:
 # Global singleton
 # ============================================================================
 
-_global_resource_manager: Optional[ResourceManager] = None
+_global_resource_manager: ResourceManager | None = None
 
 
 def get_resource_manager() -> ResourceManager:

@@ -19,6 +19,7 @@ Architecture:
 
 from __future__ import annotations
 
+import builtins
 import os
 import resource
 import subprocess
@@ -27,43 +28,77 @@ import tempfile
 import time
 import traceback
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, List, Optional, Set
-
+from enum import StrEnum
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Sandbox Policy
 # ---------------------------------------------------------------------------
 
 
-class SecurityLevel(str, Enum):
+class SecurityLevel(StrEnum):
     """Security level determines which restrictions apply."""
-    RESTRICTED = "restricted"    # Max restrictions, no network/disk
-    STANDARD = "standard"        # Reasonable limits for most use cases
-    RELAXED = "relaxed"          # Minimal restrictions, trusted code only
+
+    RESTRICTED = "restricted"  # Max restrictions, no network/disk
+    STANDARD = "standard"  # Reasonable limits for most use cases
+    RELAXED = "relaxed"  # Minimal restrictions, trusted code only
 
 
 # Dangerous modules and builtins to block
-DANGEROUS_MODULES: Set[str] = {
-    "os", "subprocess", "shlex", "sys", "ctypes",
-    "socket", "http", "requests", "urllib",
-    "multiprocessing", "threading", "concurrent.futures",
-    "importlib", "pkgutil", "pkg_resources",
-    "pickle", "marshal", "shelve",
-    "pathlib", "shutil", "glob", "fnmatch",
-    "signal", "atexit",
-    "code", "codeop", "compileall",
-    "pty", "fcntl", "tty", "termios",
+DANGEROUS_MODULES: set[str] = {
+    "os",
+    "subprocess",
+    "shlex",
+    "sys",
+    "ctypes",
+    "socket",
+    "http",
+    "requests",
+    "urllib",
+    "multiprocessing",
+    "threading",
+    "concurrent.futures",
+    "importlib",
+    "pkgutil",
+    "pkg_resources",
+    "pickle",
+    "marshal",
+    "shelve",
+    "pathlib",
+    "shutil",
+    "glob",
+    "fnmatch",
+    "signal",
+    "atexit",
+    "code",
+    "codeop",
+    "compileall",
+    "pty",
+    "fcntl",
+    "tty",
+    "termios",
     "webbrowser",
 }
 
-DANGEROUS_BUILTINS: Set[str] = {
-    "__import__", "compile", "eval", "exec", "open",
-    "input", "breakpoint",
-    "globals", "locals", "vars",
-    "getattr", "setattr", "delattr",
-    "type", "issubclass", "isinstance",
-    "memoryview", "bytearray",
+DANGEROUS_BUILTINS: set[str] = {
+    "__import__",
+    "compile",
+    "eval",
+    "exec",
+    "open",
+    "input",
+    "breakpoint",
+    "globals",
+    "locals",
+    "vars",
+    "getattr",
+    "setattr",
+    "delattr",
+    "type",
+    "issubclass",
+    "isinstance",
+    "memoryview",
+    "bytearray",
 }
 
 
@@ -87,14 +122,14 @@ class SandboxPolicy:
     # Security
     block_dangerous_modules: bool = True
     block_dangerous_builtins: bool = True
-    allowed_modules: Set[str] = field(default_factory=set)
-    allowed_imports: Set[str] = field(default_factory=set)
+    allowed_modules: set[str] = field(default_factory=set)
+    allowed_imports: set[str] = field(default_factory=set)
 
     # Audit
     enable_audit: bool = True
 
     @classmethod
-    def for_level(cls, level: SecurityLevel) -> "SandboxPolicy":
+    def for_level(cls, level: SecurityLevel) -> SandboxPolicy:
         """Create a policy for a given security level."""
         if level == SecurityLevel.RESTRICTED:
             return cls(
@@ -104,7 +139,14 @@ class SandboxPolicy:
                 network_enabled=False,
                 disk_write_enabled=False,
                 timeout_seconds=10.0,
-                allowed_modules={"math", "json", "datetime", "collections", "itertools", "functools"},
+                allowed_modules={
+                    "math",
+                    "json",
+                    "datetime",
+                    "collections",
+                    "itertools",
+                    "functools",
+                },
             )
         elif level == SecurityLevel.RELAXED:
             return cls(
@@ -128,6 +170,7 @@ class SandboxPolicy:
 @dataclass(frozen=True)
 class SandboxResult:
     """Immutable result of a sandboxed code execution."""
+
     exit_code: int
     stdout: str
     stderr: str
@@ -135,14 +178,14 @@ class SandboxResult:
     peak_memory_mb: float
     was_killed: bool = False
     kill_reason: str = ""
-    error: Optional[str] = None
+    error: str | None = None
     timestamp: float = field(default_factory=time.time)
 
     @property
     def success(self) -> bool:
         return self.exit_code == 0 and not self.was_killed
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "exit_code": self.exit_code,
             "stdout": self.stdout[:1000],
@@ -164,16 +207,18 @@ class SandboxAuditLogger:
     """Logs sandbox execution events for security auditing."""
 
     def __init__(self):
-        self._events: List[Dict[str, Any]] = []
+        self._events: list[dict[str, Any]] = []
 
-    def log(self, event_type: str, details: Dict[str, Any]) -> None:
-        self._events.append({
-            "event": event_type,
-            "timestamp": time.time(),
-            **details,
-        })
+    def log(self, event_type: str, details: dict[str, Any]) -> None:
+        self._events.append(
+            {
+                "event": event_type,
+                "timestamp": time.time(),
+                **details,
+            }
+        )
 
-    def get_events(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_events(self, limit: int = 100) -> list[dict[str, Any]]:
         return self._events[-limit:]
 
     def clear(self) -> None:
@@ -194,7 +239,7 @@ class SandboxExecutor:
 
     def __init__(
         self,
-        policy: Optional[SandboxPolicy] = None,
+        policy: SandboxPolicy | None = None,
         audit: bool = True,
     ):
         self._policy = policy or SandboxPolicy()
@@ -204,7 +249,7 @@ class SandboxExecutor:
     def policy(self) -> SandboxPolicy:
         return self._policy
 
-    def execute(self, code: str, globals_dict: Optional[Dict] = None) -> SandboxResult:
+    def execute(self, code: str, globals_dict: dict | None = None) -> SandboxResult:
         """
         Execute code in sandbox.
 
@@ -218,23 +263,25 @@ class SandboxExecutor:
         audit_id = f"sandbox_{int(time.time() * 1000)}"
 
         if self._auditor:
-            self._auditor.log("execute", {
-                "audit_id": audit_id,
-                "code_length": len(code),
-                "policy_level": self._policy.network_enabled and "relaxed" or "restricted",
-            })
+            self._auditor.log(
+                "execute",
+                {
+                    "audit_id": audit_id,
+                    "code_length": len(code),
+                    "policy_level": self._policy.network_enabled and "relaxed" or "restricted",
+                },
+            )
 
         start = time.time()
         peak_memory = 0.0
 
         try:
             # Build restricted globals
-            restricted_globals = self._build_restricted_globals(globals_dict or {})
+            self._build_restricted_globals(globals_dict or {})
 
             # Write code to temp file for subprocess isolation
             with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".py", delete=False, prefix="sandbox_",
-                dir=tempfile.gettempdir()
+                mode="w", suffix=".py", delete=False, prefix="sandbox_", dir=tempfile.gettempdir()
             ) as f:
                 f.write(self._wrap_code_with_limits(code))
                 script_path = f.name
@@ -249,8 +296,8 @@ class SandboxExecutor:
                     preexec_fn=self._set_resource_limits if os.name != "nt" else None,
                 )
 
-                stdout = result.stdout[:self._policy.max_output_size_bytes]
-                stderr = result.stderr[:self._policy.max_output_size_bytes]
+                stdout = result.stdout[: self._policy.max_output_size_bytes]
+                stderr = result.stderr[: self._policy.max_output_size_bytes]
 
                 sandbox_result = SandboxResult(
                     exit_code=result.returncode,
@@ -288,16 +335,19 @@ class SandboxExecutor:
             )
 
         if self._auditor:
-            self._auditor.log("complete", {
-                "audit_id": audit_id,
-                "success": sandbox_result.success,
-                "execution_time_ms": sandbox_result.execution_time_ms,
-                "exit_code": sandbox_result.exit_code,
-            })
+            self._auditor.log(
+                "complete",
+                {
+                    "audit_id": audit_id,
+                    "success": sandbox_result.success,
+                    "execution_time_ms": sandbox_result.execution_time_ms,
+                    "exit_code": sandbox_result.exit_code,
+                },
+            )
 
         return sandbox_result
 
-    def execute_sync(self, code: str, namespace: Optional[Dict] = None) -> SandboxResult:
+    def execute_sync(self, code: str, namespace: dict | None = None) -> SandboxResult:
         """
         Execute code synchronously in-process with restricted namespace.
 
@@ -316,8 +366,13 @@ class SandboxExecutor:
 
             # Propagate results back to caller namespace
             if namespace is not None:
-                namespace.update({k: v for k, v in restricted_globals.items()
-                                  if not k.startswith('__') and k not in self._policy.allowed_modules})
+                namespace.update(
+                    {
+                        k: v
+                        for k, v in restricted_globals.items()
+                        if not k.startswith("__") and k not in self._policy.allowed_modules
+                    }
+                )
 
             result = SandboxResult(
                 exit_code=0,
@@ -337,17 +392,21 @@ class SandboxExecutor:
             )
 
         if self._auditor:
-            self._auditor.log("complete_sync", {
-                "audit_id": audit_id,
-                "success": result.success,
-            })
+            self._auditor.log(
+                "complete_sync",
+                {
+                    "audit_id": audit_id,
+                    "success": result.success,
+                },
+            )
 
         return result
 
-    def _build_restricted_globals(self, extra: Dict) -> Dict:
+    def _build_restricted_globals(self, extra: dict) -> dict:
         """Build a restricted global namespace."""
         safe_builtins = {
-            k: v for k, v in __builtins__.items()
+            k: v
+            for k, v in __builtins__.items()
             if k not in (self._policy.block_dangerous_builtins and DANGEROUS_BUILTINS or set())
         }
 
@@ -364,7 +423,7 @@ class SandboxExecutor:
         globals_dict.update(extra)
         return globals_dict
 
-    def _build_sandbox_env(self) -> Dict[str, str]:
+    def _build_sandbox_env(self) -> dict[str, str]:
         """Build a restricted environment for subprocess."""
         env = {
             "PATH": "/usr/bin:/bin:/usr/local/bin",
@@ -399,12 +458,12 @@ class SandboxExecutor:
                 resource.RLIMIT_NPROC,
                 (self._policy.max_processes, self._policy.max_processes),
             )
-        except (ValueError, resource.error):
+        except (OSError, ValueError):
             pass
 
     def _wrap_code_with_limits(self, code: str) -> str:
         """Wrap user code with safety limits."""
-        wrapper = f'''
+        wrapper = f"""
 import sys
 
 # Blacklist dangerous modules via import hook
@@ -425,10 +484,10 @@ for _m in list(sys.modules.keys()):
 
 # Execute user code
 {code}
-'''
+"""
         return wrapper
 
-    def get_audit_log(self) -> List[Dict[str, Any]]:
+    def get_audit_log(self) -> list[dict[str, Any]]:
         if self._auditor:
             return self._auditor.get_events()
         return []
@@ -449,13 +508,14 @@ RiskLevel = SecurityLevel
 @dataclass
 class SafetyReport:
     """Safety analysis report for code/input evaluation."""
+
     risk_level: RiskLevel = RiskLevel.STANDARD
     is_safe: bool = True
-    findings: List[str] = field(default_factory=list)
+    findings: list[str] = field(default_factory=list)
     recommendation: str = ""
     score: float = 1.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "risk_level": self.risk_level.value,
             "is_safe": self.is_safe,
@@ -468,11 +528,11 @@ class SafetyReport:
 class LLMSafetyAnalyzer:
     """LLM-based safety analyzer for code and content review."""
 
-    def __init__(self, policy: Optional[SandboxPolicy] = None):
+    def __init__(self, policy: SandboxPolicy | None = None):
         self._policy = policy or SandboxPolicy()
 
     def analyze(self, code: str) -> SafetyReport:
-        findings: List[str] = []
+        findings: list[str] = []
         is_safe = True
         score = 1.0
 
@@ -507,7 +567,7 @@ class LLMSafetyAnalyzer:
 class Sandbox:
     """Backward-compatible Sandbox wrapper around SandboxPolicy + SandboxExecutor."""
 
-    def __init__(self, policy: Optional[SandboxPolicy] = None):
+    def __init__(self, policy: SandboxPolicy | None = None):
         self._policy = policy or SandboxPolicy()
         self._executor = SandboxExecutor(policy=self._policy)
 
@@ -518,23 +578,23 @@ class Sandbox:
     def run(self, code: str) -> SandboxResult:
         return self._executor.execute(code)
 
-    def run_sync(self, code: str, namespace: Optional[Dict] = None) -> SandboxResult:
+    def run_sync(self, code: str, namespace: dict | None = None) -> SandboxResult:
         return self._executor.execute_sync(code, namespace)
 
 
 class SandboxManager:
     """Backward-compatible SandboxManager — manages multiple sandbox instances."""
 
-    def __init__(self, default_policy: Optional[SandboxPolicy] = None):
+    def __init__(self, default_policy: SandboxPolicy | None = None):
         self._default_policy = default_policy or SandboxPolicy()
-        self._sandboxes: Dict[str, Sandbox] = {}
+        self._sandboxes: dict[str, Sandbox] = {}
 
-    def create(self, name: str, policy: Optional[SandboxPolicy] = None) -> Sandbox:
+    def create(self, name: str, policy: SandboxPolicy | None = None) -> Sandbox:
         sb = Sandbox(policy=policy or self._default_policy)
         self._sandboxes[name] = sb
         return sb
 
-    def get(self, name: str) -> Optional[Sandbox]:
+    def get(self, name: str) -> Sandbox | None:
         return self._sandboxes.get(name)
 
     def remove(self, name: str) -> bool:
@@ -543,8 +603,8 @@ class SandboxManager:
             return True
         return False
 
-    def list(self) -> List[str]:
+    def list(self) -> builtins.list[str]:
         return list(self._sandboxes.keys())
 
-    def execute_all(self, code: str) -> Dict[str, SandboxResult]:
+    def execute_all(self, code: str) -> dict[str, SandboxResult]:
         return {name: sb.run(code) for name, sb in self._sandboxes.items()}

@@ -17,9 +17,10 @@ import asyncio
 import logging
 import time
 from collections import defaultdict
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 from uuid import uuid4
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # Core types
 # ============================================================================
+
 
 class EventPriority(int, Enum):
     LOW = 0
@@ -47,7 +49,7 @@ class Event:
     priority: EventPriority = EventPriority.NORMAL
     source: str = ""
     correlation_id: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -65,6 +67,7 @@ class DeadLetter:
 # Subscription
 # ============================================================================
 
+
 @dataclass
 class Subscription:
     """A handler subscribed to a topic pattern."""
@@ -72,7 +75,7 @@ class Subscription:
     topic_pattern: str
     handler: Callable[[Event], Awaitable[Any]]
     handler_name: str
-    concurrency: int = 1   # Max concurrent executions
+    concurrency: int = 1  # Max concurrent executions
     is_pattern: bool = False  # True if topic_pattern contains wildcards
 
     def matches(self, topic: str) -> bool:
@@ -81,12 +84,14 @@ class Subscription:
         # Support * wildcard: "agent.*" matches "agent.start", "agent.stop"
         pattern = self.topic_pattern.replace("*", ".*")
         import re
+
         return bool(re.match(f"^{pattern}$", topic))
 
 
 # ============================================================================
 # Event Bus
 # ============================================================================
+
 
 class EventBus:
     """Async pub/sub event bus with backpressure and DLQ."""
@@ -98,14 +103,14 @@ class EventBus:
         dlq_max_size: int = 1000,
         worker_count: int = 4,
     ):
-        self._subscriptions: Dict[str, List[Subscription]] = defaultdict(list)
-        self._dead_letters: List[DeadLetter] = []
+        self._subscriptions: dict[str, list[Subscription]] = defaultdict(list)
+        self._dead_letters: list[DeadLetter] = []
         self._dlq_enabled = dlq_enabled
         self._dlq_max_size = dlq_max_size
         self._queue: asyncio.Queue[tuple[Event, Subscription]] = asyncio.Queue(
             maxsize=max_queue_size
         )
-        self._workers: List[asyncio.Task] = []
+        self._workers: list[asyncio.Task] = []
         self._worker_count = worker_count
         self._running = False
         self._lock = asyncio.Lock()
@@ -117,7 +122,7 @@ class EventBus:
         self,
         topic: str,
         handler: Callable[[Event], Awaitable[Any]],
-        handler_name: Optional[str] = None,
+        handler_name: str | None = None,
         concurrency: int = 1,
     ) -> Subscription:
         """Subscribe a handler to a topic.
@@ -141,9 +146,7 @@ class EventBus:
         """Remove a subscription by handler name."""
         subs = self._subscriptions.get(topic, [])
         original_len = len(subs)
-        self._subscriptions[topic] = [
-            s for s in subs if s.handler_name != handler_name
-        ]
+        self._subscriptions[topic] = [s for s in subs if s.handler_name != handler_name]
         removed = original_len != len(self._subscriptions[topic])
         if removed:
             logger.debug("Unsubscribed '%s' from topic '%s'", handler_name, topic)
@@ -164,7 +167,7 @@ class EventBus:
 
         Returns: number of subscribers the event was dispatched to.
         """
-        matching: List[Subscription] = []
+        matching: list[Subscription] = []
 
         # Exact topic match first
         if event.topic in self._subscriptions:
@@ -187,7 +190,9 @@ class EventBus:
             self._event_count += 1
             logger.debug(
                 "Published '%s' to %d subscribers [total events: %d]",
-                event.topic, len(matching), self._event_count,
+                event.topic,
+                len(matching),
+                self._event_count,
             )
 
         return len(matching)
@@ -196,7 +201,7 @@ class EventBus:
         """Non-blocking publish — drops event if queue is full."""
         try:
             return await asyncio.wait_for(self.publish(event), timeout=0.1)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Event bus queue full — event '%s' dropped", event.topic)
             return 0
 
@@ -215,10 +220,7 @@ class EventBus:
         if self._running:
             return
         self._running = True
-        self._workers = [
-            asyncio.create_task(self._worker(i))
-            for i in range(self._worker_count)
-        ]
+        self._workers = [asyncio.create_task(self._worker(i)) for i in range(self._worker_count)]
         logger.info("EventBus started with %d workers", self._worker_count)
 
     async def stop(self, grace_period: float = 5.0) -> None:
@@ -228,7 +230,7 @@ class EventBus:
         # Wait for queue to drain
         try:
             await asyncio.wait_for(self._queue.join(), timeout=grace_period)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "EventBus shutdown timeout — %d events remaining in queue",
                 self._queue.qsize(),
@@ -245,10 +247,8 @@ class EventBus:
 
         while self._running:
             try:
-                event, sub = await asyncio.wait_for(
-                    self._queue.get(), timeout=0.5
-                )
-            except asyncio.TimeoutError:
+                event, sub = await asyncio.wait_for(self._queue.get(), timeout=0.5)
+            except TimeoutError:
                 continue
             except asyncio.CancelledError:
                 break
@@ -258,7 +258,9 @@ class EventBus:
             except Exception as exc:
                 logger.error(
                     "Handler '%s' failed for event '%s': %s",
-                    sub.handler_name, event.topic, exc,
+                    sub.handler_name,
+                    event.topic,
+                    exc,
                 )
                 if self._dlq_enabled:
                     self._add_to_dlq(event, sub, str(exc))
@@ -268,15 +270,17 @@ class EventBus:
     def _add_to_dlq(self, event: Event, sub: Subscription, error: str) -> None:
         if len(self._dead_letters) >= self._dlq_max_size:
             self._dead_letters.pop(0)  # Drop oldest
-        self._dead_letters.append(DeadLetter(
-            event=event,
-            handler_name=sub.handler_name,
-            error=error,
-        ))
+        self._dead_letters.append(
+            DeadLetter(
+                event=event,
+                handler_name=sub.handler_name,
+                error=error,
+            )
+        )
 
     # ----- DLQ operations -----
 
-    def get_dlq(self) -> List[DeadLetter]:
+    def get_dlq(self) -> list[DeadLetter]:
         return list(self._dead_letters)
 
     async def replay_dlq(self, max_events: int = 100) -> int:
@@ -287,11 +291,16 @@ class EventBus:
         count = 0
         for dl in to_replay:
             dl.retry_count += 1
-            await self._queue.put((dl.event, Subscription(
-                topic_pattern=dl.event.topic,
-                handler=lambda e: None,  # Original handler not preserved
-                handler_name=f"dlq_replay_{dl.handler_name}",
-            )))
+            await self._queue.put(
+                (
+                    dl.event,
+                    Subscription(
+                        topic_pattern=dl.event.topic,
+                        handler=lambda e: None,  # Original handler not preserved
+                        handler_name=f"dlq_replay_{dl.handler_name}",
+                    ),
+                )
+            )
             count += 1
 
         logger.info("Replayed %d dead letter events", count)
@@ -317,13 +326,14 @@ class EventBus:
     def subscription_count(self) -> int:
         return sum(len(subs) for subs in self._subscriptions.values())
 
-    def list_topics(self) -> List[str]:
+    def list_topics(self) -> list[str]:
         return sorted(self._subscriptions.keys())
 
 
 # ============================================================================
 # Helpers
 # ============================================================================
+
 
 def event(topic: str, **kwargs) -> Event:
     """Convenience factory for creating events."""

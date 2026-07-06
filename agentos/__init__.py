@@ -48,227 +48,109 @@ __version__ = "1.16.1"
 # v1.14.8: P0 regression fix (imports, version, dependencies).
 
 # Core - DI system
-from agentos.core.di import (
-    Agent,
-    RunContext,
-    Depends,
-    inject_tool,
-    requires_context,
+# Tool-Using Agent (v1.3.38)
+from agentos.agent import (
+    AgentConfig,
+    AgentResult,
+    AgentStep,
+    MockLLMProvider,
+    ToolAgent,
+    ToolExecutor,
 )
 
-# Core - Handoff protocol
-from agentos.core.handoff import (
-    Handoff,
-    HandoffResult,
-    transfer_to,
-    can_handle,
-    execute_with_handoff,
-    HandoffAwareAgent,
+# Agent Marketplace (v1.3.0)
+from agentos.agents.market import (
+    AgentCategory,
+    AgentMarket,
+    AgentSkill,
 )
 
-# Core - CodeAgent
-from agentos.core.code_agent import (
-    CodeAgent,
-    CodeResult,
-    CodeStep,
+# API Middleware (v1.3.0)
+from agentos.api.middleware import (
+    AuthConfig,
+    CORSConfig,
+    CORSMiddleware,
+    RequestContext,
+    RequestIDMiddleware,
 )
 
-# Protocols - Structured output validation
-from agentos.protocols.output import (
-    StructuredOutput,
-    validate_output,
-    OutputValidator,
+# API Server (v1.3.2)
+from agentos.api.server import (
+    AgentAPI,
+    RunRequest,
+    RunResponse,
 )
 
-# Protocols - Agent Card
-from agentos.protocols.agent_card import (
-    AgentCard,
-    AgentCardRegistry,
-    AgentCardDiscovery,
-    discover_local,
-    create_card,
+# API Streaming (v1.3.0)
+from agentos.api.streaming import (
+    StreamEvent,
+    StreamingAgent,
+    StreamSession,
 )
 
-# Protocols - A2A
-from agentos.protocols.a2a import (
-    A2ATask,
-    A2AMessage,
-    A2AArtifact,
-    A2AHandoff,
-    A2ASession,
-    A2AClient,
-    A2AServer,
-    TextPart,
-    FilePart,
-    DataPart,
-    TaskState,
-    new_task,
-    new_handoff,
+# API Versioning (v1.3.0)
+from agentos.api.versioning import (
+    APIVersion,
+    VersionConfig,
+    VersionNegotiator,
+    VersionStrategy,
 )
 
-# Memory pyramid
-from agentos.memory.pyramid import (
-    MemoryPyramid,
-    MemoryLayer,
-    MemoryType,
-    MemoryItem,
+# Benchmark Runner (v1.3.0)
+from agentos.benchmarks.runner import (
+    BenchmarkConfig,
+    BenchmarkReport,
+    BenchmarkRunner,
+    BenchmarkScenario,
 )
 
-# Evolution engine
-from agentos.evolution.engine import (
-    EvolutionEngine,
-    EvolutionProposal,
-    EvolutionStatus,
+# Cache - LLM Response Cache (v1.2.7)
+from agentos.cache import (
+    BaseEmbedder,
+    CacheEntry,
+    CacheKeyStrategy,
+    CohereEmbedder,
+    LLMCache,
+    LocalEmbedder,
+    OpenAIEmbedder,
+    ResponseCache,
 )
 
-# Fusion toolkit
-from agentos.tools.fusion import (
-    FusionToolkit,
-    FusionResult,
-    ToolSpec,
+# CLI Init (v1.4.1)
+from agentos.cli.init import (
+    scaffold,
 )
 
-# Tool risk rating (v1.1.4)
-from agentos.tools.risk import (
-    ToolRiskLevel,
-    ToolRiskRating,
-    get_risk_preset,
-    infer_risk_level,
-)
+# CLI Main (v1.0.0)
+from agentos.cli.main import main as cli_main
 
-# Swarm coordinator
-from agentos.swarm.coordinator import (
-    SwarmCoordinator,
-    SmartSwarmCoordinator,
-    SwarmTopology,
-    SwarmMessage,
-    ExecutionMode,
-    SwarmResult,
+# CLI Serve (v1.3.0)
+from agentos.cli.serve import (
+    ServeConfig,
+    start_api_server,
 )
 
 # Communication layer
 from agentos.comm.layer import (
-    CommunicationLayer,
     Blackboard,
+    CommunicationLayer,
     EventBus,
     Mailbox,
-)
-
-# Orchestration
-from agentos.orchestration.graph import (
-    GraphOrchestrator,
-    GraphNode,
-    GraphEdge,
 )
 
 # Concurrency (v1.1.3)
 from agentos.concurrency.batch import (
     AsyncBatchExecutor,
-    TaskStatus as BatchTaskStatus,
-    TaskSpec,
-    TaskResult as BatchTaskResult,
     BatchConfig,
     BatchResult,
     BatchStrategy,
+    TaskSpec,
 )
-
-# Cost tracking (v1.1.4)
-from agentos.cost.tracker import (
-    RunCostSession,
-    CostTracker,
-    ModelPricing,
-    UsageRecord,
-    PRICING,
+from agentos.concurrency.batch import (
+    TaskResult as BatchTaskResult,
 )
-
-# Models - Resilience (v1.1.5)
-from agentos.models.resilience import (
-    CancellationSource,
-    CancelledError,
-    RetryConfig,
-    CircuitBreaker,
-    CircuitBreakerConfig,
-    ResilienceConfig,
-    ResilientCall,
-    retry_with_backoff,
-    with_timeout,
-    with_fallback,
-)
-
-# Models - Router (v1.2.7 minimal)
-from agentos.models.router import ModelRouter
-
-# Security - Sandbox (v1.2.1)
-from agentos.security.sandbox_executor import (
-    SandboxExecutor,
-    SandboxMode,
-    SandboxResult,
-    ProcessSandbox,
-    DockerSandbox,
-)
-
-# Core - Middleware Pipeline (v1.2.7)
-from agentos.core.middleware import (
-    MiddlewarePhase,
-    MiddlewareContext,
-    MiddlewareDecision,
-    AgentMiddleware,
-    MiddlewarePipeline,
-)
-
-# Queue - Task Queue & Rate Limiter (v1.2.7)
-from agentos.queue import (
-    TaskQueue,
-    TaskState as QueueTaskState,
-    TaskPriority,
-    RateLimiter,
-    RateLimitStrategy,
-    RateLimitConfig,
-)
-
-# Cache - LLM Response Cache (v1.2.7)
-from agentos.cache import (
-    LLMCache,
-    CacheEntry,
-    BaseEmbedder,
-    OpenAIEmbedder,
-    LocalEmbedder,
-    CohereEmbedder,
-    ResponseCache,
-    CacheKeyStrategy,
-)
-
-# Plugins - Plugin System (v1.2.7)
-from agentos.plugins import (
-    PluginRegistry,
-    RegisteredPlugin,
-    PluginStatus,
-    PluginDiscovery,
-    DiscoveredPlugin,
-    PluginLoader,
-    LifecycleManager,
-)
-
-# Observability (v1.2.7)
-from agentos.observability import (
-    MetricsCollector,
-    Tracer,
-    NoopTracer,
-    CostAnalytics,
-    BudgetAlert,
-)
-
-# Workflows (v1.2.7)
-from agentos.workflows import (
-    WorkflowEngine,
-    WorkflowTemplate,
-)
-
-# MCP Protocol (v1.2.7)
-from agentos.protocols.mcp import (
-    MCPClient,
-    MCPServerConfig,
-    MCPToolSchema,
+from agentos.concurrency.batch import (
+    TaskStatus as BatchTaskStatus,
 )
 
 # Config System (v1.2.7)
@@ -278,81 +160,110 @@ from agentos.config import (
     ValidationResult,
 )
 
-# Evaluation Framework (v1.3.18)
-from agentos.evaluation import (
-    GoldenDataset,
-    GoldenCase,
-    Evaluator,
-    EvalConfig,
-    EvalReport,
-    ScoreDetail,
-    Scorer,
-    load_dataset,
-    save_dataset,
-    quick_eval,
-)
-from agentos.evaluation.regression import (
-    RegressionRunner,
-    RegressionReport,
-    RegressionCheck,
-    StatisticalRunner,
-    StatResult,
-    to_junit_xml,
-    to_json,
-    save_report,
-)
-from agentos.evaluation.scorers import (
-    CompositeScorer,
-    ScoringStrategy,
-    ScoreResult,
-    rouge_l,
-    bleu,
-    semantic_similarity,
-    exact_match,
-    contains_match,
-    STRATEGY_CODE_GEN,
-    STRATEGY_QA,
-    STRATEGY_SUMMARY,
-    STRATEGY_TRANSLATION,
+# Core extensions (v1.2.9)
+from agentos.core import (
+    AgentContext,
+    AgentState,
+    AgentStateMachine,
+    AsyncAgentLoop,
+    AsyncContextManager,
+    AsyncInvocationResult,
+    AsyncLoopConfig,
+    ContextManager,
+    CoreMessage,
+    CoreToolCall,
+    CoreToolResult,
+    ResponseCollector,
+    Session,
+    SessionStore,
+    StateTimeoutError,
+    StateTransition,
+    StreamChunk,
+    StreamEmitter,
+    StreamEvent,
+    TransitionError,
 )
 
-# Security - Auditor (v1.2.7)
-from agentos.security.auditor import (
-    SecurityAuditor,
-    AuditFinding,
-    AuditReport,
+# Core - CodeAgent
+from agentos.core.code_agent import (
+    CodeAgent,
+    CodeResult,
+    CodeStep,
 )
 
-# Tools - Orchestrator (v1.2.7)
-from agentos.tools.orchestrator import (
-    ToolOrchestrator,
-    DAGBuilder,
-    DAGSpec,
+# Cost Tracking (v1.20.0)
+from agentos.core.cost_tracker import (
+    CostTracker,
+    ModelPricing,
+    UsageRecord,
+)
+from agentos.core.di import (
+    Agent,
+    Depends,
+    RunContext,
+    inject_tool,
+    requires_context,
 )
 
-# Memory - Retriever + Conversation (v1.2.7)
-from agentos.memory import (
-    SemanticMemoryRetriever,
-    ConversationMemory,
+# Feature Flags (v1.20.0)
+# Core - Handoff protocol
+from agentos.core.handoff import (
+    Handoff,
+    HandoffAwareAgent,
+    HandoffResult,
+    can_handle,
+    execute_with_handoff,
+    transfer_to,
 )
 
-# Prompts (v1.2.7)
-from agentos.prompts import (
-    PromptTemplate,
-    PromptRegistry,
+# Agent Loop (v1.3.2)
+from agentos.core.loop import (
+    AgentLoop,
+    AgentResult,
+    HumanInterruptNeeded,
+    LoopConfig,
+    LoopState,
+    MaxIterationsExceeded,
 )
 
-# Multimodal (v1.2.7)
-from agentos.multimodal import (
-    MultimodalManager,
-    Modality,
+# Core - Middleware Pipeline (v1.2.7)
+from agentos.core.middleware import (
+    AgentMiddleware,
+    MiddlewareContext,
+    MiddlewareDecision,
+    MiddlewarePhase,
+    MiddlewarePipeline,
 )
 
-# Vector Store (v1.2.7)
-from agentos.vectorstore import (
-    BaseVectorStore,
-    FAISSVectorStore,
-    ChromaVectorStore,
+# Cost - Token Counter (v1.2.9)
+from agentos.cost import (
+    CostEstimate,
+    ModelFamily,
+    TokenCount,
+    TokenCounter,
+)
+
+# Cost tracking (v1.1.4)
+from agentos.cost.tracker import (
+    PRICING,
+    CostTracker,
+    ModelPricing,
+    RunCostSession,
+    UsageRecord,
+)
+
+# Deployment (v1.2.8)
+from agentos.deployment import (
+    ComposeConfig,
+    ComposeService,
+    DockerConfig,
+)
+
+# Docs Generator (v1.3.2)
+from agentos.docs.generator import (
+    DocConfig,
+    generate_api_docs,
+    generate_quickstart,
 )
 
 # Errors (v1.2.8)
@@ -363,11 +274,173 @@ from agentos.errors import (
     HumanError,
 )
 
-# Deployment (v1.2.8)
-from agentos.deployment import (
-    DockerConfig,
-    ComposeService,
-    ComposeConfig,
+# Evaluation Framework (v1.3.18)
+from agentos.evaluation import (
+    EvalReport,
+    Evaluator,
+    Scorer,
+)
+from agentos.evaluation.scorers import (
+    CompositeScorer,
+)
+
+# Evolution engine
+from agentos.evolution.engine import (
+    EvolutionEngine,
+    EvolutionProposal,
+    EvolutionStatus,
+)
+from agentos.experiments import (
+    Evaluator as ExperimentEvaluator,
+)
+
+# Experiments (v1.2.8)
+from agentos.experiments import (
+    ExperimentConfig,
+    ExperimentReport,
+    ExperimentRunner,
+    PromptVariant,
+    TrialResult,
+)
+
+# Feedback (v1.2.8)
+from agentos.feedback import (
+    FeedbackCollector,
+    FeedbackRecord,
+    FeedbackType,
+    PreferenceLearner,
+)
+
+# Health (v1.2.9)
+from agentos.health import (
+    CheckResult,
+    HealthCheck,
+    HealthChecker,
+    HealthStatus,
+)
+
+# Logging (v1.2.9)
+from agentos.log import (
+    JSONFormatter,
+    TraceContext,
+)
+
+# MCP Package (v1.3.6)
+from agentos.mcp import (
+    MCPClient as MCPFullClient,
+)
+from agentos.mcp import (
+    MCPError,
+    MCPPromptDef,
+    MCPPromptInfo,
+    MCPResource,
+    MCPResourceInfo,
+    # MCP Server (v1.5.2)
+    MCPServer,
+    MCPToolDef,
+    MCPToolInfo,
+    connect_mcp_servers,
+    create_default_server,
+    start_mcp_server,
+)
+from agentos.mcp import (
+    MCPServerConfig as MCPConfig,
+)
+from agentos.mcp.adapter import (
+    MCPToolAdapter,
+    MCPToolRegistry,
+)
+
+# Built-in MCP Servers (v1.7.8)
+from agentos.mcp.builtin_servers import (
+    BuiltinMCPRegistry,
+    FilesystemServer,
+    MemoryServer,
+    WebFetchServer,
+    create_default_registry,
+)
+
+# Memory - Retriever + Conversation (v1.2.7)
+# Memory extensions (v1.2.8)
+# Memory - Compressor (v1.2.9)
+from agentos.memory import (
+    ContextCompressor,
+    ConversationMemory,
+    ImportanceScorer,
+    LongTermMemory,
+    MemoryChunk,
+    MemoryStore,
+    MemorySummarizer,
+    SemanticMemoryRetriever,
+    VectorMemory,
+    WorkingMemory,
+    WorkingMemoryItem,
+)
+
+# Memory pyramid
+from agentos.memory.pyramid import (
+    MemoryItem,
+    MemoryLayer,
+    MemoryPyramid,
+    MemoryType,
+)
+
+# Anthropic Claude Backend (v1.3.5)
+from agentos.models.backends.anthropic import (
+    ClaudeClient,
+    ClaudeConfig,
+)
+
+# Gemini Backend (v1.3.1)
+from agentos.models.backends.gemini import (
+    GeminiClient,
+    GeminiConfig,
+    GeminiSafetySetting,
+)
+
+# Ollama Backend (v1.3.5)
+from agentos.models.backends.ollama import (
+    OllamaClient,
+    OllamaConfig,
+)
+
+# OpenAI Backend (v1.3.5)
+from agentos.models.backends.openai import (
+    OpenAIClient,
+    OpenAIConfig,
+)
+
+# Models - Resilience (v1.1.5)
+from agentos.models.resilience import (
+    CancellationSource,
+    CancelledError,
+    CircuitBreaker,
+    CircuitBreakerConfig,
+    ResilienceConfig,
+    ResilientCall,
+    RetryConfig,
+    retry_with_backoff,
+    with_fallback,
+    with_timeout,
+)
+
+# Models - Router (v1.2.7 minimal)
+# Model Route Types (v1.3.1)
+# Model Config (v1.3.2)
+from agentos.models.router import (
+    RECOMMENDED_CONFIG,
+    AllModelsFailed,
+    ModelConfig,
+    ModelResponse,
+    ModelRouter,
+    ModelSpec,
+)
+
+# Models - Routing Strategy (v1.2.8)
+from agentos.models.routing_strategy import (
+    Budget,
+    Complexity,
+    RoutingStrategy,
 )
 
 # Monitoring (v1.2.8)
@@ -382,137 +455,184 @@ from agentos.monitoring import (
     WebhookDispatcher,
 )
 
-# Experiments (v1.2.8)
-from agentos.experiments import (
-    ExperimentRunner,
-    ExperimentConfig,
-    ExperimentReport,
-    PromptVariant,
-    TrialResult,
-    Evaluator as ExperimentEvaluator,
+# Multimodal (v1.2.7)
+from agentos.multimodal import (
+    Modality,
+    MultimodalManager,
 )
 
-# Feedback (v1.2.8)
-from agentos.feedback import (
-    FeedbackCollector,
-    FeedbackRecord,
-    FeedbackType,
-    PreferenceLearner,
-)
-
-# Memory extensions (v1.2.8)
-from agentos.memory import (
-    MemorySummarizer,
-    ImportanceScorer,
-    MemoryChunk,
-    LongTermMemory,
-    MemoryStore,
-    WorkingMemory,
-    WorkingMemoryItem,
-    VectorMemory,
+# Observability (v1.2.7)
+from agentos.observability import (
+    BudgetAlert,
+    CostAnalytics,
+    MetricsCollector,
+    NoopTracer,
+    Tracer,
 )
 
 # Orchestration extensions (v1.2.8)
 from agentos.orchestration import (
     A2ARouter,
+    AgentGraph,
+    GraphNodeState,
+    GraphRecipe,
+    GraphResult,
     RouterAgentCard,
     RouterTask,
     TaskResult,
     TaskStatus,
-    AgentGraph,
-    GraphRecipe,
-    GraphNodeState,
-    GraphResult,
 )
 
-# Models - Routing Strategy (v1.2.8)
-from agentos.models.routing_strategy import (
-    RoutingStrategy,
-    Complexity,
-    Budget,
+# Orchestration
+from agentos.orchestration.graph import (
+    GraphEdge,
+    GraphNode,
+    GraphOrchestrator,
 )
 
-# Swarm Patterns (v1.2.8)
-from agentos.swarm import (
-    SwarmPatterns,
-    Topology,
-    CollaborationConfig,
-    CollaborationResult,
+# Plugin Manager (v1.2.9)
+from agentos.plugin_manager import (
+    PluginInfo,
+    PluginManager,
 )
 
-# Code Sandbox (v1.9.5)
-from agentos.swarm.code_sandbox import (
-    CodeSandbox,
-    SandboxResult as CodeSandboxResult,
-    TestCase as CodeTestCase,
-    CodeFeedbackExtractor,
+# Plugins - Plugin System (v1.2.7)
+from agentos.plugins import (
+    DiscoveredPlugin,
+    LifecycleManager,
+    PluginDiscovery,
+    PluginLoader,
+    PluginRegistry,
+    PluginStatus,
+    RegisteredPlugin,
 )
 
-# Human-in-the-Loop (v1.9.5)
-from agentos.swarm.human_loop import (
-    HITLManager,
-    HITLConfig,
-    Breakpoint,
-    BreakpointType,
-    HumanDecision,
+# Prompts (v1.2.7)
+from agentos.prompts import (
+    PromptRegistry,
+    PromptTemplate,
 )
 
-# Core extensions (v1.2.9)
-from agentos.core import (
-    AgentContext,
-    ContextManager,
-    CoreMessage,
-    CoreToolCall,
-    CoreToolResult,
-    AgentStateMachine,
-    AgentState,
-    StateTransition,
-    TransitionError,
-    StateTimeoutError,
-    StreamChunk,
-    StreamEmitter,
-    StreamEvent,
-    ResponseCollector,
-    Session,
-    SessionStore,
-    AsyncAgentLoop,
-    AsyncLoopConfig,
-    AsyncInvocationResult,
-    AsyncContextManager,
+# Protocols - Contracts (v1.2.9)
+from agentos.protocols import (
+    AgentCapability,
+    AgentContract,
+    CapabilityDomain,
+    CapabilityMatcher,
+    ContractRegistry,
+    MatchScore,
+    QoSLevel,
 )
 
-# Logging (v1.2.9)
-from agentos.log import (
-    JSONFormatter,
-    TraceContext,
+# Protocols - A2A
+from agentos.protocols.a2a import (
+    A2AArtifact,
+    A2AClient,
+    A2AHandoff,
+    A2AMessage,
+    A2AServer,
+    A2ASession,
+    A2ATask,
+    DataPart,
+    FilePart,
+    TaskState,
+    TextPart,
+    new_handoff,
+    new_task,
 )
 
-# Health (v1.2.9)
-from agentos.health import (
-    HealthChecker,
-    HealthStatus,
-    HealthCheck,
-    CheckResult,
+# Protocols - Agent Card
+from agentos.protocols.agent_card import (
+    AgentCard,
+    AgentCardDiscovery,
+    AgentCardRegistry,
+    create_card,
+    discover_local,
+)
+
+# MCP Protocol (v1.2.7)
+from agentos.protocols.mcp import (
+    MCPClient,
+    MCPServerConfig,
+    MCPToolSchema,
+)
+
+# Protocols - Structured output validation
+from agentos.protocols.output import (
+    OutputValidator,
+    StructuredOutput,
+    validate_output,
+)
+
+# Queue - Task Queue & Rate Limiter (v1.2.7)
+from agentos.queue import (
+    RateLimitConfig,
+    RateLimiter,
+    RateLimitStrategy,
+    TaskPriority,
+    TaskQueue,
+)
+from agentos.queue import (
+    TaskState as QueueTaskState,
+)
+
+# RAG Pipeline (v1.3.5)
+from agentos.rag import (
+    ChunkConfig,
+    EmbeddingConfig,
+    RAGPipeline,
+    TextChunker,
 )
 
 # Security extensions (v1.9.9)
 from agentos.security import (
+    ContentSafetyFilter,
+    GuardAction,
+    GuardChainResult,
     GuardPipeline,
+    GuardResult,
     InputGuard,
+    LLMSafetyAnalyzer,
     OutputGuard,
     PIIDetector,
-    ContentSafetyFilter,
-    GuardChainResult,
-    GuardResult,
-    GuardAction,
-    Severity,
-    create_strict_guard,
-    create_permissive_guard,
-    SandboxManager,
-    Sandbox,
-    SafetyReport,
     RiskLevel,
-    LLMSafetyAnalyzer,
+    SafetyReport,
+    Sandbox,
+    SandboxManager,
+    Severity,
+    create_permissive_guard,
+    create_strict_guard,
+)
+
+# Security - Auditor (v1.2.7)
+from agentos.security.auditor import (
+    AuditFinding,
+    AuditReport,
+    SecurityAuditor,
+)
+
+# Content Safety Guardrails (v1.20.0)
+from agentos.security.guardrails import (
+    GuardAction,
+    GuardResult,
+)
+
+# Security - Sandbox (v1.2.1)
+from agentos.security.sandbox_executor import (
+    DockerSandbox,
+    ProcessSandbox,
+    SandboxExecutor,
+    SandboxMode,
+    SandboxResult,
+)
+
+# MCP Server (v1.3.0)
+from agentos.server.mcp_server import (
+    MCPPrompt,
+    MCPResource,
+    MCPServer,
+    MCPServerConfig,
+    MCPTool,
 )
 
 # Storage (v1.2.9)
@@ -521,171 +641,84 @@ from agentos.storage import (
     SqliteStore,
 )
 
-# Plugin Manager (v1.2.9)
-from agentos.plugin_manager import (
-    PluginManager,
-    PluginInfo,
-)
-
-# Cost - Token Counter (v1.2.9)
-from agentos.cost import (
-    TokenCounter,
-    TokenCount,
-    CostEstimate,
-    ModelFamily,
-)
-
-# Protocols - Contracts (v1.2.9)
-from agentos.protocols import (
-    AgentContract,
-    AgentCapability,
-    CapabilityDomain,
-    QoSLevel,
-    CapabilityMatcher,
-    ContractRegistry,
-    MatchScore,
-)
-
-# Memory - Compressor (v1.2.9)
-from agentos.memory import (
-    ContextCompressor,
-)
-
-# Tools extensions (v1.2.9)
-from agentos.tools import (
-    BaseTool,
-    PermissionLevel,
-    BaseToolCall,
-    BaseToolResult,
-    ToolRegistry,
-    ToolSchema,
-    FCToolCall,
-    FCToolResult,
-    FCToolRegistry,
-    OpenAPIToolGenerator,
-    GeneratedTool,
-)
-
 # SubAgent Manager (v1.2.9) + Parent-Child Communication (v1.3.15)
 from agentos.subagent import (
-    SubAgentManager,
-    SubAgentMode,
-    SubAgentSpec,
-    SubAgentResult,
-    ChildStatus,
-    ChildHeartbeat,
-    ChildInfo,
-    SharedState,
     ChildContext,
     ChildHandle,
+    ChildHeartbeat,
+    ChildInfo,
+    ChildStatus,
+    SharedState,
+    SubAgentManager,
+    SubAgentMode,
+    SubAgentResult,
+    SubAgentSpec,
 )
 
-# Agent Marketplace (v1.3.0)
-from agentos.agents.market import (
-    AgentMarket,
-    AgentSkill,
-    AgentCategory,
+# Swarm Patterns (v1.2.8)
+from agentos.swarm import (
+    CollaborationConfig,
+    CollaborationResult,
+    SwarmPatterns,
+    Topology,
 )
 
-# Tool-Using Agent (v1.3.38)
-from agentos.agent import (
-    ToolAgent,
-    ToolExecutor,
-    AgentConfig,
-    AgentStep,
-    AgentResult,
-    MockLLMProvider,
+# Code Sandbox (v1.9.5)
+from agentos.swarm.code_sandbox import (
+    CodeFeedbackExtractor,
+    CodeSandbox,
+)
+from agentos.swarm.code_sandbox import (
+    SandboxResult as CodeSandboxResult,
+)
+from agentos.swarm.code_sandbox import (
+    TestCase as CodeTestCase,
 )
 
-# API Middleware (v1.3.0)
-from agentos.api.middleware import (
-    CORSConfig,
-    CORSMiddleware,
-    AuthConfig,
-    RequestContext,
-    RequestIDMiddleware,
+# Swarm coordinator
+# Swarm Coordinator extensions (v1.3.2)
+from agentos.swarm.coordinator import (
+    AgentRole,
+    ExecutionMode,
+    MessageBus,
+    SmartSwarmCoordinator,
+    SwarmCoordinator,
+    SwarmMessage,
+    SwarmResult,
+    SwarmTopology,
 )
 
-# API Streaming (v1.3.0)
-from agentos.api.streaming import (
-    StreamEvent,
-    StreamSession,
-    StreamingAgent,
-)
-
-# API Versioning (v1.3.0)
-from agentos.api.versioning import (
-    APIVersion,
-    SemVer,
-    VersionStrategy,
-    VersionConfig,
-    VersionNegotiator,
-    DeprecationPolicy,
-    VersionedRouter,
-    APIVersioningMiddleware,
-    VersionExtractor,
-)
-
-# Content Safety Guardrails (v1.20.0)
-from agentos.security.guardrails import (
-    GuardrailsPipeline,
-    RegexGuard,
-    RegexRule,
-    GuardAction,
-    GuardResult,
-    GuardViolation,
-    GuardViolationError,
-    Category,
-    ViolationSeverity,
-    create_default_pipeline,
-)
-
-# Feature Flags (v1.20.0)
-from agentos.core.feature_flags import (
-    FeatureFlagManager,
-    FlagRule,
-    FlagType,
-    FlagContext,
-    FlagEvaluation,
-    InMemoryFlagStore,
-    create_flag_manager,
-)
-
-# Cost Tracking (v1.20.0)
-from agentos.core.cost_tracker import (
-    CostTracker,
-    PricingRegistry,
-    ModelPricing,
-    BudgetLimit,
-    BudgetAction,
-    BudgetExceededError,
-    UsageRecord,
-)
-
-# Benchmark Runner (v1.3.0)
-from agentos.benchmarks.runner import (
-    BenchmarkRunner,
-    BenchmarkScenario,
-    BenchmarkConfig,
-    BenchmarkReport,
+# Human-in-the-Loop (v1.9.5)
+from agentos.swarm.human_loop import (
+    Breakpoint,
+    BreakpointType,
+    HITLConfig,
+    HITLManager,
+    HumanDecision,
 )
 
 # Testing Fixtures (v1.3.0)
 from agentos.testing.fixtures import (
     MockLLMClient,
     MockLLMResponse,
-    mock_openai_client,
     mock_model_response,
+    mock_openai_client,
     sample_config,
 )
 
-# MCP Server (v1.3.0)
-from agentos.server.mcp_server import (
-    MCPServer,
-    MCPServerConfig,
-    MCPTool,
-    MCPResource,
-    MCPPrompt,
+# Tools extensions (v1.2.9)
+from agentos.tools import (
+    BaseTool,
+    BaseToolCall,
+    BaseToolResult,
+    FCToolCall,
+    FCToolRegistry,
+    FCToolResult,
+    GeneratedTool,
+    OpenAPIToolGenerator,
+    PermissionLevel,
+    ToolRegistry,
+    ToolSchema,
 )
 
 # Concrete Tools (v1.3.0)
@@ -694,135 +727,47 @@ from agentos.tools.code_agent import (
     ShellTool,
 )
 from agentos.tools.file_tools import (
+    ListDirectoryTool,
     ReadFileTool,
     WriteFileTool,
-    ListDirectoryTool,
+)
+
+# Fusion toolkit
+from agentos.tools.fusion import (
+    FusionResult,
+    FusionToolkit,
+    ToolSpec,
+)
+
+# Tools - Orchestrator (v1.2.7)
+from agentos.tools.orchestrator import (
+    DAGBuilder,
+    DAGSpec,
+    ToolOrchestrator,
+)
+
+# Tool risk rating (v1.1.4)
+from agentos.tools.risk import (
+    ToolRiskLevel,
+    ToolRiskRating,
+    get_risk_preset,
+    infer_risk_level,
 )
 from agentos.tools.web_tools import (
     WebFetchTool,
 )
 
-# CLI Serve (v1.3.0)
-from agentos.cli.serve import (
-    ServeConfig,
-    start_api_server,
+# Vector Store (v1.2.7)
+from agentos.vectorstore import (
+    BaseVectorStore,
+    ChromaVectorStore,
+    FAISSVectorStore,
 )
 
-# Model Route Types (v1.3.1)
-from agentos.models.router import (
-    ModelResponse,
-    ModelSpec,
-    AllModelsFailed,
-)
-
-# Gemini Backend (v1.3.1)
-from agentos.models.backends.gemini import (
-    GeminiClient,
-    GeminiConfig,
-    GeminiSafetySetting,
-)
-
-# Agent Loop (v1.3.2)
-from agentos.core.loop import (
-    AgentLoop,
-    LoopConfig,
-    LoopState,
-    AgentResult,
-    MaxIterationsExceeded,
-    HumanInterruptNeeded,
-)
-
-# API Server (v1.3.2)
-from agentos.api.server import (
-    AgentAPI,
-    RunRequest,
-    RunResponse,
-)
-
-# CLI Main (v1.0.0)
-from agentos.cli.main import main as cli_main
-
-# CLI Init (v1.4.1)
-from agentos.cli.init import (
-    init_cli,
-    scaffold,
-    load_config,
-    config_status_text,
-)
-
-# Docs Generator (v1.3.2)
-from agentos.docs.generator import (
-    DocConfig,
-    generate_api_docs,
-    generate_quickstart,
-)
-
-# Swarm Coordinator extensions (v1.3.2)
-from agentos.swarm.coordinator import (
-    AgentRole,
-    MessageBus,
-)
-
-# Model Config (v1.3.2)
-from agentos.models.router import (
-    ModelConfig,
-    RECOMMENDED_CONFIG,
-)
-
-# OpenAI Backend (v1.3.5)
-from agentos.models.backends.openai import (
-    OpenAIClient,
-    OpenAIConfig,
-)
-
-# Anthropic Claude Backend (v1.3.5)
-from agentos.models.backends.anthropic import (
-    ClaudeClient,
-    ClaudeConfig,
-)
-
-# Ollama Backend (v1.3.5)
-from agentos.models.backends.ollama import (
-    OllamaClient,
-    OllamaConfig,
-)
-
-# RAG Pipeline (v1.3.5)
-from agentos.rag import (
-    RAGPipeline,
-    TextChunker,
-    ChunkConfig,
-    EmbeddingConfig,
-)
-
-# MCP Package (v1.3.6)
-from agentos.mcp import (
-    MCPClient as MCPFullClient,
-    MCPServerConfig as MCPConfig,
-    MCPToolInfo,
-    MCPResourceInfo,
-    MCPPromptInfo,
-    MCPError,
-    connect_mcp_servers,
-    # MCP Server (v1.5.2)
-    MCPServer,
-    MCPToolDef,
-    MCPResource,
-    MCPPromptDef,
-    create_default_server,
-    start_mcp_server,
-)
-from agentos.mcp.adapter import (
-    MCPToolAdapter,
-    MCPToolRegistry,
-)
-# Built-in MCP Servers (v1.7.8)
-from agentos.mcp.builtin_servers import (
-    FilesystemServer,
-    WebFetchServer,
-    MemoryServer,
-    BuiltinMCPRegistry,
-    create_default_registry,
+# Workflows (v1.2.7)
+from agentos.workflows import (
+    WorkflowEngine,
+    WorkflowTemplate,
 )
 
 __all__ = [
@@ -1348,192 +1293,298 @@ __all__ = [
     "LLMToolParameter",
     "create_llm_provider",
     # Enterprise (v1.5.5)
-    "APIKeyManager", "APIKey", "KeyScope", "KeyCreateRequest", "KeyCreateResult",
-    "TenantManager", "Tenant", "TenantConfig", "TenantUsage", "TenantTier", "TenantStatus", "TIER_QUOTAS",
-    "User", "Role", "Permission", "ROLE_PERMISSIONS", "RBACEngine",
-    "EnterpriseSession", "EnterpriseSessionStore",
-    "JWTManager", "SSOProvider", "OIDCConfig", "SAMLConfig", "SSOUser",
-    "AuditLogger", "AuditEvent", "AuditCategory", "AuditSeverity", "RetentionPolicy",
+    "APIKeyManager",
+    "APIKey",
+    "KeyScope",
+    "KeyCreateRequest",
+    "KeyCreateResult",
+    "TenantManager",
+    "Tenant",
+    "TenantConfig",
+    "TenantUsage",
+    "TenantTier",
+    "TenantStatus",
+    "TIER_QUOTAS",
+    "User",
+    "Role",
+    "Permission",
+    "ROLE_PERMISSIONS",
+    "RBACEngine",
+    "EnterpriseSession",
+    "EnterpriseSessionStore",
+    "JWTManager",
+    "SSOProvider",
+    "OIDCConfig",
+    "SAMLConfig",
+    "SSOUser",
+    "AuditLogger",
+    "AuditEvent",
+    "AuditCategory",
+    "AuditSeverity",
+    "RetentionPolicy",
     # System Layer (v1.6.0) — P0: OS-level operations
-    "SystemPermissionManager", "SystemPermission", "PermissionTier", "PermissionDenied",
-    "SAFE_PERMISSIONS", "DEV_PERMISSIONS", "FULL_PERMISSIONS",
-    "FileOperator", "FileOpResult", "FileListing",
-    "ShellExecutor", "ShellResult", "ShellSandbox", "ShellPolicy",
-    "READONLY_POLICY", "STANDARD_POLICY", "FULL_POLICY",
-    "CDPBrowser", "BrowserSession", "BrowserAction", "BrowserResult",
+    "SystemPermissionManager",
+    "SystemPermission",
+    "PermissionTier",
+    "PermissionDenied",
+    "SAFE_PERMISSIONS",
+    "DEV_PERMISSIONS",
+    "FULL_PERMISSIONS",
+    "FileOperator",
+    "FileOpResult",
+    "FileListing",
+    "ShellExecutor",
+    "ShellResult",
+    "ShellSandbox",
+    "ShellPolicy",
+    "READONLY_POLICY",
+    "STANDARD_POLICY",
+    "FULL_POLICY",
+    "CDPBrowser",
+    "BrowserSession",
+    "BrowserAction",
+    "BrowserResult",
     # Desktop Client (v1.7.0) — P1: One-click desktop
-    "DesktopServer", "DesktopConfig", "launch_desktop",
+    "DesktopServer",
+    "DesktopConfig",
+    "launch_desktop",
     # v1.10.0: Evaluation (SWE-bench + GAIA)
-    "EvalMetric", "EvalSuite", "EvalCase", "EvalSample", "EvalResult", "EvalReport",
-    "Scorer", "ExactMatchScorer", "F1Scorer", "ROUGELScorer", "get_scorer",
-    "SWEBenchLoader", "GAIALoader",
-    "EvalRunner", "EvalRegistry", "evaluate_quick",
+    "EvalMetric",
+    "EvalSuite",
+    "EvalCase",
+    "EvalSample",
+    "EvalResult",
+    "EvalReport",
+    "Scorer",
+    "ExactMatchScorer",
+    "F1Scorer",
+    "ROUGELScorer",
+    "get_scorer",
+    "SWEBenchLoader",
+    "GAIALoader",
+    "EvalRunner",
+    "EvalRegistry",
+    "evaluate_quick",
     # v1.10.0: Prompt Hub
-    "PromptType", "PromptTag", "PromptVersion", "PromptHub",
-    "BUILTIN_PROMPTS", "create_default_hub",
+    "PromptType",
+    "PromptTag",
+    "PromptVersion",
+    "PromptHub",
+    "BUILTIN_PROMPTS",
+    "create_default_hub",
     # v1.11.0: Background Task Manager
-    "BackgroundTaskManager", "BackgroundTask", "BackgroundTaskStatus", "BackgroundTaskConfig",
-    "TaskProgress", "ProgressPhase",
+    "BackgroundTaskManager",
+    "BackgroundTask",
+    "BackgroundTaskStatus",
+    "BackgroundTaskConfig",
+    "TaskProgress",
+    "ProgressPhase",
     # v1.11.0: Agent Supervision Tree
-    "AgentSupervisor", "SupervisedAgent", "SupervisorConfig",
-    "AgentQuota", "SupervisionEvent", "SupervisionEventType",
+    "AgentSupervisor",
+    "SupervisedAgent",
+    "SupervisorConfig",
+    "AgentQuota",
+    "SupervisionEvent",
+    "SupervisionEventType",
     # v1.12.0: Virtual Memory Pager
-    "MemoryPager", "SwapStore", "MemoryPage", "PagerStats",
-    "create_paging_callback", "recall_relevant_memories",
+    "MemoryPager",
+    "SwapStore",
+    "MemoryPage",
+    "PagerStats",
+    "create_paging_callback",
+    "recall_relevant_memories",
     # v1.12.1: Async Parallel Primitives
-    "ParallelExecutor", "FanOutExecutor", "FanOutConfig",
-    "TaskThrottler", "ParallelTaskResult", "ParallelTaskStatus", "ParallelGatherResult",
-    "parallel_gather", "parallel_map", "create_parallel_agent_gather",
+    "ParallelExecutor",
+    "FanOutExecutor",
+    "FanOutConfig",
+    "TaskThrottler",
+    "ParallelTaskResult",
+    "ParallelTaskStatus",
+    "ParallelGatherResult",
+    "parallel_gather",
+    "parallel_map",
+    "create_parallel_agent_gather",
 ]
 
 # Enterprise (v1.5.5)
-from agentos.enterprise import (
-    APIKeyManager, APIKey, KeyScope, KeyCreateRequest, KeyCreateResult,
-    TenantManager, Tenant, TenantConfig, TenantUsage, TenantTier, TenantStatus, TIER_QUOTAS,
-    User, Role, Permission, ROLE_PERMISSIONS, RBACEngine,
-    Session as EnterpriseSession, SessionStore as EnterpriseSessionStore,
-    JWTManager, SSOProvider, OIDCConfig, SAMLConfig, SSOUser,
-    AuditLogger, AuditEvent, AuditCategory, AuditSeverity, RetentionPolicy,
-)
-
-# System Layer (v1.6.0) — P0: OS-level operations with tiered permissions
-from agentos.system.permissions import (
-    SystemPermissionManager, SystemPermission, PermissionTier, PermissionDenied,
-    SAFE_PERMISSIONS, DEV_PERMISSIONS, FULL_PERMISSIONS,
-)
-from agentos.system.file_ops import (
-    FileOperator, FileOpResult, FileListing,
-)
-from agentos.system.shell_exec import (
-    ShellExecutor, ShellResult, ShellSandbox, ShellPolicy,
-    READONLY_POLICY, STANDARD_POLICY, FULL_POLICY,
-)
-from agentos.system.browser import (
-    CDPBrowser, BrowserSession, BrowserAction, BrowserResult,
-)
-
-# Desktop Client (v1.7.0) — P1: One-click web desktop (AutoClaw-inspired)
-from agentos.desktop.server import (
-    DesktopServer, DesktopConfig,
-)
-from agentos.desktop.server import launch_desktop
-
-# ── v1.10.0: Evaluation Framework (SWE-bench + GAIA) ──
-from agentos.eval.benchmark import (
-    EvalMetric, EvalSuite, EvalCase, EvalSample, EvalResult, EvalReport,
-    Scorer, ExactMatchScorer, F1Scorer, ROUGELScorer, get_scorer,
-    SWEBenchLoader, GAIALoader,
-    EvalRunner, EvalRegistry, evaluate_quick,
-)
-
-# ── v1.10.0: Prompt Hub (versioned templates) ──
-from agentos.prompt.hub import (
-    PromptType, PromptTag, PromptVersion, PromptHub,
-    BUILTIN_PROMPTS, create_default_hub,
-)
-
-# ── v1.12.0: Virtual Memory Pager ──
-from agentos.memory.pager import (
-    MemoryPager, SwapStore, MemoryPage, PagerStats,
-    create_paging_callback, recall_relevant_memories,
-)
-
-# ── v1.11.0: Background Task Manager ──
-from agentos.background.task_manager import (
-    BackgroundTaskManager, BackgroundTask, BackgroundTaskStatus, BackgroundTaskConfig,
-    TaskProgress, ProgressPhase,
+# SSE Streaming (v1.3.12)
+from agentos.api.sse import (
+    SSEEvent,
+    SSEEventType,
+    SSEResponse,
+    SSEStream,
 )
 
 # ── v1.11.0: Agent Supervision Tree ──
 from agentos.background.supervisor import (
-    AgentSupervisor, SupervisedAgent, SupervisorConfig,
-    AgentQuota, SupervisionEvent, SupervisionEventType,
+    AgentQuota,
+    AgentSupervisor,
+    SupervisedAgent,
+    SupervisionEvent,
+    SupervisionEventType,
+    SupervisorConfig,
 )
 
-# Schema Enforcer (v1.3.9)
-from agentos.validation.schema_enforcer import (
-    SchemaEnforcer,
-    EnforcerConfig,
-    EnforcerResult,
-    EnforcerStats,
-    FixStrategy,
+# ── v1.11.0: Background Task Manager ──
+from agentos.background.task_manager import (
+    BackgroundTask,
+    BackgroundTaskConfig,
+    BackgroundTaskManager,
+    BackgroundTaskStatus,
+    ProgressPhase,
+    TaskProgress,
 )
 
 # Conversation Manager (v1.3.10)
 from agentos.conversation.conversation import (
-    ConversationManager,
     ConversationConfig,
-    ConversationStats,
+    ConversationManager,
     ConversationSnapshot,
+    ConversationStats,
     Message,
     MessageRole,
     TrimStrategy,
 )
 
-# Guardrails (v1.3.11)
-from agentos.guardrails.engine import (
-    GuardrailEngine,
-    GuardrailResult,
-    GuardrailAction,
-    GuardrailRule,
-    GuardrailCategory,
-    InputGuardrail,
-    OutputGuardrail,
+# Desktop Client (v1.7.0) — P1: One-click web desktop (AutoClaw-inspired)
+from agentos.desktop.server import (
+    DesktopConfig,
+    DesktopServer,
+    launch_desktop,
 )
-from agentos.guardrails.rules import (
-    PIIRule,
-    KeywordBlockRule,
-    LengthLimitRule,
-    RegexRule,
-    ToxicityRule,
-    CodeInjectionRule,
-    build_default_rules,
+from agentos.enterprise import (
+    ROLE_PERMISSIONS,
+    TIER_QUOTAS,
+    APIKey,
+    APIKeyManager,
+    AuditCategory,
+    AuditEvent,
+    AuditLogger,
+    AuditSeverity,
+    JWTManager,
+    KeyCreateRequest,
+    KeyCreateResult,
+    KeyScope,
+    OIDCConfig,
+    Permission,
+    RBACEngine,
+    RetentionPolicy,
+    Role,
+    SAMLConfig,
+    SSOProvider,
+    SSOUser,
+    Tenant,
+    TenantConfig,
+    TenantManager,
+    TenantStatus,
+    TenantTier,
+    TenantUsage,
+    User,
 )
-from agentos.guardrails.policy import (
-    GuardrailPolicy,
-    PolicyEnforcer,
-    PolicyViolation,
+from agentos.enterprise import (
+    Session as EnterpriseSession,
+)
+from agentos.enterprise import (
+    SessionStore as EnterpriseSessionStore,
 )
 
+# ── v1.10.0: Evaluation Framework (SWE-bench + GAIA) ──
+from agentos.eval.benchmark import (
+    EvalCase,
+    EvalMetric,
+    EvalRegistry,
+    EvalReport,
+    EvalResult,
+    EvalRunner,
+    EvalSample,
+    EvalSuite,
+    ExactMatchScorer,
+    F1Scorer,
+    GAIALoader,
+    ROUGELScorer,
+    Scorer,
+    SWEBenchLoader,
+    evaluate_quick,
+    get_scorer,
+)
+
+# Guardrails (v1.3.11)
 # HITL (v1.3.11)
 from agentos.hitl.approver import (
-    HumanInTheLoop,
-    ApprovalRequest,
-    ApprovalDecision,
-    ApprovalStatus,
     RiskLevel,
-    ApprovalPolicy,
-    ApprovalCallback,
-)
-from agentos.hitl.presets import (
-    default_approval_policy,
-    permissive_approval_policy,
-    strict_approval_policy,
 )
 
-# Prompt Optimizer (v1.3.12)
-from agentos.prompts.optimizer import (
-    PromptOptimizer,
-    OptimizerConfig,
-    OptimizationStrategy,
-    OptimizationResult,
-    PromptCandidate,
+# LLM Provider Module (v1.3.36)
+from agentos.llm import (
+    AnthropicProvider,
+    CompletionChoice,
+    CompletionResult,
+    CompletionUsage,
+    DeepSeekProvider,
+    LLMProvider,
+    OpenAIProvider,
+    TokenUsage,
+)
+from agentos.llm import (
+    Message as LLMMessage,
+)
+from agentos.llm import (
+    MessageRole as LLMMessageRole,
+)
+from agentos.llm import (
+    StreamChunk as LLMStreamChunk,
+)
+from agentos.llm import (
+    Tool as LLMTool,
+)
+from agentos.llm import (
+    ToolCall as LLMToolCall,
+)
+from agentos.llm import (
+    ToolFunction as LLMToolFunction,
+)
+from agentos.llm import (
+    ToolParameter as LLMToolParameter,
+)
+from agentos.llm import (
+    create_provider as create_llm_provider,
+)
+
+# ── v1.12.0: Virtual Memory Pager ──
+from agentos.memory.pager import (
+    MemoryPage,
+    MemoryPager,
+    PagerStats,
+    SwapStore,
+    create_paging_callback,
+    recall_relevant_memories,
+)
+
+# ── v1.10.0: Prompt Hub (versioned templates) ──
+from agentos.prompt.hub import (
+    BUILTIN_PROMPTS,
+    PromptHub,
+    PromptTag,
+    PromptType,
+    PromptVersion,
+    create_default_hub,
 )
 
 # Few-Shot Selector (v1.3.12)
 from agentos.prompts.few_shot import (
-    FewShotSelector,
     Example,
+    FewShotSelector,
     SelectionStrategy,
     build_examples,
 )
 
-# SSE Streaming (v1.3.12)
-from agentos.api.sse import (
-    SSEEvent,
-    SSEEventType,
-    SSEStream,
-    SSEResponse,
+# Prompt Optimizer (v1.3.12)
+from agentos.prompts.optimizer import (
+    OptimizationResult,
+    OptimizationStrategy,
+    OptimizerConfig,
+    PromptCandidate,
+    PromptOptimizer,
 )
 
 # A2A Store (v1.3.13)
@@ -1546,27 +1597,47 @@ from agentos.protocols.a2a_store import (
 # A2A Streaming (v1.3.13)
 from agentos.protocols.a2a_streaming import (
     A2AStreamEvent,
-    TaskProgress,
-    A2AStreamSession,
     A2AStreamManager,
+    A2AStreamSession,
+    TaskProgress,
+)
+from agentos.system.browser import (
+    BrowserAction,
+    BrowserResult,
+    BrowserSession,
+    CDPBrowser,
+)
+from agentos.system.file_ops import (
+    FileListing,
+    FileOperator,
+    FileOpResult,
 )
 
-# LLM Provider Module (v1.3.36)
-from agentos.llm import (
-    LLMProvider,
-    OpenAIProvider,
-    DeepSeekProvider,
-    AnthropicProvider,
-    CompletionResult,
-    CompletionChoice,
-    CompletionUsage,
-    TokenUsage,
-    Message as LLMMessage,
-    MessageRole as LLMMessageRole,
-    StreamChunk as LLMStreamChunk,
-    Tool as LLMTool,
-    ToolCall as LLMToolCall,
-    ToolFunction as LLMToolFunction,
-    ToolParameter as LLMToolParameter,
-    create_provider as create_llm_provider,
+# System Layer (v1.6.0) — P0: OS-level operations with tiered permissions
+from agentos.system.permissions import (
+    DEV_PERMISSIONS,
+    FULL_PERMISSIONS,
+    SAFE_PERMISSIONS,
+    PermissionDenied,
+    PermissionTier,
+    SystemPermission,
+    SystemPermissionManager,
+)
+from agentos.system.shell_exec import (
+    FULL_POLICY,
+    READONLY_POLICY,
+    STANDARD_POLICY,
+    ShellExecutor,
+    ShellPolicy,
+    ShellResult,
+    ShellSandbox,
+)
+
+# Schema Enforcer (v1.3.9)
+from agentos.validation.schema_enforcer import (
+    EnforcerConfig,
+    EnforcerResult,
+    EnforcerStats,
+    FixStrategy,
+    SchemaEnforcer,
 )

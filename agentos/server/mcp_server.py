@@ -7,9 +7,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
-
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +16,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MCPServerConfig:
     """MCP 服务端配置。"""
+
     name: str = "AgentOS-MCP-Server"
     version: str = "0.40.0"
     transport: str = "stdio"  # stdio | sse | streamable-http
@@ -27,6 +27,7 @@ class MCPServerConfig:
 @dataclass
 class MCPTool:
     """MCP工具定义。"""
+
     name: str
     description: str
     input_schema: dict
@@ -37,6 +38,7 @@ class MCPTool:
 @dataclass
 class MCPResource:
     """MCP资源定义。"""
+
     uri: str
     name: str
     description: str = ""
@@ -47,6 +49,7 @@ class MCPResource:
 @dataclass
 class MCPPrompt:
     """MCP提示模板。"""
+
     name: str
     description: str = ""
     arguments: list[dict] = field(default_factory=list)
@@ -120,12 +123,16 @@ class MCPServer:
     def _error(self, req_id, code: int, message: str) -> dict:
         if req_id is None:
             return {}
-        return {"jsonrpc": self.JSONRPC_VERSION, "id": req_id, "error": {"code": code, "message": message}}
+        return {
+            "jsonrpc": self.JSONRPC_VERSION,
+            "id": req_id,
+            "error": {"code": code, "message": message},
+        }
 
     # ── 方法实现 ──────────────────────────────────
 
     def _handle_initialize(self, params: dict) -> dict:
-        client_info = params.get("clientInfo", {})
+        params.get("clientInfo", {})
         self._session_id = params.get("sessionId")
         return {
             "protocolVersion": "2024-11-05",
@@ -140,12 +147,14 @@ class MCPServer:
     def _handle_tools_list(self) -> dict:
         tools = []
         for t in self._tools.values():
-            tools.append({
-                "name": t.name,
-                "description": t.description,
-                "inputSchema": t.input_schema,
-                "annotations": t.annotations,
-            })
+            tools.append(
+                {
+                    "name": t.name,
+                    "description": t.description,
+                    "inputSchema": t.input_schema,
+                    "annotations": t.annotations,
+                }
+            )
         return {"tools": tools}
 
     def _handle_tool_call(self, params: dict) -> dict:
@@ -172,7 +181,14 @@ class MCPServer:
     def _handle_resources_list(self) -> dict:
         resources = []
         for r in self._resources.values():
-            resources.append({"uri": r.uri, "name": r.name, "description": r.description, "mimeType": r.mime_type})
+            resources.append(
+                {
+                    "uri": r.uri,
+                    "name": r.name,
+                    "description": r.description,
+                    "mimeType": r.mime_type,
+                }
+            )
         return {"resources": resources}
 
     def _handle_resource_read(self, params: dict) -> dict:
@@ -194,7 +210,10 @@ class MCPServer:
         prompt = self._prompts.get(name)
         if not prompt:
             raise ValueError(f"Prompt not found: {name}")
-        return {"description": prompt.description, "messages": [{"role": "user", "content": {"type": "text", "text": prompt.template}}]}
+        return {
+            "description": prompt.description,
+            "messages": [{"role": "user", "content": {"type": "text", "text": prompt.template}}],
+        }
 
     def list_tools(self) -> list[dict]:
         """Compliance-facing tool listing method."""
@@ -206,7 +225,12 @@ class MCPServer:
     # ── 统计 ──────────────────────────────────────
 
     def stats(self) -> dict:
-        return {"tools": len(self._tools), "resources": len(self._resources), "prompts": len(self._prompts), "transport": self.config.transport}
+        return {
+            "tools": len(self._tools),
+            "resources": len(self._resources),
+            "prompts": len(self._prompts),
+            "transport": self.config.transport,
+        }
 
 
 class MCPClient:

@@ -16,13 +16,14 @@ import hashlib
 import json
 import threading
 import time
+from collections.abc import Callable
 from enum import Enum
-from typing import Any, Callable, Dict, Optional
-
+from typing import Any
 
 # ============================================================================
 # Result
 # ============================================================================
+
 
 class ResultStatus(Enum):
     COMPLETED = "completed"
@@ -41,6 +42,7 @@ class DedupResult:
 # ============================================================================
 # RequestDeduplicator
 # ============================================================================
+
 
 class RequestDeduplicator:
     """Fingerprint-based request deduplication with result caching.
@@ -77,9 +79,9 @@ class RequestDeduplicator:
         self._ttl = ttl
         self._max_entries = max_entries
         self._key_prefix = key_prefix
-        self._cache: Dict[str, DedupResult] = {}
-        self._in_flight: Dict[str, threading.Event] = {}
-        self._in_flight_results: Dict[str, DedupResult] = {}
+        self._cache: dict[str, DedupResult] = {}
+        self._in_flight: dict[str, threading.Event] = {}
+        self._in_flight_results: dict[str, DedupResult] = {}
         self._lock = threading.RLock()
         self._last_cleanup = time.time()
 
@@ -90,14 +92,14 @@ class RequestDeduplicator:
 
         Args are hashed positionally; kwargs are sorted by key.
         """
-        payload: Dict[str, Any] = {"args": args, "kwargs": dict(sorted(kwargs.items()))}
+        payload: dict[str, Any] = {"args": args, "kwargs": dict(sorted(kwargs.items()))}
         raw = json.dumps(payload, sort_keys=True, default=str)
         digest = hashlib.sha256(raw.encode()).hexdigest()[:16]
         return f"{self._key_prefix}{digest}"
 
     # ---------- lookup ----------
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Return cached result if available and not expired. None if not found."""
         self._maybe_cleanup()
         with self._lock:
@@ -110,7 +112,7 @@ class RequestDeduplicator:
                 return None
             return entry
 
-    def get_or_none(self, key: str) -> Optional[Any]:
+    def get_or_none(self, key: str) -> Any | None:
         """Same as get() but returns the raw value or None."""
         entry = self.get(key)
         if entry:
@@ -129,7 +131,7 @@ class RequestDeduplicator:
             self._in_flight[key] = threading.Event()
             return True
 
-    def wait_in_flight(self, key: str, timeout: Optional[float] = None) -> Optional[Any]:
+    def wait_in_flight(self, key: str, timeout: float | None = None) -> Any | None:
         """Wait for an in-flight request to complete, then return its result."""
         event = None
         with self._lock:
@@ -172,7 +174,7 @@ class RequestDeduplicator:
     def deduplicate(
         self,
         key_fn: Callable[..., str],
-        wait_timeout: Optional[float] = 30.0,
+        wait_timeout: float | None = 30.0,
         cache_errors: bool = False,
     ):
         """Decorator: deduplicate concurrent calls with same fingerprint.
@@ -194,7 +196,11 @@ class RequestDeduplicator:
                         if not cache_errors:
                             pass  # fall through to re-execute
                         else:
-                            raise cached.value if isinstance(cached.value, Exception) else Exception(str(cached.value))
+                            raise (
+                                cached.value
+                                if isinstance(cached.value, Exception)
+                                else Exception(str(cached.value))
+                            )
                     else:
                         return cached.value
 
@@ -231,10 +237,7 @@ class RequestDeduplicator:
             return
         self._last_cleanup = now
         with self._lock:
-            expired = [
-                k for k, v in self._cache.items()
-                if now - v.timestamp > self._ttl
-            ]
+            expired = [k for k, v in self._cache.items() if now - v.timestamp > self._ttl]
             for k in expired:
                 del self._cache[k]
 

@@ -19,20 +19,19 @@ Usage:
 
 from __future__ import annotations
 
+import logging
 import os
 import socket
-import logging
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
 
-class Severity(str, Enum):
-    CRITICAL = "critical"   # Server MUST NOT start
-    ERROR = "error"         # Feature degraded
-    WARNING = "warning"     # Non-blocking concern
+class Severity(StrEnum):
+    CRITICAL = "critical"  # Server MUST NOT start
+    ERROR = "error"  # Feature degraded
+    WARNING = "warning"  # Non-blocking concern
     OK = "ok"
 
 
@@ -76,6 +75,7 @@ class ValidationReport:
 
 # ── Checks ──────────────────────────────────────────────────────────────────
 
+
 def _check_env_vars(report: ValidationReport):
     required = ["AGENTOS_SECRET_KEY"]
     optional = {
@@ -85,13 +85,21 @@ def _check_env_vars(report: ValidationReport):
     }
     for var in required:
         if not os.environ.get(var):
-            report.add("env", f"{var} not set", Severity.WARNING,
-                       f"Set {var} for production; using default for dev")
+            report.add(
+                "env",
+                f"{var} not set",
+                Severity.WARNING,
+                f"Set {var} for production; using default for dev",
+            )
 
     for var, hint in optional.items():
         if not os.environ.get(var):
-            report.add("env", f"{var} not set — {hint}", Severity.WARNING,
-                       f"Set {var} for full production readiness")
+            report.add(
+                "env",
+                f"{var} not set — {hint}",
+                Severity.WARNING,
+                f"Set {var} for full production readiness",
+            )
 
 
 def _check_disk(report: ValidationReport, paths: list[str]):
@@ -104,8 +112,12 @@ def _check_disk(report: ValidationReport, paths: list[str]):
             os.remove(test_file)
             report.add("disk", f"{path} writable", Severity.OK)
         except PermissionError:
-            report.add("disk", f"Cannot write to {path}", Severity.CRITICAL,
-                       "Fix permissions or change AGENTOS_LOG_DIR / AGENTOS_DATA_DIR")
+            report.add(
+                "disk",
+                f"Cannot write to {path}",
+                Severity.CRITICAL,
+                "Fix permissions or change AGENTOS_LOG_DIR / AGENTOS_DATA_DIR",
+            )
         except OSError as e:
             report.add("disk", f"{path}: {e}", Severity.ERROR)
 
@@ -113,6 +125,7 @@ def _check_disk(report: ValidationReport, paths: list[str]):
 def _check_connectivity(report: ValidationReport, name: str, url: str, timeout: float = 3.0):
     """Quick TCP connectivity check."""
     from urllib.parse import urlparse
+
     parsed = urlparse(url)
     host = parsed.hostname or "localhost"
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
@@ -121,16 +134,21 @@ def _check_connectivity(report: ValidationReport, name: str, url: str, timeout: 
         sock = socket.create_connection((host, port), timeout=timeout)
         sock.close()
         report.add("connectivity", f"{name} reachable ({host}:{port})", Severity.OK)
-    except (socket.timeout, ConnectionRefusedError, OSError) as e:
-        report.add("connectivity", f"{name} unreachable ({host}:{port}): {e}",
-                   Severity.WARNING, f"Verify {name} is running or disable related features")
+    except (TimeoutError, ConnectionRefusedError, OSError) as e:
+        report.add(
+            "connectivity",
+            f"{name} unreachable ({host}:{port}): {e}",
+            Severity.WARNING,
+            f"Verify {name} is running or disable related features",
+        )
 
 
 # ── Public API ──────────────────────────────────────────────────────────────
 
+
 def validate_startup(
-    data_dir: Optional[str] = None,
-    log_dir: Optional[str] = None,
+    data_dir: str | None = None,
+    log_dir: str | None = None,
 ) -> ValidationReport:
     """Run all startup checks and return a report.
 

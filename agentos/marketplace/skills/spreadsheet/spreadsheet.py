@@ -10,8 +10,16 @@ import os
 from typing import Any
 
 
-def run(action: str = "read", file_path: str = "", column: str = "", condition: str = "",
-        sort_by: str = "", aggregate: str = "", delimiter: str = ",", **kwargs: Any) -> str:
+def run(
+    action: str = "read",
+    file_path: str = "",
+    column: str = "",
+    condition: str = "",
+    sort_by: str = "",
+    aggregate: str = "",
+    delimiter: str = ",",
+    **kwargs: Any,
+) -> str:
     if not file_path or not os.path.exists(file_path):
         return f"[spreadsheet] File not found: {file_path}"
 
@@ -66,7 +74,9 @@ def run(action: str = "read", file_path: str = "", column: str = "", condition: 
             return f"Count of {column}: {len(values)}"
         return f"Sum: {sum(values)}, Avg: {sum(values)/len(values):.2f}, Min: {min(values)}, Max: {max(values)}, Count: {len(values)}"
 
-    return f"[spreadsheet] Unknown action: {action}. Available: read, filter, sort, aggregate, columns"
+    return (
+        f"[spreadsheet] Unknown action: {action}. Available: read, filter, sort, aggregate, columns"
+    )
 
 
 def _format(rows, headers):

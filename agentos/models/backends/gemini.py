@@ -8,15 +8,14 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from typing import AsyncIterator
 
 import httpx
 
-from agentos.models.router import ModelResponse, ModelSpec
 from agentos.core.context import AgentContext
+from agentos.models.router import ModelResponse, ModelSpec
 from agentos.tools.base import ToolCall
-
 
 # ── Gemini Public API Endpoint ──────────────────
 GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta"
@@ -52,7 +51,9 @@ class GeminiSafetySetting:
     """安全过滤配置。"""
 
     category: str  # HARM_CATEGORY_HARASSMENT | HATE_SPEECH | SEXUALLY_EXPLICIT | DANGEROUS_CONTENT
-    threshold: str = "BLOCK_ONLY_HIGH"  # BLOCK_NONE | BLOCK_ONLY_HIGH | BLOCK_MEDIUM_AND_ABOVE | BLOCK_LOW_AND_ABOVE
+    threshold: str = (
+        "BLOCK_ONLY_HIGH"  # BLOCK_NONE | BLOCK_ONLY_HIGH | BLOCK_MEDIUM_AND_ABOVE | BLOCK_LOW_AND_ABOVE
+    )
 
 
 @dataclass
@@ -64,15 +65,18 @@ class GeminiConfig:
     top_p: float = 0.95
     top_k: int = 40
     max_output_tokens: int = 8192
-    safety_settings: list[GeminiSafetySetting] = field(default_factory=lambda: [
-        GeminiSafetySetting("HARM_CATEGORY_HARASSMENT", "BLOCK_ONLY_HIGH"),
-        GeminiSafetySetting("HARM_CATEGORY_HATE_SPEECH", "BLOCK_ONLY_HIGH"),
-        GeminiSafetySetting("HARM_CATEGORY_SEXUALLY_EXPLICIT", "BLOCK_ONLY_HIGH"),
-        GeminiSafetySetting("HARM_CATEGORY_DANGEROUS_CONTENT", "BLOCK_ONLY_HIGH"),
-    ])
+    safety_settings: list[GeminiSafetySetting] = field(
+        default_factory=lambda: [
+            GeminiSafetySetting("HARM_CATEGORY_HARASSMENT", "BLOCK_ONLY_HIGH"),
+            GeminiSafetySetting("HARM_CATEGORY_HATE_SPEECH", "BLOCK_ONLY_HIGH"),
+            GeminiSafetySetting("HARM_CATEGORY_SEXUALLY_EXPLICIT", "BLOCK_ONLY_HIGH"),
+            GeminiSafetySetting("HARM_CATEGORY_DANGEROUS_CONTENT", "BLOCK_ONLY_HIGH"),
+        ]
+    )
 
 
 # ── Tool Declaration Helpers ─────────────────────
+
 
 def _convert_tools_to_gemini(openai_tools: list[dict]) -> list[dict]:
     """将OpenAI格式的tools转换为Gemini functionDeclarations。"""
@@ -81,11 +85,13 @@ def _convert_tools_to_gemini(openai_tools: list[dict]) -> list[dict]:
         if tool.get("type") != "function":
             continue
         func = tool.get("function", {})
-        declarations.append({
-            "name": func.get("name", ""),
-            "description": func.get("description", ""),
-            "parameters": func.get("parameters", {}),
-        })
+        declarations.append(
+            {
+                "name": func.get("name", ""),
+                "description": func.get("description", ""),
+                "parameters": func.get("parameters", {}),
+            }
+        )
     return [{"function_declarations": declarations}] if declarations else []
 
 
@@ -102,15 +108,18 @@ def _convert_gemini_tool_calls(parts: list[dict]) -> list[ToolCall]:
                 args = json.loads(args)
             except json.JSONDecodeError:
                 args = {}
-        tool_calls.append(ToolCall(
-            id=fc.get("name", "unknown"),
-            name=fc.get("name", "unknown"),
-            arguments=args,
-        ))
+        tool_calls.append(
+            ToolCall(
+                id=fc.get("name", "unknown"),
+                name=fc.get("name", "unknown"),
+                arguments=args,
+            )
+        )
     return tool_calls
 
 
 # ── Core Gemini Client ───────────────────────────
+
 
 class GeminiClient:
     """
@@ -219,14 +228,17 @@ class GeminiClient:
     ) -> ModelResponse:
         """Vision多模态调用。image_data为base64之前的内容。"""
         import base64
+
         b64 = base64.b64encode(image_data).decode()
-        contents = [{
-            "role": "user",
-            "parts": [
-                {"text": prompt},
-                {"inlineData": {"mimeType": mime_type, "data": b64}},
-            ],
-        }]
+        contents = [
+            {
+                "role": "user",
+                "parts": [
+                    {"text": prompt},
+                    {"inlineData": {"mimeType": mime_type, "data": b64}},
+                ],
+            }
+        ]
         body = {
             "contents": contents,
             "generationConfig": {
@@ -275,22 +287,26 @@ class GeminiClient:
             # tool calls from assistant
             if msg.tool_calls:
                 for tc in msg.tool_calls:
-                    parts.append({
-                        "functionCall": {
-                            "name": tc.name,
-                            "args": tc.arguments,
+                    parts.append(
+                        {
+                            "functionCall": {
+                                "name": tc.name,
+                                "args": tc.arguments,
+                            }
                         }
-                    })
+                    )
 
             # tool results
             if msg.role == "tool" and msg.tool_call_id:
                 # Gemini uses functionResponse in user role
-                parts.append({
-                    "functionResponse": {
-                        "name": msg.tool_call_id,
-                        "response": {"content": msg.content},
+                parts.append(
+                    {
+                        "functionResponse": {
+                            "name": msg.tool_call_id,
+                            "response": {"content": msg.content},
+                        }
                     }
-                })
+                )
 
             if parts:
                 contents.append({"role": role, "parts": parts})
@@ -306,7 +322,7 @@ class GeminiClient:
             "user": "user",
             "assistant": "model",
             "system": "user",  # handled separately via systemInstruction
-            "tool": "user",    # functionResponse must be in user turn
+            "tool": "user",  # functionResponse must be in user turn
         }
         return mapping.get(role, "user")
 
@@ -336,11 +352,13 @@ class GeminiClient:
                         args = json.loads(args)
                     except json.JSONDecodeError:
                         args = {}
-                tool_calls.append(ToolCall(
-                    id=fc.get("name", "unknown"),
-                    name=fc.get("name", "unknown"),
-                    arguments=args,
-                ))
+                tool_calls.append(
+                    ToolCall(
+                        id=fc.get("name", "unknown"),
+                        name=fc.get("name", "unknown"),
+                        arguments=args,
+                    )
+                )
 
         return ModelResponse(
             content="\n".join(text_parts),

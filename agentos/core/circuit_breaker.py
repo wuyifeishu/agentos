@@ -15,10 +15,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from functools import wraps
-from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar
+from typing import Any, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -29,21 +30,22 @@ T = TypeVar("T")
 # State machine
 # ============================================================================
 
-class CircuitState(str, Enum):
-    CLOSED = "closed"          # Normal operation — requests pass through
-    OPEN = "open"              # Failing — requests are rejected immediately
-    HALF_OPEN = "half_open"    # Probing — limited requests allowed to test recovery
+
+class CircuitState(StrEnum):
+    CLOSED = "closed"  # Normal operation — requests pass through
+    OPEN = "open"  # Failing — requests are rejected immediately
+    HALF_OPEN = "half_open"  # Probing — limited requests allowed to test recovery
 
 
 @dataclass
 class CircuitConfig:
     """Circuit breaker configuration."""
 
-    failure_threshold: int = 5        # Consecutive failures to trip OPEN
-    success_threshold: int = 2        # Consecutive successes in HALF_OPEN to reset
-    timeout_seconds: float = 60.0     # Seconds in OPEN before transitioning to HALF_OPEN
-    half_open_max_requests: int = 1   # Max concurrent requests in HALF_OPEN
-    excluded_exceptions: tuple = ()   # Exceptions that don't count as failures
+    failure_threshold: int = 5  # Consecutive failures to trip OPEN
+    success_threshold: int = 2  # Consecutive successes in HALF_OPEN to reset
+    timeout_seconds: float = 60.0  # Seconds in OPEN before transitioning to HALF_OPEN
+    half_open_max_requests: int = 1  # Max concurrent requests in HALF_OPEN
+    excluded_exceptions: tuple = ()  # Exceptions that don't count as failures
 
 
 @dataclass
@@ -70,13 +72,14 @@ class CircuitStats:
 # Circuit Breaker
 # ============================================================================
 
+
 class CircuitBreaker:
     """Thread-safe circuit breaker for a single endpoint."""
 
     def __init__(
         self,
         name: str,
-        config: Optional[CircuitConfig] = None,
+        config: CircuitConfig | None = None,
     ):
         self.name = name
         self.config = config or CircuitConfig()
@@ -97,7 +100,8 @@ class CircuitBreaker:
             self.stats.reset()
             logger.warning(
                 "Circuit '%s' OPENED after %d consecutive failures",
-                self.name, self.config.failure_threshold,
+                self.name,
+                self.config.failure_threshold,
             )
         elif new_state == CircuitState.CLOSED:
             self.stats.reset()
@@ -175,7 +179,7 @@ class CircuitBreaker:
         self,
         fn: Callable[..., Awaitable[T]],
         *args: Any,
-        fallback: Optional[Callable[..., Awaitable[T]]] = None,
+        fallback: Callable[..., Awaitable[T]] | None = None,
         **kwargs: Any,
     ) -> T:
         """Execute fn through the circuit breaker.
@@ -186,9 +190,7 @@ class CircuitBreaker:
             if fallback is not None:
                 logger.debug("Circuit '%s' open — using fallback", self.name)
                 return await fallback(*args, **kwargs)
-            raise CircuitOpenError(
-                f"Circuit '{self.name}' is OPEN — request rejected"
-            )
+            raise CircuitOpenError(f"Circuit '{self.name}' is OPEN — request rejected")
 
         try:
             result = await fn(*args, **kwargs)
@@ -205,24 +207,25 @@ class CircuitBreaker:
 # Registry
 # ============================================================================
 
+
 class CircuitRegistry:
     """Global registry of circuit breakers, keyed by endpoint name."""
 
     def __init__(self):
-        self._circuits: Dict[str, CircuitBreaker] = {}
+        self._circuits: dict[str, CircuitBreaker] = {}
         self._lock = asyncio.Lock()
 
     async def get_or_create(
         self,
         name: str,
-        config: Optional[CircuitConfig] = None,
+        config: CircuitConfig | None = None,
     ) -> CircuitBreaker:
         async with self._lock:
             if name not in self._circuits:
                 self._circuits[name] = CircuitBreaker(name=name, config=config)
             return self._circuits[name]
 
-    def get_all_stats(self) -> Dict[str, CircuitStats]:
+    def get_all_stats(self) -> dict[str, CircuitStats]:
         """Export all circuit stats for monitoring."""
         return {name: cb.stats for name, cb in self._circuits.items()}
 
@@ -250,6 +253,7 @@ class CircuitRegistry:
 # Decorator
 # ============================================================================
 
+
 def circuit_breaker(
     name: str,
     failure_threshold: int = 5,
@@ -275,8 +279,10 @@ def circuit_breaker(
         @wraps(fn)
         async def wrapper(*args, **kwargs):
             return await cb.call(fn, *args, **kwargs)
+
         wrapper._circuit_breaker = cb  # type: ignore[attr-defined]
         return wrapper
+
     return decorator
 
 
@@ -284,9 +290,10 @@ def circuit_breaker(
 # Exceptions
 # ============================================================================
 
+
 class CircuitOpenError(Exception):
     """Raised when request is rejected because circuit is OPEN."""
-    pass
+
 
 
 # ============================================================================

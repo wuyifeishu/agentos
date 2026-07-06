@@ -15,10 +15,11 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, AsyncIterator, Optional
+from enum import StrEnum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,8 @@ logger = logging.getLogger(__name__)
 # Data types
 # ============================================================================
 
-class LockBackend(str, Enum):
+
+class LockBackend(StrEnum):
     IN_MEMORY = "in_memory"
     POSTGRES = "postgres"
     REDIS = "redis"
@@ -37,7 +39,7 @@ class LockBackend(str, Enum):
 class LockConfig:
     """Configuration for distributed lock acquisition."""
 
-    ttl: float = 30.0            # Seconds until lock auto-expires
+    ttl: float = 30.0  # Seconds until lock auto-expires
     retry_interval: float = 0.1  # Polling interval when waiting
     acquire_timeout: float = 10.0  # Max time to wait for lock
     renew_interval: float = 0.0  # Auto-renew interval (0 = disabled)
@@ -66,6 +68,7 @@ class LockNotHeldError(Exception):
 # Abstract backend
 # ============================================================================
 
+
 class AbstractLockBackend(ABC):
     """Interface all lock backends must implement."""
 
@@ -89,6 +92,7 @@ class AbstractLockBackend(ABC):
 # ============================================================================
 # In-Memory backend
 # ============================================================================
+
 
 class InMemoryLockBackend(AbstractLockBackend):
     """Single-process in-memory lock — for testing and single-worker scenarios."""
@@ -150,9 +154,11 @@ ADVISORY_UNLOCK_SQL = """
 SELECT pg_advisory_unlock(%s) AS released;
 """
 
+
 # Hash key to an int64 for advisory lock
 def _key_to_int64(key: str) -> int:
     import hashlib
+
     return int(hashlib.sha256(key.encode()).hexdigest()[:16], 16) % (2**63 - 1)
 
 
@@ -176,9 +182,7 @@ class PostgresLockBackend(AbstractLockBackend):
         conn = await self._get_conn()
         try:
             lock_id = _key_to_int64(key)
-            result = await conn.fetchval(
-                "SELECT pg_try_advisory_lock($1) AS acquired;", lock_id
-            )
+            result = await conn.fetchval("SELECT pg_try_advisory_lock($1) AS acquired;", lock_id)
             if result:
                 self._acquired.add((key, owner_id))
                 return True
@@ -192,9 +196,7 @@ class PostgresLockBackend(AbstractLockBackend):
         conn = await self._get_conn()
         try:
             lock_id = _key_to_int64(key)
-            result = await conn.fetchval(
-                "SELECT pg_advisory_unlock($1) AS released;", lock_id
-            )
+            result = await conn.fetchval("SELECT pg_advisory_unlock($1) AS released;", lock_id)
             if result:
                 self._acquired.discard((key, owner_id))
             return bool(result)
@@ -251,7 +253,11 @@ class RedisLockBackend(AbstractLockBackend):
         return bool(result)
 
     async def release(self, key: str, owner_id: str) -> bool:
-        script = self._redis.register_script(RELEASE_SCRIPT) if hasattr(self._redis, 'register_script') else None
+        script = (
+            self._redis.register_script(RELEASE_SCRIPT)
+            if hasattr(self._redis, "register_script")
+            else None
+        )
         if script:
             result = await script(keys=[key], args=[owner_id])
             return int(result) == 1
@@ -277,6 +283,7 @@ class RedisLockBackend(AbstractLockBackend):
 # ============================================================================
 # High-level Lock Manager
 # ============================================================================
+
 
 class DistributedLock:
     """High-level distributed lock with auto-renew and context manager support.
@@ -329,11 +336,9 @@ class DistributedLock:
             self._renew_tasks.pop(token.key).cancel()
         return await self._backend.release(token.key, token.owner_id)
 
-    async def extend(self, token: LockToken, ttl: Optional[float] = None) -> bool:
+    async def extend(self, token: LockToken, ttl: float | None = None) -> bool:
         """Extend the TTL of a held lock."""
-        return await self._backend.extend(
-            token.key, token.owner_id, ttl or self._config.ttl
-        )
+        return await self._backend.extend(token.key, token.owner_id, ttl or self._config.ttl)
 
     def _start_renew(self, key: str, owner_id: str):
         """Start auto-renew background task."""
@@ -360,6 +365,7 @@ class DistributedLock:
 # ============================================================================
 # Factory
 # ============================================================================
+
 
 def create_lock_backend(backend: LockBackend, **kwargs: Any) -> AbstractLockBackend:
     """Factory for creating lock backends."""

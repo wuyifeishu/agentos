@@ -1,43 +1,130 @@
 from dataclasses import dataclass
 from enum import Enum
-class KeyScope(Enum): READ='read'; WRITE='write'
+
+
+class KeyScope(Enum):
+    READ = "read"
+    WRITE = "write"
+
+
 @dataclass
-class APIKey: id:str=''
+class APIKey:
+    id: str = ""
+
+
 @dataclass
-class KeyCreateRequest: name:str=''
+class KeyCreateRequest:
+    name: str = ""
+
+
 @dataclass
-class KeyCreateResult: ok:bool=True
-class APIKeyManager: pass
-class TenantTier(Enum): FREE='free'
-class TenantStatus(Enum): ACTIVE='active'
+class KeyCreateResult:
+    ok: bool = True
+
+
+class APIKeyManager:
+    pass
+
+
+class TenantTier(Enum):
+    FREE = "free"
+
+
+class TenantStatus(Enum):
+    ACTIVE = "active"
+
+
 @dataclass
-class TenantConfig: max_agents:int=5
+class TenantConfig:
+    max_agents: int = 5
+
+
 @dataclass
-class TenantUsage: agents:int=0
+class TenantUsage:
+    agents: int = 0
+
+
 @dataclass
-class Tenant: id:str=''
-class TenantManager: pass
+class Tenant:
+    id: str = ""
+
+
+class TenantManager:
+    pass
+
+
 TIER_QUOTAS = {}
-class Permission(Enum): READ='read'
-class ROLE_PERMISSIONS: pass
+
+
+class Permission(Enum):
+    READ = "read"
+
+
+class ROLE_PERMISSIONS:
+    pass
+
+
 @dataclass
-class Role: name:str=''
+class Role:
+    name: str = ""
+
+
 @dataclass
-class User: id:str=''
-class RBACEngine: pass
-class Session: pass
-class SessionStore: pass
-class JWTManager: pass
-class SSOProvider: pass
+class User:
+    id: str = ""
+
+
+class RBACEngine:
+    pass
+
+
+class Session:
+    pass
+
+
+class SessionStore:
+    pass
+
+
+class JWTManager:
+    pass
+
+
+class SSOProvider:
+    pass
+
+
 @dataclass
-class OIDCConfig: issuer:str=''
+class OIDCConfig:
+    issuer: str = ""
+
+
 @dataclass
-class SAMLConfig: idp_url:str=''
+class SAMLConfig:
+    idp_url: str = ""
+
+
 @dataclass
-class SSOUser: id:str=''
-class AuditCategory(Enum): SECURITY='security'
-class AuditSeverity(Enum): INFO='info'
+class SSOUser:
+    id: str = ""
+
+
+class AuditCategory(Enum):
+    SECURITY = "security"
+
+
+class AuditSeverity(Enum):
+    INFO = "info"
+
+
 @dataclass
-class AuditEvent: pass
-class AuditLogger: pass
-class RetentionPolicy: pass
+class AuditEvent:
+    pass
+
+
+class AuditLogger:
+    pass
+
+
+class RetentionPolicy:
+    pass

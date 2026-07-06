@@ -10,15 +10,15 @@ from __future__ import annotations
 
 import math
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 import numpy as np
 
 
 class RetrievalStrategy(Enum):
-
     """检索策略枚举。"""
 
     SEMANTIC = "semantic"
@@ -34,8 +34,8 @@ class MemoryEntry:
     id: str
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
-    embedding: Optional[list[float]] = None
-    timestamp: Optional[float] = None
+    embedding: list[float] | None = None
+    timestamp: float | None = None
     importance: float = 0.5
     source: str = "conversation"  # conversation / long_term / working
 
@@ -82,7 +82,7 @@ class SemanticMemoryRetriever:
 
     def __init__(
         self,
-        embedder: Optional[Callable[[str], list[float]]] = None,
+        embedder: Callable[[str], list[float]] | None = None,
         hybrid_weight: float = 0.7,
         min_keyword_score: float = 0.01,
         default_top_k: int = 10,
@@ -134,9 +134,9 @@ class SemanticMemoryRetriever:
     def retrieve(
         self,
         query: str,
-        top_k: Optional[int] = None,
+        top_k: int | None = None,
         strategy: RetrievalStrategy = RetrievalStrategy.HYBRID,
-        filter_source: Optional[str] = None,
+        filter_source: str | None = None,
         min_importance: float = 0.0,
     ) -> list[RetrievalResult]:
         """
@@ -153,12 +153,14 @@ class SemanticMemoryRetriever:
             List of RetrievalResult sorted by relevance.
         """
         import time
+
         start = time.perf_counter()
         top_k = top_k or self._default_top_k
 
         # Filter entries
         candidates = [
-            e for e in self._entries.values()
+            e
+            for e in self._entries.values()
             if (filter_source is None or e.source == filter_source)
             and e.importance >= min_importance
         ]
@@ -175,12 +177,14 @@ class SemanticMemoryRetriever:
         else:  # HYBRID
             results = self._retrieve_hybrid(query, candidates, top_k)
 
-        elapsed = (time.perf_counter() - start) * 1000
+        (time.perf_counter() - start) * 1000
         # Attach stats to results via a common approach
         return results
 
     def _retrieve_recent(
-        self, candidates: list[MemoryEntry], top_k: int,
+        self,
+        candidates: list[MemoryEntry],
+        top_k: int,
     ) -> list[RetrievalResult]:
         """Return most recent entries sorted by timestamp."""
         sorted_entries = sorted(
@@ -190,13 +194,18 @@ class SemanticMemoryRetriever:
         )
         return [
             RetrievalResult(
-                entry=e, score=1.0, strategy=RetrievalStrategy.RECENT,
+                entry=e,
+                score=1.0,
+                strategy=RetrievalStrategy.RECENT,
             )
             for e in sorted_entries[:top_k]
         ]
 
     def _retrieve_keyword(
-        self, query: str, candidates: list[MemoryEntry], top_k: int,
+        self,
+        query: str,
+        candidates: list[MemoryEntry],
+        top_k: int,
     ) -> list[RetrievalResult]:
         """BM25-style keyword search."""
         query_tokens = self._tokenize(query)
@@ -212,13 +221,18 @@ class SemanticMemoryRetriever:
         scores.sort(key=lambda x: x[0], reverse=True)
         return [
             RetrievalResult(
-                entry=e, score=s, strategy=RetrievalStrategy.KEYWORD,
+                entry=e,
+                score=s,
+                strategy=RetrievalStrategy.KEYWORD,
             )
             for s, e in scores[:top_k]
         ]
 
     def _retrieve_semantic(
-        self, query: str, candidates: list[MemoryEntry], top_k: int,
+        self,
+        query: str,
+        candidates: list[MemoryEntry],
+        top_k: int,
     ) -> list[RetrievalResult]:
         """Cosine similarity semantic search."""
         if not self._embedder:
@@ -236,13 +250,18 @@ class SemanticMemoryRetriever:
         scores.sort(key=lambda x: x[0], reverse=True)
         return [
             RetrievalResult(
-                entry=e, score=float(s), strategy=RetrievalStrategy.SEMANTIC,
+                entry=e,
+                score=float(s),
+                strategy=RetrievalStrategy.SEMANTIC,
             )
             for s, e in scores[:top_k]
         ]
 
     def _retrieve_hybrid(
-        self, query: str, candidates: list[MemoryEntry], top_k: int,
+        self,
+        query: str,
+        candidates: list[MemoryEntry],
+        top_k: int,
     ) -> list[RetrievalResult]:
         """Weighted combination of semantic and keyword scores."""
         query_tokens = self._tokenize(query)
@@ -260,10 +279,7 @@ class SemanticMemoryRetriever:
                     entry.embedding = self._embedder(entry.content)
                 entry_embedding = np.array(entry.embedding)
                 sem_score = self._cosine_sim(query_embedding, entry_embedding)
-                combined = (
-                    self._hybrid_weight * sem_score
-                    + (1 - self._hybrid_weight) * kw_score
-                )
+                combined = self._hybrid_weight * sem_score + (1 - self._hybrid_weight) * kw_score
             else:
                 combined = kw_score
 
@@ -273,7 +289,9 @@ class SemanticMemoryRetriever:
         scores.sort(key=lambda x: x[0], reverse=True)
         return [
             RetrievalResult(
-                entry=e, score=float(s), strategy=RetrievalStrategy.HYBRID,
+                entry=e,
+                score=float(s),
+                strategy=RetrievalStrategy.HYBRID,
             )
             for s, e in scores[:top_k]
         ]
@@ -305,14 +323,15 @@ class SemanticMemoryRetriever:
             if df == 0 or self._total_docs == 0:
                 self._idf_cache[term] = 0.0
             else:
-                self._idf_cache[term] = math.log(
-                    (self._total_docs - df + 0.5) / (df + 0.5) + 1.0
-                )
+                self._idf_cache[term] = math.log((self._total_docs - df + 0.5) / (df + 0.5) + 1.0)
         return self._idf_cache[term]
 
     def _bm25_score(
-        self, query_tokens: list[str], document: str,
-        k1: float = 1.2, b: float = 0.75,
+        self,
+        query_tokens: list[str],
+        document: str,
+        k1: float = 1.2,
+        b: float = 0.75,
     ) -> float:
         """BM25 score for a document given query tokens."""
         doc_tokens = self._tokenize(document)

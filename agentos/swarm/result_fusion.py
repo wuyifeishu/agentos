@@ -7,11 +7,9 @@ confidence scoring, and LLM-as-Judge quality arbitration.
 
 from __future__ import annotations
 
+import json as _json
 from dataclasses import dataclass, field
 from typing import Any
-
-import json as _json
-
 
 _JUDGE_PROMPT = """You are an expert quality judge. Given a task and multiple candidate results,
 select the best result or synthesize a combined result.
@@ -159,12 +157,11 @@ class ResultFusion:
 
         return max(0.0, min(1.0, score))
 
-    def _llm_judge(
-        self, task: str, outputs: dict[str, Any]
-    ) -> FusedResult | None:
+    def _llm_judge(self, task: str, outputs: dict[str, Any]) -> FusedResult | None:
         """Use LLM to judge and fuse results. Returns None on failure."""
         try:
             import os
+
             api_key = os.environ.get("OPENAI_API_KEY", "")
             if not api_key:
                 return None
@@ -180,10 +177,10 @@ class ResultFusion:
             )
 
             import requests
+
             resp = requests.post(
                 "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}",
-                         "Content-Type": "application/json"},
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
                     "model": self._llm_model,
                     "messages": [{"role": "user", "content": prompt}],
@@ -210,12 +207,8 @@ class ResultFusion:
             result = FusedResult()
             result.action = action
             result.reason = data.get("reason", "")
-            result.all_outputs = {
-                k: str(v)[:200] for k, v in outputs.items()
-            }
-            result.individual_scores = {
-                k: 0.5 for k in outputs
-            }
+            result.all_outputs = {k: str(v)[:200] for k, v in outputs.items()}
+            result.individual_scores = {k: 0.5 for k in outputs}
 
             if action == "select":
                 idx = int(data.get("best_index", 0))

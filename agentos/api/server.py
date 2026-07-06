@@ -14,7 +14,7 @@ import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -25,15 +25,18 @@ _active_connections: int = 0
 _shutdown_event = asyncio.Event()
 
 try:
-    from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Query
-    from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import StreamingResponse, JSONResponse
-    from pydantic import BaseModel, Field
     import uvicorn
+    from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import StreamingResponse
+    from pydantic import BaseModel, Field
+
     HAS_API_DEPS = True
 except ImportError:
     HAS_API_DEPS = False
-    logger.warning("FastAPI/uvicorn not installed. API server unavailable. pip install nexus-agentos[api]")
+    logger.warning(
+        "FastAPI/uvicorn not installed. API server unavailable. pip install nexus-agentos[api]"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -46,17 +49,17 @@ if HAS_API_DEPS:
         name: str = "default"
         model: str = "gpt-4o"
         system_prompt: str = "You are a helpful agent."
-        tools: List[str] = Field(default_factory=list)
+        tools: list[str] = Field(default_factory=list)
         memory: bool = False
         max_tokens: int = 4096
         temperature: float = 0.7
-        metadata: Dict[str, Any] = Field(default_factory=dict)
+        metadata: dict[str, Any] = Field(default_factory=dict)
 
     class RunRequest(BaseModel):
         agent_id: str
         prompt: str
         stream: bool = False
-        metadata: Dict[str, Any] = Field(default_factory=dict)
+        metadata: dict[str, Any] = Field(default_factory=dict)
 
     class RunResponse(BaseModel):
         task_id: str
@@ -75,7 +78,7 @@ if HAS_API_DEPS:
 
     class WorkflowRunRequest(BaseModel):
         workflow_yaml: str
-        variables: Dict[str, Any] = Field(default_factory=dict)
+        variables: dict[str, Any] = Field(default_factory=dict)
 
     class HealthResponse(BaseModel):
         status: str
@@ -89,13 +92,15 @@ if HAS_API_DEPS:
 # Agent Manager
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ManagedAgent:
     """Agent instance tracked by the server."""
+
     id: str
     name: str
     model: str
-    config: Dict[str, Any]
+    config: dict[str, Any]
     created_at: float = field(default_factory=time.time)
     tasks_completed: int = 0
 
@@ -104,7 +109,7 @@ class AgentManager:
     """Manages Agent lifecycle — create, run, list, delete."""
 
     def __init__(self):
-        self._agents: Dict[str, ManagedAgent] = {}
+        self._agents: dict[str, ManagedAgent] = {}
         self._start_time = time.time()
 
     def create(self, config: "AgentConfigRequest") -> ManagedAgent:
@@ -119,10 +124,10 @@ class AgentManager:
         logger.info(f"[API] Agent created: {agent_id} ({config.name})")
         return agent
 
-    def get(self, agent_id: str) -> Optional[ManagedAgent]:
+    def get(self, agent_id: str) -> ManagedAgent | None:
         return self._agents.get(agent_id)
 
-    def list_all(self) -> List[ManagedAgent]:
+    def list_all(self) -> list[ManagedAgent]:
         return list(self._agents.values())
 
     def delete(self, agent_id: str) -> bool:
@@ -147,11 +152,11 @@ class AgentManager:
 if HAS_API_DEPS:
 
     agent_manager = AgentManager()
-    active_ws: Dict[str, WebSocket] = {}
+    active_ws: dict[str, WebSocket] = {}
 
     # ── Prometheus metrics ───────────────────────────────────────────────
 
-    _metrics: Dict[str, Any] = defaultdict(int)
+    _metrics: dict[str, Any] = defaultdict(int)
     _metrics["agentos_uptime_seconds"] = 0.0
     _metrics["agentos_requests_total"] = 0
     _metrics["agentos_errors_total"] = 0
@@ -170,8 +175,7 @@ if HAS_API_DEPS:
         for sig in (signal.SIGTERM, signal.SIGINT):
             try:
                 loop.add_signal_handler(
-                    sig,
-                    lambda s=sig: asyncio.create_task(_handle_shutdown(s, app))
+                    sig, lambda s=sig: asyncio.create_task(_handle_shutdown(s, app))
                 )
             except NotImplementedError:
                 pass  # Windows doesn't support add_signal_handler
@@ -217,6 +221,7 @@ if HAS_API_DEPS:
         global _active_connections
         if _shutting_down and request.url.path not in ("/health", "/metrics"):
             from fastapi.responses import JSONResponse
+
             return JSONResponse(
                 status_code=503,
                 content={"detail": "Server is shutting down. Please retry later."},
@@ -250,6 +255,7 @@ if HAS_API_DEPS:
     @app.get("/health", response_model=HealthResponse)
     async def health():
         from agentos import __version__
+
         return HealthResponse(
             status="healthy" if not _shutting_down else "shutting_down",
             version=__version__,
@@ -300,12 +306,15 @@ if HAS_API_DEPS:
             status="ready",
         )
 
-    @app.get("/agents", response_model=List[AgentInfo])
+    @app.get("/agents", response_model=list[AgentInfo])
     async def list_agents():
         return [
             AgentInfo(
-                id=a.id, name=a.name, model=a.model,
-                status="ready", tasks_completed=a.tasks_completed,
+                id=a.id,
+                name=a.name,
+                model=a.model,
+                status="ready",
+                tasks_completed=a.tasks_completed,
                 uptime=time.time() - a.created_at,
             )
             for a in agent_manager.list_all()
@@ -317,8 +326,11 @@ if HAS_API_DEPS:
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
         return AgentInfo(
-            id=agent.id, name=agent.name, model=agent.model,
-            status="ready", tasks_completed=agent.tasks_completed,
+            id=agent.id,
+            name=agent.name,
+            model=agent.model,
+            status="ready",
+            tasks_completed=agent.tasks_completed,
             uptime=time.time() - agent.created_at,
         )
 
@@ -370,7 +382,8 @@ if HAS_API_DEPS:
     async def run_workflow(request: WorkflowRunRequest):
         try:
             import yaml
-            from agentos.workflow import WorkflowParser, WorkflowEngine
+
+            from agentos.workflow import WorkflowEngine, WorkflowParser
 
             wf_data = yaml.safe_load(request.workflow_yaml)
             wf = WorkflowParser.parse_dict(wf_data)
@@ -384,7 +397,9 @@ if HAS_API_DEPS:
     async def validate_workflow(request: WorkflowRunRequest):
         try:
             import yaml
-            from agentos.workflow import WorkflowParser, WorkflowEngine
+
+            from agentos.workflow import WorkflowEngine, WorkflowParser
+
             wf_data = yaml.safe_load(request.workflow_yaml)
             wf = WorkflowParser.parse_dict(wf_data)
             result = await WorkflowEngine().dry_run(wf)
@@ -417,11 +432,13 @@ if HAS_API_DEPS:
 
                 words = f"[{agent.name}] {prompt[:50]}...".split()
                 for i, word in enumerate(words):
-                    await websocket.send_json({
-                        "type": "token",
-                        "data": word,
-                        "seq": i,
-                    })
+                    await websocket.send_json(
+                        {
+                            "type": "token",
+                            "data": word,
+                            "seq": i,
+                        }
+                    )
                     await asyncio.sleep(0.03)
 
                 await websocket.send_json({"type": "done", "total_tokens": len(words)})
@@ -439,9 +456,10 @@ if HAS_API_DEPS:
     # -----------------------------------------------------------------------
 
     @app.get("/marketplace/search")
-    async def marketplace_search(q: str = "", category: Optional[str] = None, limit: int = 20):
+    async def marketplace_search(q: str = "", category: str | None = None, limit: int = 20):
         try:
             from agentos.marketplace import MarketplaceManager, MarketSearchQuery, TemplateCategory
+
             manager = MarketplaceManager()
             cat = TemplateCategory(category) if category else None
             results = await manager.search(MarketSearchQuery(keywords=q, category=cat, limit=limit))
@@ -466,6 +484,7 @@ if HAS_API_DEPS:
     @app.get("/marketplace/stats")
     async def marketplace_stats():
         from agentos.marketplace import MarketplaceManager, seed_default_templates
+
         manager = MarketplaceManager()
         seed_default_templates(manager)
         return await manager.get_stats()
@@ -488,6 +507,11 @@ __all__ = ["app", "serve", "AgentManager", "AgentConfigRequest", "RunRequest", "
 
 # ── Auto-generated compat stubs ──
 
+
 # Auto-generated compat stubs
-class AgentAPI: pass
-class RunResponse: pass
+class AgentAPI:
+    pass
+
+
+class RunResponse:
+    pass

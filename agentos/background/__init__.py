@@ -5,22 +5,21 @@ v1.11.0: Long-running task support with persistent state, progress milestones,
 and agent supervision trees.
 """
 
-from agentos.background.task_manager import (
-    BackgroundTaskManager,
-    BackgroundTask,
-    BackgroundTaskStatus,
-    BackgroundTaskConfig,
-    TaskProgress,
-    ProgressPhase,
-)
-
 from agentos.background.supervisor import (
+    AgentQuota,
     AgentSupervisor,
     SupervisedAgent,
-    SupervisorConfig,
-    AgentQuota,
     SupervisionEvent,
     SupervisionEventType,
+    SupervisorConfig,
+)
+from agentos.background.task_manager import (
+    BackgroundTask,
+    BackgroundTaskConfig,
+    BackgroundTaskManager,
+    BackgroundTaskStatus,
+    ProgressPhase,
+    TaskProgress,
 )
 
 __all__ = [

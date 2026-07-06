@@ -11,8 +11,9 @@ Supports failure/success thresholds, recovery timeout, and callbacks.
 
 import threading
 import time
+from collections.abc import Callable
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Optional, TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -21,9 +22,10 @@ T = TypeVar("T")
 # Enums & Types
 # ============================================================================
 
+
 class CircuitState(Enum):
-    CLOSED = auto()     # Normal operation
-    OPEN = auto()       # Fast-fail, no calls allowed
+    CLOSED = auto()  # Normal operation
+    OPEN = auto()  # Fast-fail, no calls allowed
     HALF_OPEN = auto()  # Probe mode, limited calls allowed
 
 
@@ -33,6 +35,7 @@ CircuitCallback = Callable[["CircuitBreaker", CircuitState, CircuitState], None]
 # ============================================================================
 # CircuitBreaker
 # ============================================================================
+
 
 class CircuitBreaker:
     """Thread-safe circuit breaker.
@@ -51,7 +54,7 @@ class CircuitBreaker:
         recovery_timeout: float = 30.0,
         half_open_max_calls: int = 3,
         success_threshold: int = 2,
-        on_state_change: Optional[CircuitCallback] = None,
+        on_state_change: CircuitCallback | None = None,
     ):
         self.name = name
         self.failure_threshold = failure_threshold
@@ -151,7 +154,9 @@ class CircuitBreaker:
             self._failure_count += 1
             if self._state == CircuitState.HALF_OPEN:
                 self._transition(CircuitState.OPEN)
-            elif self._state == CircuitState.CLOSED and self._failure_count >= self.failure_threshold:
+            elif (
+                self._state == CircuitState.CLOSED and self._failure_count >= self.failure_threshold
+            ):
                 self._transition(CircuitState.OPEN)
 
     # ---------- manual control ----------
@@ -173,7 +178,7 @@ class CircuitBreaker:
     # ---------- stats ----------
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "name": self.name,
@@ -193,20 +198,22 @@ class CircuitBreaker:
 # Errors
 # ============================================================================
 
+
 class CircuitOpenError(Exception):
     """Raised when a call is attempted on an OPEN circuit."""
-    pass
+
 
 
 # ============================================================================
 # CircuitRegistry — manage multiple breakers by name
 # ============================================================================
 
+
 class CircuitRegistry:
     """Global registry for named circuit breakers."""
 
     def __init__(self):
-        self._breakers: Dict[str, CircuitBreaker] = {}
+        self._breakers: dict[str, CircuitBreaker] = {}
         self._lock = threading.Lock()
 
     def get(self, name: str, **kwargs) -> CircuitBreaker:
@@ -219,7 +226,7 @@ class CircuitRegistry:
         with self._lock:
             return self._breakers.pop(name, None) is not None
 
-    def list_breakers(self) -> Dict[str, str]:
+    def list_breakers(self) -> dict[str, str]:
         with self._lock:
             return {n: b.state.name for n, b in self._breakers.items()}
 
@@ -229,7 +236,7 @@ class CircuitRegistry:
                 b.reset()
 
 
-_default_registry: Optional[CircuitRegistry] = None
+_default_registry: CircuitRegistry | None = None
 _registry_lock = threading.Lock()
 
 

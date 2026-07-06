@@ -21,10 +21,10 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import AsyncIterable, AsyncIterator, Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, AsyncIterable, AsyncIterator, Callable, Dict, List, Optional
-
+from enum import StrEnum
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Stream Chunk
@@ -34,11 +34,12 @@ from typing import Any, AsyncIterable, AsyncIterator, Callable, Dict, List, Opti
 @dataclass
 class StreamChunk:
     """A single chunk from an LLM stream."""
+
     content: str
     index: int
     timestamp: float = field(default_factory=time.time)
     is_final: bool = False
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -46,22 +47,24 @@ class StreamChunk:
 # ---------------------------------------------------------------------------
 
 
-class AggregationStrategy(str, Enum):
+class AggregationStrategy(StrEnum):
     """How to aggregate small chunks."""
-    NONE = "none"          # Pass through as-is
-    FIXED_SIZE = "fixed"   # Wait for N tokens before emitting
-    TIME_WINDOW = "time"   # Emit every T milliseconds
+
+    NONE = "none"  # Pass through as-is
+    FIXED_SIZE = "fixed"  # Wait for N tokens before emitting
+    TIME_WINDOW = "time"  # Emit every T milliseconds
     ADAPTIVE = "adaptive"  # Adjust based on latency
 
 
 @dataclass
 class StreamConfig:
     """Configuration for streaming optimization."""
+
     strategy: AggregationStrategy = AggregationStrategy.ADAPTIVE
-    min_chunk_size: int = 3          # Minimum tokens before emitting
-    max_chunk_size: int = 50         # Maximum tokens in a single chunk
-    time_window_ms: int = 50         # Max wait time between emissions
-    buffer_max_chunks: int = 100     # Max unacknowledged chunks (backpressure)
+    min_chunk_size: int = 3  # Minimum tokens before emitting
+    max_chunk_size: int = 50  # Maximum tokens in a single chunk
+    time_window_ms: int = 50  # Max wait time between emissions
+    buffer_max_chunks: int = 100  # Max unacknowledged chunks (backpressure)
     adaptive_latency_target_ms: int = 100  # Target round-trip latency
     adaptive_min_chunk_size: int = 1
     adaptive_max_chunk_size: int = 100
@@ -77,6 +80,7 @@ class StreamConfig:
 @dataclass
 class StreamMetrics:
     """Stream performance metrics."""
+
     total_chunks_received: int = 0
     total_chunks_emitted: int = 0
     total_tokens_received: int = 0
@@ -99,7 +103,7 @@ class MetricsCollector:
 
     def __init__(self):
         self._metrics = StreamMetrics()
-        self._latencies: List[float] = []
+        self._latencies: list[float] = []
 
     def record_received(self, tokens: int = 1) -> None:
         self._metrics.total_chunks_received += 1
@@ -122,8 +126,8 @@ class MetricsCollector:
         if self._latencies:
             self._metrics.avg_chunk_latency_ms = sum(self._latencies) / len(self._latencies)
         if wall_time_ms > 0:
-            self._metrics.tokens_per_second = (
-                self._metrics.total_tokens_emitted / (wall_time_ms / 1000)
+            self._metrics.tokens_per_second = self._metrics.total_tokens_emitted / (
+                wall_time_ms / 1000
             )
         return self._metrics
 
@@ -133,20 +137,20 @@ class MetricsCollector:
 # ---------------------------------------------------------------------------
 
 
-StreamTransformer = Callable[[StreamChunk], Optional[StreamChunk]]
+StreamTransformer = Callable[[StreamChunk], StreamChunk | None]
 
 
 class TransformerPipeline:
     """Chain of stream transformers applied to each chunk."""
 
     def __init__(self):
-        self._transformers: List[StreamTransformer] = []
+        self._transformers: list[StreamTransformer] = []
 
-    def add(self, transformer: StreamTransformer) -> "TransformerPipeline":
+    def add(self, transformer: StreamTransformer) -> TransformerPipeline:
         self._transformers.append(transformer)
         return self
 
-    def apply(self, chunk: StreamChunk) -> Optional[StreamChunk]:
+    def apply(self, chunk: StreamChunk) -> StreamChunk | None:
         current = chunk
         for t in self._transformers:
             if current is None:
@@ -188,17 +192,21 @@ def normalize_newlines() -> StreamTransformer:
 
 def filter_empty_chunks() -> StreamTransformer:
     """Drop chunks with empty content."""
-    def transformer(chunk: StreamChunk) -> Optional[StreamChunk]:
+
+    def transformer(chunk: StreamChunk) -> StreamChunk | None:
         return chunk if chunk.content else None
+
     return transformer
 
 
 def add_token_count() -> StreamTransformer:
     """Add approximate token count to metadata."""
+
     def transformer(chunk: StreamChunk) -> StreamChunk:
         # Rough estimate: ~1.3 chars per token
         chunk.metadata["approx_tokens"] = max(1, int(len(chunk.content) / 1.3))
         return chunk
+
     return transformer
 
 
@@ -223,13 +231,13 @@ class StreamingOptimizer:
             ...
     """
 
-    def __init__(self, config: Optional[StreamConfig] = None):
+    def __init__(self, config: StreamConfig | None = None):
         self._config = config or StreamConfig()
         self._pipeline = TransformerPipeline()
-        self._buffer: List[StreamChunk] = []
-        self._token_accumulator: List[str] = []
+        self._buffer: list[StreamChunk] = []
+        self._token_accumulator: list[str] = []
         self._metrics = MetricsCollector()
-        self._start_time: Optional[float] = None
+        self._start_time: float | None = None
         self._paused = False
 
     @property
@@ -240,9 +248,7 @@ class StreamingOptimizer:
     def config(self) -> StreamConfig:
         return self._config
 
-    async def optimize(
-        self, stream: AsyncIterable[StreamChunk]
-    ) -> AsyncIterator[StreamChunk]:
+    async def optimize(self, stream: AsyncIterable[StreamChunk]) -> AsyncIterator[StreamChunk]:
         """
         Optimize a stream of chunks.
 
@@ -272,26 +278,21 @@ class StreamingOptimizer:
 
         self._metrics.finalize((time.time() - self._start_time) * 1000)
 
-    async def optimize_simple(
-        self, text_stream: AsyncIterable[str]
-    ) -> AsyncIterator[str]:
+    async def optimize_simple(self, text_stream: AsyncIterable[str]) -> AsyncIterator[str]:
         """
         Optimize a simple text stream (strings instead of StreamChunk objects).
         """
         async for chunk in self.optimize(
-            StreamChunk(content=text, index=i)
-            for i, text in enumerate(text_stream)
+            StreamChunk(content=text, index=i) for i, text in enumerate(text_stream)
         ):
             yield chunk.content
 
-    async def _maybe_emit(self) -> Optional[StreamChunk]:
+    async def _maybe_emit(self) -> StreamChunk | None:
         """Check if we should emit an aggregated chunk."""
         if not self._buffer:
             return None
 
-        tokens = sum(
-            chunk.metadata.get("approx_tokens", 1) for chunk in self._buffer
-        )
+        tokens = sum(chunk.metadata.get("approx_tokens", 1) for chunk in self._buffer)
 
         should_emit = False
 
@@ -304,12 +305,8 @@ class StreamingOptimizer:
                 elapsed = (time.time() - self._buffer[0].timestamp) * 1000
                 should_emit = elapsed >= self._config.time_window_ms
         elif self._config.strategy == AggregationStrategy.ADAPTIVE:
-            should_emit = (
-                tokens >= self._config.adaptive_min_chunk_size
-                and (
-                    tokens >= self._config.max_chunk_size
-                    or self._buffer[-1].is_final
-                )
+            should_emit = tokens >= self._config.adaptive_min_chunk_size and (
+                tokens >= self._config.max_chunk_size or self._buffer[-1].is_final
             )
 
         if not should_emit:
@@ -317,7 +314,7 @@ class StreamingOptimizer:
 
         return self._emit_aggregated()
 
-    def _emit_aggregated(self) -> Optional[StreamChunk]:
+    def _emit_aggregated(self) -> StreamChunk | None:
         """Aggregate buffered chunks into a single emission."""
         if not self._buffer:
             return None

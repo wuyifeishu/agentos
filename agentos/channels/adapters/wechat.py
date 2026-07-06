@@ -15,12 +15,13 @@ from __future__ import annotations
 
 import time
 import xml.etree.ElementTree as ET
-from typing import Optional
 
 import httpx
 
 from agentos.channels.base import (
-    BaseChannelAdapter, ChannelConfig, ReplyResult,
+    BaseChannelAdapter,
+    ChannelConfig,
+    ReplyResult,
 )
 from agentos.channels.message import ChannelMessage, ChannelType, MessageType
 
@@ -48,7 +49,9 @@ class WeChatAdapter(BaseChannelAdapter):
         expected = self.make_signature(self.config.verify_token, timestamp, nonce)
         return signature == expected
 
-    def parse_webhook(self, raw_body: bytes, headers: dict) -> ChannelMessage | list[ChannelMessage]:
+    def parse_webhook(
+        self, raw_body: bytes, headers: dict
+    ) -> ChannelMessage | list[ChannelMessage]:
         """解析微信 XML 报文。"""
         root = ET.fromstring(raw_body.decode("utf-8"))
 
@@ -123,7 +126,9 @@ class WeChatAdapter(BaseChannelAdapter):
             data = resp.json()
             if data.get("errcode") == 0:
                 return ReplyResult(success=True, msg_id=str(data.get("msgid", "")))
-            return ReplyResult(success=False, error=f"wechat error {data.get('errcode')}: {data.get('errmsg')}")
+            return ReplyResult(
+                success=False, error=f"wechat error {data.get('errcode')}: {data.get('errmsg')}"
+            )
 
     async def send_image(self, user_id: str, image_url: str) -> ReplyResult:
         token = await self.get_access_token()
@@ -141,10 +146,9 @@ class WeChatAdapter(BaseChannelAdapter):
             return ReplyResult(success=False, error=str(data))
 
     async def send_file(self, user_id: str, file_url: str, filename: str) -> ReplyResult:
-        token = await self.get_access_token()
+        await self.get_access_token()
         # 先上传临时素材
-        upload_url = f"https://api.weixin.qq.com/cgi-bin/media/upload?access_token={token}&type=file"
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient():
             # 简化实现：发文本链接
             return await self.send_message(user_id, f"文件: {filename}\n{file_url}")
 
@@ -172,6 +176,6 @@ class WeChatAdapter(BaseChannelAdapter):
     # ── Helpers ──
 
     @staticmethod
-    def _xml_text(element: ET.Element, tag: str) -> Optional[str]:
+    def _xml_text(element: ET.Element, tag: str) -> str | None:
         child = element.find(tag)
         return child.text if child is not None else None

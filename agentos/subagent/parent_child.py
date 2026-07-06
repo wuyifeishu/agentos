@@ -7,13 +7,15 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Awaitable
+from enum import StrEnum
+from typing import Any
 
 
-class ChildStatus(str, Enum):
+class ChildStatus(StrEnum):
     """子Agent运行状态。"""
+
     IDLE = "idle"
     RUNNING = "running"
     PAUSED = "paused"
@@ -26,9 +28,10 @@ class ChildStatus(str, Enum):
 @dataclass
 class ChildHeartbeat:
     """子Agent心跳包。"""
+
     agent_id: str
     status: ChildStatus = ChildStatus.RUNNING
-    progress: float = 0.0          # 0.0 ~ 1.0
+    progress: float = 0.0  # 0.0 ~ 1.0
     current_step: str = ""
     message: str = ""
     iteration: int = 0
@@ -38,14 +41,15 @@ class ChildHeartbeat:
 @dataclass
 class ChildInfo:
     """子Agent元信息（父Agent侧）。"""
+
     agent_id: str
     task: str
     mode: str
     status: ChildStatus = ChildStatus.IDLE
     spawned_at: float = field(default_factory=time.time)
     last_heartbeat: float = field(default_factory=time.time)
-    heartbeat_interval: float = 2.0     # 期望心跳间隔（秒）
-    timeout: float | None = None        # 超时（秒），None=无超时
+    heartbeat_interval: float = 2.0  # 期望心跳间隔（秒）
+    timeout: float | None = None  # 超时（秒），None=无超时
     progress: float = 0.0
     current_step: str = ""
     iterations: int = 0
@@ -129,14 +133,16 @@ class ChildContext:
         self._progress = max(0.0, min(1.0, progress))
         self._current_step = step
         if self._heartbeat_cb:
-            await self._heartbeat_cb(ChildHeartbeat(
-                agent_id=self.agent_id,
-                status=ChildStatus.RUNNING,
-                progress=self._progress,
-                current_step=step,
-                message=message,
-                iteration=self._iteration,
-            ))
+            await self._heartbeat_cb(
+                ChildHeartbeat(
+                    agent_id=self.agent_id,
+                    status=ChildStatus.RUNNING,
+                    progress=self._progress,
+                    current_step=step,
+                    message=message,
+                    iteration=self._iteration,
+                )
+            )
 
     async def step(self, iteration: int, step: str = "") -> None:
         """子Agent标记一个执行步。"""
@@ -156,38 +162,44 @@ class ChildContext:
     async def send_heartbeat(self, message: str = "") -> None:
         """子Agent发送心跳。"""
         if self._heartbeat_cb:
-            await self._heartbeat_cb(ChildHeartbeat(
-                agent_id=self.agent_id,
-                status=ChildStatus.RUNNING,
-                progress=self._progress,
-                current_step=self._current_step,
-                message=message,
-                iteration=self._iteration,
-            ))
+            await self._heartbeat_cb(
+                ChildHeartbeat(
+                    agent_id=self.agent_id,
+                    status=ChildStatus.RUNNING,
+                    progress=self._progress,
+                    current_step=self._current_step,
+                    message=message,
+                    iteration=self._iteration,
+                )
+            )
 
     async def done(self, output: str = "") -> None:
         """子Agent标记完成。"""
         if self._heartbeat_cb:
-            await self._heartbeat_cb(ChildHeartbeat(
-                agent_id=self.agent_id,
-                status=ChildStatus.COMPLETED,
-                progress=1.0,
-                current_step=self._current_step,
-                message=output,
-                iteration=self._iteration,
-            ))
+            await self._heartbeat_cb(
+                ChildHeartbeat(
+                    agent_id=self.agent_id,
+                    status=ChildStatus.COMPLETED,
+                    progress=1.0,
+                    current_step=self._current_step,
+                    message=output,
+                    iteration=self._iteration,
+                )
+            )
 
     async def fail(self, error: str) -> None:
         """子Agent报告失败。"""
         if self._heartbeat_cb:
-            await self._heartbeat_cb(ChildHeartbeat(
-                agent_id=self.agent_id,
-                status=ChildStatus.FAILED,
-                progress=self._progress,
-                current_step=self._current_step,
-                message=error,
-                iteration=self._iteration,
-            ))
+            await self._heartbeat_cb(
+                ChildHeartbeat(
+                    agent_id=self.agent_id,
+                    status=ChildStatus.FAILED,
+                    progress=self._progress,
+                    current_step=self._current_step,
+                    message=error,
+                    iteration=self._iteration,
+                )
+            )
 
 
 class ChildHandle:

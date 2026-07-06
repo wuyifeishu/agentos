@@ -4,8 +4,8 @@ healthcheck — System health checks.
 Actions: disk, memory, cpu, uptime, processes, all
 """
 
-import subprocess
 import shutil
+import subprocess
 from typing import Any
 
 
@@ -15,9 +15,7 @@ def run(action: str = "all", **kwargs: Any) -> str:
     if action in ("disk", "all"):
         usage = shutil.disk_usage("/")
         pct = usage.used / usage.total * 100
-        results.append(
-            f"Disk: {usage.used//(1024**3)}GB / {usage.total//(1024**3)}GB ({pct:.1f}%)"
-        )
+        results.append(f"Disk: {usage.used//(1024**3)}GB / {usage.total//(1024**3)}GB ({pct:.1f}%)")
 
     if action in ("memory", "all"):
         try:
@@ -45,7 +43,9 @@ def run(action: str = "all", **kwargs: Any) -> str:
 
     if action in ("processes", "all"):
         try:
-            r = subprocess.run(["ps", "aux", "--no-headers"], capture_output=True, text=True, timeout=5)
+            r = subprocess.run(
+                ["ps", "aux", "--no-headers"], capture_output=True, text=True, timeout=5
+            )
             count = len([l for l in r.stdout.split("\n") if l.strip()])
             results.append(f"Processes: {count}")
         except Exception:

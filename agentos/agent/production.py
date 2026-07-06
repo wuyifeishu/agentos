@@ -32,16 +32,10 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Callable, Generator
 from dataclasses import dataclass, field
-from typing import Any, Callable, Generator, Optional
+from typing import Any
 
-from agentos.agent.tool_agent import (
-    ToolAgent,
-    ToolExecutor,
-    AgentConfig,
-    AgentStep,
-    AgentResult,
-)
 from agentos.agent.model_router import (
     ModelRouter,
     ModelSpec,
@@ -49,14 +43,20 @@ from agentos.agent.model_router import (
     TaskComplexity,
     TaskPriority,
 )
-from agentos.security.audit_logger import (
-    AuditLogger,
-    AuditSeverity,
-    AuditActionCategory,
+from agentos.agent.tool_agent import (
+    AgentConfig,
+    AgentResult,
+    AgentStep,
+    ToolAgent,
+    ToolExecutor,
 )
 from agentos.llm.base import LLMProvider
 from agentos.llm.smart_cache import SmartCache
-
+from agentos.security.audit_logger import (
+    AuditActionCategory,
+    AuditLogger,
+    AuditSeverity,
+)
 
 __all__ = [
     "ProductionAgent",
@@ -67,6 +67,7 @@ __all__ = [
 
 
 # ── Complexity Estimator ────────────────────────────────────────────
+
 
 @dataclass
 class ComplexityEstimate:
@@ -85,24 +86,68 @@ class ComplexityEstimator:
 
     # keywords that indicate higher complexity
     COMPLEX_KEYWORDS = [
-        "分析", "对比", "比较", "总结", "调研", "研究", "评估",
-        "analyze", "compare", "research", "evaluate", "assess",
-        "代码审查", "架构", "重构", "安全审计",
-        "code review", "architecture", "refactor", "audit",
+        "分析",
+        "对比",
+        "比较",
+        "总结",
+        "调研",
+        "研究",
+        "评估",
+        "analyze",
+        "compare",
+        "research",
+        "evaluate",
+        "assess",
+        "代码审查",
+        "架构",
+        "重构",
+        "安全审计",
+        "code review",
+        "architecture",
+        "refactor",
+        "audit",
     ]
     EXPERT_KEYWORDS = [
-        "深度", "全面", "完整", "生产级", "企业级", "从零",
-        "comprehensive", "production", "enterprise", "from scratch",
-        "论文", "学术", "法律",
-        "paper", "academic", "legal",
+        "深度",
+        "全面",
+        "完整",
+        "生产级",
+        "企业级",
+        "从零",
+        "comprehensive",
+        "production",
+        "enterprise",
+        "from scratch",
+        "论文",
+        "学术",
+        "法律",
+        "paper",
+        "academic",
+        "legal",
     ]
     TRIVIAL_KEYWORDS = [
-        "天气", "时间", "翻译", "计算", "换算", "几点", "日期",
-        "weather", "time", "translate", "calculate", "convert",
+        "天气",
+        "时间",
+        "翻译",
+        "计算",
+        "换算",
+        "几点",
+        "日期",
+        "weather",
+        "time",
+        "translate",
+        "calculate",
+        "convert",
     ]
     URGENT_KEYWORDS = [
-        "快", "紧急", "马上", "立即",
-        "urgent", "asap", "immediately", "now",
+        "快",
+        "紧急",
+        "马上",
+        "立即",
+        "urgent",
+        "asap",
+        "immediately",
+        "now",
     ]
 
     def estimate(self, task: str) -> ComplexityEstimate:
@@ -136,7 +181,7 @@ class ComplexityEstimator:
         # estimate token count
         # rough heuristic: ~1.5 chars per token for Chinese, ~4 for English
         char_count = len(task)
-        if any('\u4e00' <= c <= '\u9fff' for c in task):
+        if any("\u4e00" <= c <= "\u9fff" for c in task):
             estimated_tokens = max(50, char_count // 1.5)
         else:
             estimated_tokens = max(50, char_count // 4)
@@ -148,11 +193,12 @@ class ComplexityEstimator:
             priority=priority,
             estimated_tokens=estimated_tokens,
             reason=f"task_len={char_count} chars, expert_hits={expert_hits}, "
-                   f"complex_hits={complex_hits}, trivial_hits={trivial_hits}",
+            f"complex_hits={complex_hits}, trivial_hits={trivial_hits}",
         )
 
 
 # ── ProductionConfig ────────────────────────────────────────────────
+
 
 @dataclass
 class ProductionConfig:
@@ -167,6 +213,7 @@ class ProductionConfig:
 
 
 # ── ProductionAgent ─────────────────────────────────────────────────
+
 
 class ProductionAgent:
     """Production-grade ToolAgent wrapper with routing and auditing.
@@ -222,15 +269,19 @@ class ProductionAgent:
 
         # auditing
         self._session_id = self._config.session_id or f"sess-{uuid.uuid4().hex[:8]}"
-        self._audit = AuditLogger(
-            log_dir=self._config.audit_log_dir,
-            max_events=100_000,
-            max_age_days=90,
-        ) if self._config.enable_audit else None
+        self._audit = (
+            AuditLogger(
+                log_dir=self._config.audit_log_dir,
+                max_events=100_000,
+                max_age_days=90,
+            )
+            if self._config.enable_audit
+            else None
+        )
 
         # track routing decisions
-        self._last_route: Optional[RequestSpec] = None
-        self._last_model: Optional[ModelSpec] = None
+        self._last_route: RequestSpec | None = None
+        self._last_model: ModelSpec | None = None
 
     # ── public API ──────────────────────────────────────────────
 
@@ -361,17 +412,17 @@ class ProductionAgent:
     # ── properties ───────────────────────────────────────────────
 
     @property
-    def last_route(self) -> Optional[RequestSpec]:
+    def last_route(self) -> RequestSpec | None:
         """The last routing request spec."""
         return self._last_route
 
     @property
-    def last_model(self) -> Optional[ModelSpec]:
+    def last_model(self) -> ModelSpec | None:
         """The model used in the last run."""
         return self._last_model
 
     @property
-    def cache_stats(self) -> Optional[Any]:
+    def cache_stats(self) -> Any | None:
         """Cache statistics if cache is enabled, else None.
 
         Returns a CacheStats dataclass with fields:
@@ -410,7 +461,7 @@ class ProductionAgent:
             session_id=self._session_id,
         )
         self._last_route = route_spec
-        route_result = self._router.route(route_spec)
+        self._router.route(route_spec)
 
         agent = ToolAgent(
             provider=self._provider,
@@ -428,7 +479,7 @@ class ProductionAgent:
         return self._router
 
     @property
-    def audit(self) -> Optional[AuditLogger]:
+    def audit(self) -> AuditLogger | None:
         return self._audit
 
     @property
@@ -436,11 +487,11 @@ class ProductionAgent:
         return self._session_id
 
     @property
-    def last_route(self) -> Optional[RequestSpec]:
+    def last_route(self) -> RequestSpec | None:
         return self._last_route
 
     @property
-    def last_model(self) -> Optional[ModelSpec]:
+    def last_model(self) -> ModelSpec | None:
         return self._last_model
 
     def route_summary(self) -> dict:
@@ -475,10 +526,14 @@ class ProductionAgent:
                     t_start = time.time()
                     try:
                         result = self._executor.execute(
-                            type("FakeCall", (), {
-                                "name": name,
-                                "parsed_arguments": kwargs,
-                            })()
+                            type(
+                                "FakeCall",
+                                (),
+                                {
+                                    "name": name,
+                                    "parsed_arguments": kwargs,
+                                },
+                            )()
                         )
                         elapsed = (time.time() - t_start) * 1000
                         self._audit.log(
@@ -507,6 +562,7 @@ class ProductionAgent:
                             error_message=str(exc),
                         )
                         raise
+
                 return wrapper
 
             audited.register(schema, make_wrapper(original_name))

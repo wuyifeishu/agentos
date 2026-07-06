@@ -43,7 +43,11 @@ class EnforcerConfig:
 
     max_retries: int = 3
     strategy_order: list[FixStrategy] = field(
-        default_factory=lambda: [FixStrategy.JSON_REPAIR, FixStrategy.FIELD_FALLBACK, FixStrategy.LLM_ASSISTED]
+        default_factory=lambda: [
+            FixStrategy.JSON_REPAIR,
+            FixStrategy.FIELD_FALLBACK,
+            FixStrategy.LLM_ASSISTED,
+        ]
     )
     llm_fix_prompt_template: str = ""
     default_value_fallback: bool = True
@@ -95,7 +99,9 @@ class SchemaEnforcer:
         for attempt in range(self.config.max_retries):
             for strategy in self.config.strategy_order:
                 try:
-                    repaired = await self._apply_fix(strategy, output, schema_model, errors, context)
+                    repaired = await self._apply_fix(
+                        strategy, output, schema_model, errors, context
+                    )
                     if repaired is not None:
                         validated = schema_model.model_validate(repaired)
                         self.stats.total_repairs += 1
@@ -136,7 +142,12 @@ class SchemaEnforcer:
         return result
 
     async def _apply_fix(
-        self, strategy: FixStrategy, output: Any, model: type, errors: list[str], context: dict | None
+        self,
+        strategy: FixStrategy,
+        output: Any,
+        model: type,
+        errors: list[str],
+        context: dict | None,
     ) -> dict | None:
         if strategy == FixStrategy.JSON_REPAIR:
             return self._json_repair(output)
@@ -164,6 +175,7 @@ class SchemaEnforcer:
             s = s.replace("'", '"')
             # 修复尾部多余逗号
             import re
+
             s = re.sub(r",(\s*[}\]])", r"\1", s)
             try:
                 return json.loads(s)

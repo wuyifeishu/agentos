@@ -11,11 +11,11 @@ import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class TraceEvent(str, Enum):
+class TraceEvent(StrEnum):
     """Event types in an execution trace."""
 
     TASK_START = "task_start"
@@ -42,7 +42,7 @@ class TraceSpan:
     parent_id: str = ""
     event: TraceEvent = TraceEvent.TASK_START
     name: str = ""
-    status: str = "started"   # started, done, failed, aborted
+    status: str = "started"  # started, done, failed, aborted
     start_ms: float = field(default_factory=lambda: time.time() * 1000)
     end_ms: float = 0.0
     duration_ms: float = 0.0
@@ -148,7 +148,9 @@ class ExecutionTrace:
 
         return span
 
-    def end_span(self, span_id: str, status: str = "done", data: dict | None = None) -> TraceSpan | None:
+    def end_span(
+        self, span_id: str, status: str = "done", data: dict | None = None
+    ) -> TraceSpan | None:
         """End a span and record its duration."""
         span = self._span_map.get(span_id)
         if not span:
@@ -209,7 +211,9 @@ class ExecutionTrace:
 
         lines = []
         prefix = "  " * indent
-        status_icon = {"done": "O", "failed": "X", "started": ">", "aborted": "!"}.get(span.status, "?")
+        status_icon = {"done": "O", "failed": "X", "started": ">", "aborted": "!"}.get(
+            span.status, "?"
+        )
         lines.append(
             f"{prefix}{status_icon} [{span.event.value}] {span.name} "
             f"({span.duration_ms:.0f}ms) [{span.status}]"
@@ -246,13 +250,15 @@ class ExecutionTrace:
         sorted_spans = sorted(all_spans, key=lambda s: s.duration_ms, reverse=True)
         result = []
         for s in sorted_spans[:top_n]:
-            result.append({
-                "name": s.name,
-                "event": s.event.value,
-                "duration_ms": round(s.duration_ms, 1),
-                "status": s.status,
-                "tags": s.tags,
-            })
+            result.append(
+                {
+                    "name": s.name,
+                    "event": s.event.value,
+                    "duration_ms": round(s.duration_ms, 1),
+                    "status": s.status,
+                    "tags": s.tags,
+                }
+            )
         return result
 
     def errors_list(self) -> list[dict]:
@@ -261,11 +267,13 @@ class ExecutionTrace:
 
         def collect(s: TraceSpan):
             if s.event == TraceEvent.ERROR or s.status == "failed":
-                errors.append({
-                    "name": s.name,
-                    "data": {k: str(v)[:100] for k, v in s.data.items()},
-                    "tags": s.tags,
-                })
+                errors.append(
+                    {
+                        "name": s.name,
+                        "data": {k: str(v)[:100] for k, v in s.data.items()},
+                        "tags": s.tags,
+                    }
+                )
             for c in s.children:
                 collect(c)
 
@@ -290,13 +298,15 @@ class ExecutionTrace:
 
         timeline = []
         for s in all_spans:
-            timeline.append({
-                "time_ms": f"{s.start_ms:.1f}",
-                "event": s.event.value,
-                "name": s.name,
-                "duration_ms": f"{s.duration_ms:.1f}",
-                "status": s.status,
-            })
+            timeline.append(
+                {
+                    "time_ms": f"{s.start_ms:.1f}",
+                    "event": s.event.value,
+                    "name": s.name,
+                    "duration_ms": f"{s.duration_ms:.1f}",
+                    "status": s.status,
+                }
+            )
         return timeline
 
 
@@ -360,10 +370,12 @@ class TraceCollector:
         failed = []
         for t in self._traces.values():
             if t.root_span and t.root_span.status in ("failed", "aborted"):
-                failed.append({
-                    "trace_id": t.id,
-                    "task_name": t.task_name,
-                    "status": t.root_span.status,
-                    "errors": t.total_errors,
-                })
+                failed.append(
+                    {
+                        "trace_id": t.id,
+                        "task_name": t.task_name,
+                        "status": t.root_span.status,
+                        "errors": t.total_errors,
+                    }
+                )
         return failed

@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import pytest
 from pydantic import BaseModel, Field
+
 from agentos.validation.schema_enforcer import (
-    SchemaEnforcer,
     EnforcerConfig,
     FixStrategy,
+    SchemaEnforcer,
 )
 
 

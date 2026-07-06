@@ -5,13 +5,13 @@
 from __future__ import annotations
 
 import os
+
 import aiofiles
 
 from agentos.tools.base import BaseTool, PermissionLevel, ToolResult
 
 
 class ReadFileTool(BaseTool):
-
     """文件读取工具。"""
 
     name = "read_file"
@@ -34,7 +34,7 @@ class ReadFileTool(BaseTool):
     async def execute(self, arguments: dict, sandbox=None) -> ToolResult:
         file_path = arguments["file_path"]
         try:
-            async with aiofiles.open(file_path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(file_path, encoding="utf-8") as f:
                 content = await f.read()
             return ToolResult.ok("", output=content)
         except FileNotFoundError:
@@ -46,7 +46,6 @@ class ReadFileTool(BaseTool):
 
 
 class WriteFileTool(BaseTool):
-
     """文件写入工具。"""
 
     name = "write_file"
@@ -80,7 +79,6 @@ class WriteFileTool(BaseTool):
 
 
 class ListDirectoryTool(BaseTool):
-
     """目录列表工具。"""
 
     name = "list_directory"

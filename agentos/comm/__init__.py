@@ -1,8 +1,8 @@
 """Communication module - Communication layer"""
 
 from agentos.comm.layer import (
-    CommunicationLayer,
     Blackboard,
+    CommunicationLayer,
     EventBus,
     Mailbox,
 )

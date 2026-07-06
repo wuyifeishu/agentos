@@ -13,9 +13,10 @@ Supports:
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from enum import Enum
 from threading import RLock
-from typing import Any, Callable, Dict, Optional, Set, Type, TypeVar, get_type_hints
+from typing import Any, TypeVar, get_type_hints
 
 T = TypeVar("T")
 
@@ -23,6 +24,7 @@ T = TypeVar("T")
 # ============================================================================
 # Lifetime
 # ============================================================================
+
 
 class Lifetime(Enum):
     SINGLETON = "singleton"
@@ -33,15 +35,16 @@ class Lifetime(Enum):
 # Registration
 # ============================================================================
 
+
 class Registration:
     __slots__ = ("interface", "implementation", "lifetime", "factory", "instance", "instance_lock")
 
     def __init__(
         self,
-        interface: Type,
-        implementation: Optional[Type] = None,
+        interface: type,
+        implementation: type | None = None,
         lifetime: Lifetime = Lifetime.TRANSIENT,
-        factory: Optional[Callable[[], Any]] = None,
+        factory: Callable[[], Any] | None = None,
         instance: Any = None,
     ):
         self.interface = interface
@@ -56,6 +59,7 @@ class Registration:
 # Circular Dependency Error
 # ============================================================================
 
+
 class CircularDependencyError(Exception):
     def __init__(self, chain: list):
         self.chain = chain
@@ -65,6 +69,7 @@ class CircularDependencyError(Exception):
 # ============================================================================
 # DIContainer
 # ============================================================================
+
 
 class DIContainer:
     """Lightweight dependency injection container.
@@ -88,8 +93,8 @@ class DIContainer:
         container.register_factory(AbstractQueue, lambda: build_queue())
     """
 
-    def __init__(self, parent: Optional["DIContainer"] = None):
-        self._registrations: Dict[Any, Registration] = {}
+    def __init__(self, parent: DIContainer | None = None):
+        self._registrations: dict[Any, Registration] = {}
         self._lock = RLock()
         self._parent = parent
 
@@ -97,8 +102,8 @@ class DIContainer:
 
     def register(
         self,
-        interface: Type,
-        implementation: Optional[Type] = None,
+        interface: type,
+        implementation: type | None = None,
         lifetime: Lifetime = Lifetime.TRANSIENT,
     ) -> None:
         """Register an interface with its implementation."""
@@ -111,7 +116,7 @@ class DIContainer:
                 lifetime=lifetime,
             )
 
-    def register_instance(self, interface: Type, instance: Any) -> None:
+    def register_instance(self, interface: type, instance: Any) -> None:
         """Register a pre-built instance."""
         with self._lock:
             self._registrations[interface] = Registration(
@@ -121,7 +126,9 @@ class DIContainer:
                 instance=instance,
             )
 
-    def register_factory(self, interface: Type, factory: Callable[[], Any], lifetime: Lifetime = Lifetime.TRANSIENT) -> None:
+    def register_factory(
+        self, interface: type, factory: Callable[[], Any], lifetime: Lifetime = Lifetime.TRANSIENT
+    ) -> None:
         """Register a factory callable for the interface."""
         with self._lock:
             self._registrations[interface] = Registration(
@@ -133,11 +140,11 @@ class DIContainer:
 
     # ---------- resolve ----------
 
-    def resolve(self, interface: Type[T]) -> T:
+    def resolve(self, interface: type[T]) -> T:
         """Resolve and return an instance of the given interface."""
         return self._resolve(interface, set())
 
-    def _resolve(self, interface: Type, resolving: Set[Type]) -> Any:
+    def _resolve(self, interface: type, resolving: set[type]) -> Any:
         # Check circular deps
         if interface in resolving:
             raise CircularDependencyError(list(resolving) + [interface])
@@ -164,7 +171,7 @@ class DIContainer:
         finally:
             resolving.discard(interface)
 
-    def _get_registration(self, interface: Type) -> Registration:
+    def _get_registration(self, interface: type) -> Registration:
         with self._lock:
             if interface in self._registrations:
                 return self._registrations[interface]
@@ -172,7 +179,7 @@ class DIContainer:
                 return self._parent._get_registration(interface)
         raise KeyError(f"No registration for {interface.__name__}")
 
-    def _build(self, reg: Registration, resolving: Set[Type]) -> Any:
+    def _build(self, reg: Registration, resolving: set[type]) -> Any:
         # Factory takes priority
         if reg.factory is not None:
             return reg.factory()
@@ -180,7 +187,7 @@ class DIContainer:
         # Constructor injection
         impl = reg.implementation or reg.interface
         hints = self._safe_get_type_hints(impl.__init__)
-        kwargs: Dict[str, Any] = {}
+        kwargs: dict[str, Any] = {}
 
         for param_name, param in inspect.signature(impl.__init__).parameters.items():
             if param_name == "self":
@@ -200,7 +207,7 @@ class DIContainer:
         return impl(**kwargs)
 
     @staticmethod
-    def _safe_get_type_hints(func) -> Dict[str, Any]:
+    def _safe_get_type_hints(func) -> dict[str, Any]:
         try:
             return get_type_hints(func)
         except Exception:
@@ -208,13 +215,13 @@ class DIContainer:
 
     # ---------- scoped ----------
 
-    def create_scope(self) -> "DIContainer":
+    def create_scope(self) -> DIContainer:
         """Create a scoped child container (snapshot of current registrations)."""
         return DIContainer(parent=self)
 
     # ---------- check ----------
 
-    def is_registered(self, interface: Type) -> bool:
+    def is_registered(self, interface: type) -> bool:
         with self._lock:
             if interface in self._registrations:
                 return True

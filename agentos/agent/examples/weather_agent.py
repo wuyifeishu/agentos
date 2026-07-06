@@ -11,12 +11,12 @@ Tool-Using Agent 端到端示例: 天气助手 Agent。
     python agentos/agent/examples/weather_agent.py
 """
 
+from agentos.agent import AgentConfig, ToolAgent, ToolExecutor
 from agentos.llm import create_provider
 from agentos.llm.base import Tool, ToolParameter
-from agentos.agent import ToolAgent, ToolExecutor, AgentConfig
-
 
 # ── 模拟工具 ──────────────────────────────────────────────────────
+
 
 def get_weather(city: str) -> str:
     """获取指定城市的天气信息（模拟）。"""

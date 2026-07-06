@@ -6,30 +6,32 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
 @dataclass
 class CheckpointMetadata:
     """Checkpoint 元信息。"""
-    thread_id: str                     # 对话线程 ID
-    checkpoint_id: str                 # 唯一 ID
-    step: int                          # 步骤序号
-    parent_checkpoint_id: str | None = None   # 父 checkpoint（用于分支/回溯）
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    thread_id: str  # 对话线程 ID
+    checkpoint_id: str  # 唯一 ID
+    step: int  # 步骤序号
+    parent_checkpoint_id: str | None = None  # 父 checkpoint（用于分支/回溯）
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     tags: list[str] = field(default_factory=list)  # 标签
-    summary: str = ""                  # 可选摘要
+    summary: str = ""  # 可选摘要
 
 
 @dataclass
 class Checkpoint:
     """单个 Checkpoint — 完整的运行时状态快照。"""
-    metadata: CheckpointMetadata       # 元信息
-    messages: list[dict[str, Any]]     # 对话消息（序列化后）
-    state: dict[str, Any]              # Agent 运行时状态
-    tools_result: dict[str, Any]       # 工具调用结果
-    next_node: str = ""                # 下一个执行节点
+
+    metadata: CheckpointMetadata  # 元信息
+    messages: list[dict[str, Any]]  # 对话消息（序列化后）
+    state: dict[str, Any]  # Agent 运行时状态
+    tools_result: dict[str, Any]  # 工具调用结果
+    next_node: str = ""  # 下一个执行节点
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -49,7 +51,7 @@ class Checkpoint:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Checkpoint":
+    def from_dict(cls, d: dict[str, Any]) -> Checkpoint:
         meta = d["metadata"]
         return cls(
             metadata=CheckpointMetadata(
@@ -87,9 +89,7 @@ class CheckpointBackend(ABC):
         ...
 
     @abstractmethod
-    async def list_threads(
-        self, limit: int = 50, offset: int = 0
-    ) -> list[CheckpointMetadata]:
+    async def list_threads(self, limit: int = 50, offset: int = 0) -> list[CheckpointMetadata]:
         """列出所有线程的最新 checkpoint 元信息。"""
         ...
 

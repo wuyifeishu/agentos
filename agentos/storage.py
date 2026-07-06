@@ -1,2 +1,6 @@
-class CheckpointStore: pass
-class SqliteStore: pass
+class CheckpointStore:
+    pass
+
+
+class SqliteStore:
+    pass

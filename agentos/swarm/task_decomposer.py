@@ -7,11 +7,9 @@ assigning each sub-task to appropriate agent roles.
 
 from __future__ import annotations
 
+import json as _json
 from dataclasses import dataclass, field
 from typing import Any
-
-import json as _json
-
 
 _DECOMPOSE_PROMPT = """You are a task decomposition expert. Given a complex task, break it into
 a sequence of sub-tasks that can be executed independently or sequentially.
@@ -115,15 +113,16 @@ class TaskDecomposer:
         """Use LLM to decompose task. Returns None on failure."""
         try:
             import os
+
             api_key = os.environ.get("OPENAI_API_KEY", "")
             if not api_key:
                 return None
 
             import requests
+
             resp = requests.post(
                 "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}",
-                         "Content-Type": "application/json"},
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
                 json={
                     "model": self._llm_model,
                     "messages": [{"role": "user", "content": prompt}],
@@ -164,9 +163,7 @@ class TaskDecomposer:
         except Exception:
             return None
 
-    def _fallback_decompose(
-        self, task: str, agents: list[str]
-    ) -> Decomposition:
+    def _fallback_decompose(self, task: str, agents: list[str]) -> Decomposition:
         """Rule-based fallback when LLM unavailable.
 
         Splits on explicit delimiters ('then', 'after', numbered steps)
@@ -176,8 +173,9 @@ class TaskDecomposer:
 
         # Try to split on explicit markers
         markers = re.split(
-            r'(?:Step\s*\d+[.:]\s*|\d+\)\s*|(?:then|之后|然后|接着)[,，\s]*|;\s*)',
-            task, flags=re.IGNORECASE,
+            r"(?:Step\s*\d+[.:]\s*|\d+\)\s*|(?:then|之后|然后|接着)[,，\s]*|;\s*)",
+            task,
+            flags=re.IGNORECASE,
         )
         markers = [m.strip() for m in markers if m.strip()]
 

@@ -31,7 +31,7 @@ def run(action: str = "read", file_path: str = "", page: int = 0, **kwargs: Any)
 
     if action == "read":
         text = ""
-        for p in reader.pages[:min(len(reader.pages), 5)]:
+        for p in reader.pages[: min(len(reader.pages), 5)]:
             text += p.extract_text() or ""
         return text[:3000] or "[pdf] No extractable text on first 5 pages."
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 # ── Dockerfile generator ──────────────────────────────────────────────────────
 
@@ -12,6 +11,7 @@ from typing import Optional
 @dataclass
 class DockerConfig:
     """Docker 部署配置。"""
+
     python_version: str = "3.11"
     base_image: str = "python:{python_version}-slim"
     workdir: str = "/app"
@@ -22,7 +22,7 @@ class DockerConfig:
     user: str = "appuser"
 
 
-def generate_dockerfile(config: Optional[DockerConfig] = None) -> str:
+def generate_dockerfile(config: DockerConfig | None = None) -> str:
     """Generate a production-ready Dockerfile for an AgentOS project."""
     cfg = config or DockerConfig()
     base = cfg.base_image.format(python_version=cfg.python_version)
@@ -30,7 +30,7 @@ def generate_dockerfile(config: Optional[DockerConfig] = None) -> str:
     lines = [
         f"FROM {base}",
         "",
-        "LABEL org.opencontainers.image.source=\"https://github.com/agentos/agentos\"",
+        'LABEL org.opencontainers.image.source="https://github.com/agentos/agentos"',
         "",
         "# System dependencies",
         "RUN apt-get update && apt-get install -y --no-install-recommends \\",
@@ -83,6 +83,7 @@ def generate_dockerfile(config: Optional[DockerConfig] = None) -> str:
 @dataclass
 class ComposeService:
     """Compose 服务定义。"""
+
     name: str
     build_context: str = "."
     port: int = 8000
@@ -95,6 +96,7 @@ class ComposeService:
 @dataclass
 class ComposeConfig:
     """Compose 编排配置。"""
+
     services: list[ComposeService] = field(default_factory=list)
     project_name: str = "agentos"
     network_name: str = "agentos-net"
@@ -139,8 +141,8 @@ def generate_docker_compose(config: ComposeConfig) -> str:
 
 def write_deployment_files(
     output_dir: str | Path,
-    docker_config: Optional[DockerConfig] = None,
-    compose_config: Optional[ComposeConfig] = None,
+    docker_config: DockerConfig | None = None,
+    compose_config: ComposeConfig | None = None,
 ) -> list[Path]:
     """Write Dockerfile and docker-compose.yml to output_dir.  Returns written paths."""
     out = Path(output_dir)
@@ -151,9 +153,7 @@ def write_deployment_files(
     df_path.write_text(generate_dockerfile(docker_config))
     written.append(df_path)
 
-    compose = compose_config or ComposeConfig(
-        services=[ComposeService(name="agentos")]
-    )
+    compose = compose_config or ComposeConfig(services=[ComposeService(name="agentos")])
     dc_path = out / "docker-compose.yml"
     dc_path.write_text(generate_docker_compose(compose))
     written.append(dc_path)

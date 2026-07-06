@@ -11,13 +11,13 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 DEFAULT_PERSIST_DIR = Path.home() / ".agentos" / "chroma"
 
 
 @dataclass
 class SearchResult:
     """检索结果。"""
+
     content: str
     score: float
     metadata: dict = field(default_factory=dict)
@@ -28,20 +28,18 @@ class VectorStore(ABC):
     """向量存储抽象基类。"""
 
     @abstractmethod
-    def add(self, texts: list[str], metadatas: list[dict] | None = None, ids: list[str] | None = None):
-        ...
+    def add(
+        self, texts: list[str], metadatas: list[dict] | None = None, ids: list[str] | None = None
+    ): ...
 
     @abstractmethod
-    def search(self, query: str, top_k: int = 5) -> list[SearchResult]:
-        ...
+    def search(self, query: str, top_k: int = 5) -> list[SearchResult]: ...
 
     @abstractmethod
-    def count(self) -> int:
-        ...
+    def count(self) -> int: ...
 
     @abstractmethod
-    def clear(self):
-        ...
+    def clear(self): ...
 
 
 class ChromaStore(VectorStore):
@@ -69,8 +67,10 @@ class ChromaStore(VectorStore):
     def _get_embedding_function(self):
         """获取 embedding 函数，优先 sentence-transformers，fallback 到 ONNX 内置模型。"""
         from chromadb.utils import embedding_functions
+
         try:
             import sentence_transformers  # noqa: F401
+
             return embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name=self._embedding_model,
             )
@@ -82,7 +82,6 @@ class ChromaStore(VectorStore):
             return
         try:
             import chromadb
-            from chromadb.utils import embedding_functions
 
             if self._persist_dir:
                 os.makedirs(self._persist_dir, exist_ok=True)
@@ -97,11 +96,11 @@ class ChromaStore(VectorStore):
             )
             self._initialized = True
         except ImportError:
-            raise ImportError(
-                "chromadb 未安装。运行: pip install chromadb sentence-transformers"
-            )
+            raise ImportError("chromadb 未安装。运行: pip install chromadb sentence-transformers")
 
-    def add(self, texts: list[str], metadatas: list[dict] | None = None, ids: list[str] | None = None):
+    def add(
+        self, texts: list[str], metadatas: list[dict] | None = None, ids: list[str] | None = None
+    ):
         self._ensure_init()
         if ids is None:
             ids = [str(self.count() + i) for i in range(len(texts))]

@@ -6,11 +6,10 @@ All responses are wrapped in APIResponse[T] for consistency.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Generic, List, Optional, TypeVar
+from datetime import UTC, datetime
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-
 
 T = TypeVar("T")
 
@@ -19,17 +18,16 @@ T = TypeVar("T")
 # Meta & pagination
 # ============================================================================
 
+
 class APIResponseMeta(BaseModel):
     """Response metadata: timing, version, request tracking."""
 
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO 8601 response timestamp",
     )
     version: str = Field(default="1.0", description="API version")
-    request_id: str = Field(
-        default="", description="Unique request ID for tracing"
-    )
+    request_id: str = Field(default="", description="Unique request ID for tracing")
 
 
 class PaginationMeta(BaseModel):
@@ -39,9 +37,7 @@ class PaginationMeta(BaseModel):
     page_size: int = Field(default=20, ge=1, le=200, description="Items per page")
     total_items: int = Field(default=0, ge=0, description="Total matching items")
     total_pages: int = Field(default=0, ge=0, description="Total pages")
-    next_cursor: Optional[str] = Field(
-        default=None, description="Opaque cursor for next page"
-    )
+    next_cursor: str | None = Field(default=None, description="Opaque cursor for next page")
     has_next: bool = Field(default=False, description="Whether a next page exists")
     has_prev: bool = Field(default=False, description="Whether a previous page exists")
 
@@ -64,6 +60,7 @@ class PaginationMeta(BaseModel):
 # Error detail (RFC 9457 Problem Details)
 # ============================================================================
 
+
 class APIErrorDetail(BaseModel):
     """Single error entry conforming to RFC 9457 Problem Details."""
 
@@ -74,18 +71,17 @@ class APIErrorDetail(BaseModel):
     title: str = Field(description="Short, human-readable summary")
     status: int = Field(default=500, ge=100, le=599)
     detail: str = Field(default="", description="Human-readable explanation")
-    instance: Optional[str] = Field(
+    instance: str | None = Field(
         default=None, description="URI reference identifying the specific occurrence"
     )
     code: str = Field(default="INTERNAL_ERROR", description="Machine-readable error code")
-    field: Optional[str] = Field(
-        default=None, description="Field name for validation errors"
-    )
+    field: str | None = Field(default=None, description="Field name for validation errors")
 
 
 # ============================================================================
 # Response envelope
 # ============================================================================
+
 
 class APIResponse(BaseModel, Generic[T]):
     """Canonical API response envelope.
@@ -100,31 +96,28 @@ class APIResponse(BaseModel, Generic[T]):
     """
 
     success: bool = Field(default=True, description="Whether the request succeeded")
-    data: Optional[T] = Field(default=None, description="Response payload")
-    error: Optional[APIErrorDetail] = Field(
+    data: T | None = Field(default=None, description="Response payload")
+    error: APIErrorDetail | None = Field(
         default=None, description="Error detail (only when success=False)"
     )
-    meta: APIResponseMeta = Field(
-        default_factory=APIResponseMeta, description="Response metadata"
-    )
+    meta: APIResponseMeta = Field(default_factory=APIResponseMeta, description="Response metadata")
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
     """Paginated list response."""
 
     success: bool = Field(default=True)
-    data: List[T] = Field(default_factory=list, description="Page items")
+    data: list[T] = Field(default_factory=list, description="Page items")
     pagination: PaginationMeta = Field(
         default_factory=PaginationMeta, description="Pagination metadata"
     )
-    meta: APIResponseMeta = Field(
-        default_factory=APIResponseMeta, description="Response metadata"
-    )
+    meta: APIResponseMeta = Field(default_factory=APIResponseMeta, description="Response metadata")
 
 
 # ============================================================================
 # Health & version
 # ============================================================================
+
 
 class HealthComponent(BaseModel):
     """Individual component health status."""
@@ -132,7 +125,7 @@ class HealthComponent(BaseModel):
     name: str
     status: str = Field(description="healthy | degraded | unhealthy")
     latency_ms: float = Field(default=0.0, description="Check latency in ms")
-    error: Optional[str] = Field(default=None)
+    error: str | None = Field(default=None)
 
 
 class HealthResponse(BaseModel):
@@ -140,10 +133,8 @@ class HealthResponse(BaseModel):
 
     status: str = Field(description="healthy | degraded | unhealthy")
     uptime_seconds: float
-    components: List[HealthComponent] = Field(default_factory=list)
-    timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    components: list[HealthComponent] = Field(default_factory=list)
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class VersionResponse(BaseModel):
@@ -151,6 +142,6 @@ class VersionResponse(BaseModel):
 
     version: str
     build: str = ""
-    commit_sha: Optional[str] = None
+    commit_sha: str | None = None
     python_version: str = ""
     environment: str = "production"

@@ -11,11 +11,10 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-
 # ── 抽象基类 ────────────────────────────────────
 
-class CheckpointStore(ABC):
 
+class CheckpointStore(ABC):
     """检查点存储基类。"""
 
     @abstractmethod
@@ -36,14 +35,12 @@ class SqliteStore(CheckpointStore):
 
     def __post_init__(self):
         self._conn = sqlite3.connect(self.path, check_same_thread=False)
-        self._conn.execute(
-            """CREATE TABLE IF NOT EXISTS checkpoints (
+        self._conn.execute("""CREATE TABLE IF NOT EXISTS checkpoints (
                 session_id TEXT PRIMARY KEY,
                 snapshot TEXT NOT NULL,
                 created_at REAL NOT NULL,
                 updated_at REAL NOT NULL
-            )"""
-        )
+            )""")
         self._conn.execute("CREATE INDEX IF NOT EXISTS idx_updated ON checkpoints(updated_at DESC)")
         self._conn.commit()
 

@@ -17,25 +17,35 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Optional
 
 
-class SkillFormat(str, Enum):
+class SkillFormat(StrEnum):
     AGENTOS = "agentos"
     OPENCLAW = "openclaw"
     MCP = "mcp"
     GENERIC = "generic"
 
     @classmethod
-    def detect(cls, raw: dict) -> "SkillFormat":
+    def detect(cls, raw: dict) -> SkillFormat:
         """从原始 manifest dict 自动检测格式。"""
-        if raw.get("mcpServers") or raw.get("tools") and isinstance(raw.get("tools"), list) and raw["tools"] and "server" in raw["tools"][0]:
+        if (
+            raw.get("mcpServers")
+            or raw.get("tools")
+            and isinstance(raw.get("tools"), list)
+            and raw["tools"]
+            and "server" in raw["tools"][0]
+        ):
             return cls.MCP
         if raw.get("format") == "openclaw" or raw.get("openclaw_version"):
             return cls.OPENCLAW
-        if raw.get("format") == "agentos" or raw.get("entrypoint") or raw.get("tools") and isinstance(raw.get("tools"), list):
+        if (
+            raw.get("format") == "agentos"
+            or raw.get("entrypoint")
+            or raw.get("tools")
+            and isinstance(raw.get("tools"), list)
+        ):
             return cls.AGENTOS
         return cls.GENERIC
 
@@ -43,6 +53,7 @@ class SkillFormat(str, Enum):
 @dataclass
 class ToolDef:
     """Skill 暴露的工具定义。"""
+
     name: str
     description: str = ""
     parameters: dict = field(default_factory=dict)
@@ -65,15 +76,15 @@ class SkillManifest:
     format: SkillFormat = SkillFormat.GENERIC
 
     # AgentOS 原生字段
-    entrypoint: str = ""           # "module:func" 格式的入口点
+    entrypoint: str = ""  # "module:func" 格式的入口点
     tools: list[ToolDef] = field(default_factory=list)
     dependencies: list[str] = field(default_factory=list)
 
     # MCP 兼容字段
-    mcp_command: str = ""          # MCP server 启动命令，如 "npx -y @anthropic/mcp-server"
+    mcp_command: str = ""  # MCP server 启动命令，如 "npx -y @anthropic/mcp-server"
     mcp_args: list[str] = field(default_factory=list)
     mcp_env: dict = field(default_factory=dict)
-    mcp_type: str = "stdio"        # stdio | sse
+    mcp_type: str = "stdio"  # stdio | sse
 
     # OpenClaw 兼容字段
     openclaw_version: str = ""
@@ -87,11 +98,11 @@ class SkillManifest:
 
     # 元数据
     install_path: str = ""
-    source: str = ""               # pypi | github | local | url
+    source: str = ""  # pypi | github | local | url
     manifest_hash: str = ""
 
     @classmethod
-    def from_dict(cls, raw: dict, source: str = "", install_path: str = "") -> "SkillManifest":
+    def from_dict(cls, raw: dict, source: str = "", install_path: str = "") -> SkillManifest:
         """从原始 dict 自动检测格式并解析。"""
         fmt = SkillFormat.detect(raw)
         m = cls(name="", description="")
@@ -115,12 +126,14 @@ class SkillManifest:
             m.dependencies = raw.get("dependencies", raw.get("requires", []))
             tools_raw = raw.get("tools", [])
             for t in tools_raw:
-                m.tools.append(ToolDef(
-                    name=t.get("name", ""),
-                    description=t.get("description", ""),
-                    parameters=t.get("parameters", {}),
-                    returns=t.get("returns", ""),
-                ))
+                m.tools.append(
+                    ToolDef(
+                        name=t.get("name", ""),
+                        description=t.get("description", ""),
+                        parameters=t.get("parameters", {}),
+                        returns=t.get("returns", ""),
+                    )
+                )
 
         elif fmt == SkillFormat.OPENCLAW:
             # OpenClaw 格式：skill.yaml → agentos 适配
@@ -129,11 +142,13 @@ class SkillManifest:
             m.openclaw_version = raw.get("openclaw_version", raw.get("format_version", ""))
             tools_raw = raw.get("tools", raw.get("functions", []))
             for t in tools_raw:
-                m.tools.append(ToolDef(
-                    name=t.get("name", ""),
-                    description=t.get("description", ""),
-                    parameters=t.get("parameters", t.get("input_schema", {})),
-                ))
+                m.tools.append(
+                    ToolDef(
+                        name=t.get("name", ""),
+                        description=t.get("description", ""),
+                        parameters=t.get("parameters", t.get("input_schema", {})),
+                    )
+                )
 
         elif fmt == SkillFormat.MCP:
             # MCP 格式：mcpServers.{name} → agentos 适配
@@ -150,15 +165,19 @@ class SkillManifest:
                 m.description = f"MCP Server: {m.mcp_command} {' '.join(m.mcp_args)}"
             tools_raw = raw.get("tools", [])
             for t in tools_raw:
-                m.tools.append(ToolDef(
-                    name=t.get("name", ""),
-                    description=t.get("description", ""),
-                    parameters=t.get("inputSchema", {}),
-                ))
+                m.tools.append(
+                    ToolDef(
+                        name=t.get("name", ""),
+                        description=t.get("description", ""),
+                        parameters=t.get("inputSchema", {}),
+                    )
+                )
 
         elif fmt == SkillFormat.GENERIC:
             m.entrypoint = raw.get("entrypoint", raw.get("main", ""))
-            m.dependencies = raw.get("dependencies", raw.get("requires", raw.get("install_requires", [])))
+            m.dependencies = raw.get(
+                "dependencies", raw.get("requires", raw.get("install_requires", []))
+            )
             m.description = raw.get("description", raw.get("summary", ""))
 
         # 计算 manifest 哈希
@@ -190,12 +209,16 @@ class SkillManifest:
             "repository": self.repository,
             "icon": self.icon,
             "min_agentos_version": self.min_agentos_version,
-            "mcp": {
-                "command": self.mcp_command,
-                "args": self.mcp_args,
-                "env": self.mcp_env,
-                "type": self.mcp_type,
-            } if self.mcp_command else None,
+            "mcp": (
+                {
+                    "command": self.mcp_command,
+                    "args": self.mcp_args,
+                    "env": self.mcp_env,
+                    "type": self.mcp_type,
+                }
+                if self.mcp_command
+                else None
+            ),
             "manifest_hash": self.manifest_hash,
             "source": self.source,
         }
@@ -205,7 +228,7 @@ class SkillManifest:
         return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
     @staticmethod
-    def load_from_path(manifest_path: str | Path, source: str = "local") -> Optional["SkillManifest"]:
+    def load_from_path(manifest_path: str | Path, source: str = "local") -> SkillManifest | None:
         """从本地 manifest 文件加载。支持 yaml/json。"""
         p = Path(manifest_path)
         if not p.exists():
@@ -213,6 +236,7 @@ class SkillManifest:
         text = p.read_text(encoding="utf-8")
         if p.suffix in (".yaml", ".yml"):
             import yaml
+
             raw = yaml.safe_load(text)
         else:
             raw = json.loads(text)

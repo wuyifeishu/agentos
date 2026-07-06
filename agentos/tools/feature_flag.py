@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import hashlib
 import threading
-from typing import Dict, List, Optional, Set
 
 
 class FeatureFlag:
@@ -35,7 +34,7 @@ class FeatureFlag:
     """
 
     def __init__(self):
-        self._flags: Dict[str, _FlagDef] = {}
+        self._flags: dict[str, _FlagDef] = {}
         self._lock = threading.RLock()
 
     # ---------- Define ----------
@@ -45,8 +44,8 @@ class FeatureFlag:
         name: str,
         default: bool = False,
         rollout: int = 0,
-        targets: Optional[List[str]] = None,
-        depends_on: Optional[List[str]] = None,
+        targets: list[str] | None = None,
+        depends_on: list[str] | None = None,
     ):
         """Register a feature flag.
 
@@ -72,7 +71,7 @@ class FeatureFlag:
 
     # ---------- Evaluate ----------
 
-    def is_enabled(self, name: str, context: Optional[dict] = None) -> bool:
+    def is_enabled(self, name: str, context: dict | None = None) -> bool:
         """Check whether a feature flag is enabled for the given context.
 
         Context may include:
@@ -125,7 +124,7 @@ class FeatureFlag:
             if name in self._flags:
                 self._flags[name].overrides.pop(user_id, None)
 
-    def clear_all_overrides(self, name: Optional[str] = None):
+    def clear_all_overrides(self, name: str | None = None):
         """Clear all overrides, optionally for a specific flag."""
         with self._lock:
             if name:
@@ -137,11 +136,11 @@ class FeatureFlag:
 
     # ---------- Query ----------
 
-    def list_flags(self) -> List[str]:
+    def list_flags(self) -> list[str]:
         with self._lock:
             return list(self._flags.keys())
 
-    def get_definition(self, name: str) -> Optional[dict]:
+    def get_definition(self, name: str) -> dict | None:
         with self._lock:
             flag = self._flags.get(name)
             if not flag:
@@ -179,6 +178,6 @@ class _FlagDef:
         self.name = name
         self.default = default
         self.rollout = rollout
-        self.targets: Set[str] = targets
-        self.depends_on: Set[str] = depends_on
-        self.overrides: Dict[str, bool] = overrides or {}
+        self.targets: set[str] = targets
+        self.depends_on: set[str] = depends_on
+        self.overrides: dict[str, bool] = overrides or {}

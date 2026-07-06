@@ -8,7 +8,6 @@ development, production, testing, and budget-constrained environments.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -154,7 +153,7 @@ PRESETS: dict[str, AgentOSPreset] = {
 }
 
 
-def get_preset(name: str) -> Optional[AgentOSPreset]:
+def get_preset(name: str) -> AgentOSPreset | None:
     """Get a preset by name. Returns None if not found."""
     return PRESETS.get(name.lower())
 
@@ -184,9 +183,7 @@ def apply_preset(preset_name: str, config: dict) -> dict:
     """
     preset = get_preset(preset_name)
     if not preset:
-        raise ValueError(
-            f"Unknown preset: '{preset_name}'. Available: {list(PRESETS.keys())}"
-        )
+        raise ValueError(f"Unknown preset: '{preset_name}'. Available: {list(PRESETS.keys())}")
 
     mapping = {
         "model": "model",

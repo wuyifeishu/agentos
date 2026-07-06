@@ -2,25 +2,26 @@
 
 from __future__ import annotations
 
-import traceback
 import sys
+import traceback
 from dataclasses import dataclass, field
 from enum import Enum, auto
 
 
 class ErrorCategory(Enum):
     """错误分类枚举。"""
-    NETWORK = auto()         # 网络/API 调用失败
-    AUTH = auto()            # 认证/API Key 问题
-    CONFIG = auto()          # 配置错误
-    RATE_LIMIT = auto()      # 限流/配额
-    VALIDATION = auto()      # 输入验证
-    TIMEOUT = auto()         # 超时
-    RESOURCE = auto()        # 资源不足（内存/磁盘）
-    MODEL = auto()           # 模型相关
-    PLUGIN = auto()          # 插件错误
-    INTERNAL = auto()        # 内部错误
-    UNKNOWN = auto()         # 未分类
+
+    NETWORK = auto()  # 网络/API 调用失败
+    AUTH = auto()  # 认证/API Key 问题
+    CONFIG = auto()  # 配置错误
+    RATE_LIMIT = auto()  # 限流/配额
+    VALIDATION = auto()  # 输入验证
+    TIMEOUT = auto()  # 超时
+    RESOURCE = auto()  # 资源不足（内存/磁盘）
+    MODEL = auto()  # 模型相关
+    PLUGIN = auto()  # 插件错误
+    INTERNAL = auto()  # 内部错误
+    UNKNOWN = auto()  # 未分类
 
 
 CATEGORY_HINTS = {
@@ -41,6 +42,7 @@ CATEGORY_HINTS = {
 @dataclass
 class ErrorContext:
     """错误上下文信息。"""
+
     trace_id: str = ""
     category: ErrorCategory = ErrorCategory.UNKNOWN
     message: str = ""
@@ -74,11 +76,16 @@ class ErrorFormatter:
             return ErrorCategory.TIMEOUT
         if any(kw in msg for kw in ["rate limit", "too many requests", "429"]):
             return ErrorCategory.RATE_LIMIT
-        if any(kw in msg for kw in ["unauthorized", "forbidden", "401", "403", "api key", "invalid key"]):
+        if any(
+            kw in msg
+            for kw in ["unauthorized", "forbidden", "401", "403", "api key", "invalid key"]
+        ):
             return ErrorCategory.AUTH
         if any(kw in msg for kw in ["connection", "network", "dns", "refused", "unreachable"]):
             return ErrorCategory.NETWORK
-        if any(kw in msg for kw in ["validation", "invalid", "expected", "type error", "value error"]):
+        if any(
+            kw in msg for kw in ["validation", "invalid", "expected", "type error", "value error"]
+        ):
             return ErrorCategory.VALIDATION
         if any(kw in msg for kw in ["memory", "disk", "quota", "out of"]):
             return ErrorCategory.RESOURCE
@@ -158,6 +165,7 @@ def format_error(exc: Exception, trace_id: str = "") -> str:
 
 def friendly_error(func):
     """装饰器：自动捕获异常并输出友好信息。"""
+
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -165,4 +173,5 @@ def friendly_error(func):
             friendly_msg = format_error(e)
             print(friendly_msg, file=sys.stderr)
             raise
+
     return wrapper

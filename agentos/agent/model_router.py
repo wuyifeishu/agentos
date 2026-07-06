@@ -13,8 +13,6 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
-
 
 __all__ = [
     "TaskComplexity",
@@ -28,12 +26,13 @@ __all__ = [
 
 # ── Enums ──────────────────────────────────────────────────────────
 
+
 class TaskComplexity(Enum):
-    TRIVIAL = 0       # weather, time, simple calc
-    SIMPLE = 1        # basic Q&A, short translation
-    MODERATE = 2      # typical assistant tasks
-    COMPLEX = 3       # code review, analysis, research
-    EXPERT = 4        # deep research, architecture design
+    TRIVIAL = 0  # weather, time, simple calc
+    SIMPLE = 1  # basic Q&A, short translation
+    MODERATE = 2  # typical assistant tasks
+    COMPLEX = 3  # code review, analysis, research
+    EXPERT = 4  # deep research, architecture design
 
 
 class TaskPriority(Enum):
@@ -45,12 +44,13 @@ class TaskPriority(Enum):
 
 # ── Dataclasses ────────────────────────────────────────────────────
 
+
 @dataclass
 class ModelSpec:
     name: str
     provider: str
-    cost_per_1k_input: float      # USD per 1k input tokens
-    cost_per_1k_output: float     # USD per 1k output tokens
+    cost_per_1k_input: float  # USD per 1k input tokens
+    cost_per_1k_output: float  # USD per 1k output tokens
     max_tokens: int = 4096
     context_window: int = 128_000
     min_complexity: TaskComplexity = TaskComplexity.TRIVIAL
@@ -80,34 +80,101 @@ class RouteResult:
 
 DEFAULT_MODELS: list[ModelSpec] = [
     # GPT family
-    ModelSpec("gpt-4o", "openai", 2.50, 10.00, 16384, 128000,
-              TaskComplexity.COMPLEX, ["gpt", "vision", "best"]),
-    ModelSpec("gpt-4o-mini", "openai", 0.15, 0.60, 16384, 128000,
-              TaskComplexity.SIMPLE, ["gpt", "cheap", "fast"]),
+    ModelSpec(
+        "gpt-4o",
+        "openai",
+        2.50,
+        10.00,
+        16384,
+        128000,
+        TaskComplexity.COMPLEX,
+        ["gpt", "vision", "best"],
+    ),
+    ModelSpec(
+        "gpt-4o-mini",
+        "openai",
+        0.15,
+        0.60,
+        16384,
+        128000,
+        TaskComplexity.SIMPLE,
+        ["gpt", "cheap", "fast"],
+    ),
     # Claude family
-    ModelSpec("claude-3.5-sonnet", "anthropic", 3.00, 15.00, 8192, 200000,
-              TaskComplexity.COMPLEX, ["claude", "code", "best"]),
-    ModelSpec("claude-3-haiku", "anthropic", 0.25, 1.25, 4096, 200000,
-              TaskComplexity.TRIVIAL, ["claude", "cheap", "fast"]),
+    ModelSpec(
+        "claude-3.5-sonnet",
+        "anthropic",
+        3.00,
+        15.00,
+        8192,
+        200000,
+        TaskComplexity.COMPLEX,
+        ["claude", "code", "best"],
+    ),
+    ModelSpec(
+        "claude-3-haiku",
+        "anthropic",
+        0.25,
+        1.25,
+        4096,
+        200000,
+        TaskComplexity.TRIVIAL,
+        ["claude", "cheap", "fast"],
+    ),
     # DeepSeek
-    ModelSpec("deepseek-v3", "deepseek", 0.27, 1.10, 8192, 64000,
-              TaskComplexity.MODERATE, ["deepseek", "value"]),
-    ModelSpec("deepseek-r1", "deepseek", 0.55, 2.19, 32768, 128000,
-              TaskComplexity.EXPERT, ["deepseek", "reasoning", "best"]),
+    ModelSpec(
+        "deepseek-v3",
+        "deepseek",
+        0.27,
+        1.10,
+        8192,
+        64000,
+        TaskComplexity.MODERATE,
+        ["deepseek", "value"],
+    ),
+    ModelSpec(
+        "deepseek-r1",
+        "deepseek",
+        0.55,
+        2.19,
+        32768,
+        128000,
+        TaskComplexity.EXPERT,
+        ["deepseek", "reasoning", "best"],
+    ),
     # Gemini
-    ModelSpec("gemini-2.5-pro", "google", 1.25, 10.00, 8192, 1048576,
-              TaskComplexity.EXPERT, ["gemini", "best", "context"]),
-    ModelSpec("gemini-2.5-flash", "google", 0.15, 0.60, 8192, 1048576,
-              TaskComplexity.SIMPLE, ["gemini", "cheap", "fast"]),
+    ModelSpec(
+        "gemini-2.5-pro",
+        "google",
+        1.25,
+        10.00,
+        8192,
+        1048576,
+        TaskComplexity.EXPERT,
+        ["gemini", "best", "context"],
+    ),
+    ModelSpec(
+        "gemini-2.5-flash",
+        "google",
+        0.15,
+        0.60,
+        8192,
+        1048576,
+        TaskComplexity.SIMPLE,
+        ["gemini", "cheap", "fast"],
+    ),
     # Ollama / local
-    ModelSpec("llama3.2-3b", "ollama", 0.0, 0.0, 4096, 128000,
-              TaskComplexity.TRIVIAL, ["local", "free"]),
-    ModelSpec("qwen2.5-7b", "ollama", 0.0, 0.0, 8192, 128000,
-              TaskComplexity.SIMPLE, ["local", "free"]),
+    ModelSpec(
+        "llama3.2-3b", "ollama", 0.0, 0.0, 4096, 128000, TaskComplexity.TRIVIAL, ["local", "free"]
+    ),
+    ModelSpec(
+        "qwen2.5-7b", "ollama", 0.0, 0.0, 8192, 128000, TaskComplexity.SIMPLE, ["local", "free"]
+    ),
 ]
 
 
 # ── Model Router ──────────────────────────────────────────────────
+
 
 class ModelRouter:
     """Intelligent model router with budget-aware selection.
@@ -133,7 +200,7 @@ class ModelRouter:
         self,
         models: list[ModelSpec],
         daily_budget_usd: float = 50.0,
-        complexity_cost_map: Optional[dict[TaskComplexity, float]] = None,
+        complexity_cost_map: dict[TaskComplexity, float] | None = None,
     ):
         self.models = models
         self._daily_budget = daily_budget_usd
@@ -157,7 +224,7 @@ class ModelRouter:
     # ── Factory ────────────────────────────────────────────────────
 
     @classmethod
-    def with_defaults(cls, daily_budget_usd: float = 50.0) -> "ModelRouter":
+    def with_defaults(cls, daily_budget_usd: float = 50.0) -> ModelRouter:
         """Create a ModelRouter with default model registry."""
         return cls(models=list(DEFAULT_MODELS), daily_budget_usd=daily_budget_usd)
 
@@ -183,10 +250,7 @@ class ModelRouter:
                     )
 
         # 1. Find candidate models that can handle this complexity
-        candidates = [
-            m for m in self.models
-            if m.min_complexity.value <= spec.complexity.value
-        ]
+        candidates = [m for m in self.models if m.min_complexity.value <= spec.complexity.value]
         if not candidates:
             # Use cheapest as fallback
             candidates = [self._by_cost[0]]

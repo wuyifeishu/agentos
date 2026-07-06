@@ -11,9 +11,10 @@ import pickle
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -21,6 +22,7 @@ T = TypeVar("T")
 # ============================================================================
 # Serializer
 # ============================================================================
+
 
 class SerialFormat(Enum):
     JSON = "json"
@@ -31,14 +33,15 @@ class SerialFormat(Enum):
     def detect(self, data: bytes) -> "SerialFormat":
         if self != SerialFormat.AUTO:
             return self
-        if data[:2] in (b'\x80\x03', b'\x80\x04', b'\x80\x05'):
+        if data[:2] in (b"\x80\x03", b"\x80\x04", b"\x80\x05"):
             return SerialFormat.PICKLE
-        if data[:1] == b'{' or data[:1] == b'[':
+        if data[:1] == b"{" or data[:1] == b"[":
             return SerialFormat.JSON
         # Try msgpack header (0x80-0x8f for fixmap, 0x90-0x9f for fixarray, 0xdc/0xdd/0xde/0xdf, etc.)
         if len(data) > 0 and data[0] in range(0x80, 0x100):
             try:
                 import msgpack
+
                 msgpack.unpackb(data)
                 return SerialFormat.MSGPACK
             except Exception:
@@ -62,7 +65,7 @@ class Serializer:
         if fmt == SerialFormat.JSON:
             data = json.dumps(obj, ensure_ascii=False, default=str)
             self._total_serialized += 1
-            return data.encode('utf-8')
+            return data.encode("utf-8")
 
         elif fmt == SerialFormat.PICKLE:
             data = pickle.dumps(obj)
@@ -71,20 +74,21 @@ class Serializer:
 
         elif fmt == SerialFormat.MSGPACK:
             import msgpack
+
             data = msgpack.packb(obj, default=str)
             self._total_serialized += 1
             return data
 
         raise ValueError(f"Unsupported format: {fmt}")
 
-    def loads(self, data: bytes, fmt: Optional[SerialFormat] = None) -> Any:
+    def loads(self, data: bytes, fmt: SerialFormat | None = None) -> Any:
         if fmt is None:
             fmt = SerialFormat.AUTO
 
         fmt = fmt.detect(data)
 
         if fmt == SerialFormat.JSON:
-            result = json.loads(data.decode('utf-8'))
+            result = json.loads(data.decode("utf-8"))
             self._total_deserialized += 1
             return result
 
@@ -95,6 +99,7 @@ class Serializer:
 
         elif fmt == SerialFormat.MSGPACK:
             import msgpack
+
             result = msgpack.unpackb(data)
             self._total_deserialized += 1
             return result
@@ -102,7 +107,7 @@ class Serializer:
         raise ValueError(f"Unsupported format: {fmt}")
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "format": self._fmt.value if isinstance(self._fmt, SerialFormat) else self._fmt,
             "total_serialized": self._total_serialized,
@@ -113,6 +118,7 @@ class Serializer:
 # ============================================================================
 # EvictionPolicy
 # ============================================================================
+
 
 class EvictionPolicy(Enum):
     LRU = "lru"
@@ -131,6 +137,7 @@ class _CacheEntry(Generic[T]):
 # ============================================================================
 # TTLCache
 # ============================================================================
+
 
 class TTLCache(Generic[T]):
     """Thread-safe TTL cache with configurable eviction policy (LRU/LFU).
@@ -153,7 +160,7 @@ class TTLCache(Generic[T]):
         self._misses: int = 0
         self._evictions: int = 0
 
-    def get(self, key: str) -> Optional[T]:
+    def get(self, key: str) -> T | None:
         with self._lock:
             entry = self._data.get(key)
             if entry is None:
@@ -173,7 +180,7 @@ class TTLCache(Generic[T]):
             self._hits += 1
             return entry.value
 
-    def set(self, key: str, value: T, ttl: Optional[float] = None) -> None:
+    def set(self, key: str, value: T, ttl: float | None = None) -> None:
         with self._lock:
             if key in self._data:
                 self._data.pop(key)
@@ -238,7 +245,7 @@ class TTLCache(Generic[T]):
             return len(self._data)
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "size": len(self._data),
@@ -256,6 +263,7 @@ class TTLCache(Generic[T]):
 # SmartCache
 # ============================================================================
 
+
 class SmartCache(Generic[T]):
     """Compute-on-miss cache combining TTLCache with Serializer.
 
@@ -272,10 +280,10 @@ class SmartCache(Generic[T]):
         self._cache = TTLCache[T](max_size=max_size, ttl=ttl, policy=policy)
         self._serializer = Serializer()
 
-    def get(self, key: str) -> Optional[T]:
+    def get(self, key: str) -> T | None:
         return self._cache.get(key)
 
-    def get_or_compute(self, key: str, factory: Callable[[], T], ttl: Optional[float] = None) -> T:
+    def get_or_compute(self, key: str, factory: Callable[[], T], ttl: float | None = None) -> T:
         """Get from cache or compute via factory and cache the result."""
         value = self._cache.get(key)
         if value is not None:
@@ -284,7 +292,7 @@ class SmartCache(Generic[T]):
         self._cache.set(key, value, ttl=ttl)
         return value
 
-    def set(self, key: str, value: T, ttl: Optional[float] = None) -> None:
+    def set(self, key: str, value: T, ttl: float | None = None) -> None:
         self._cache.set(key, value, ttl=ttl)
 
     def delete(self, key: str) -> bool:
@@ -328,5 +336,5 @@ class SmartCache(Generic[T]):
         return self._cache.size
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return self._cache.stats

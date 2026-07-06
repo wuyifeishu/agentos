@@ -7,7 +7,9 @@ Category: knowledge
 
 def run(action: str, query: str = "", lang: str = "zh") -> str:
     """Wikipedia 查询工具。action: search/summary/page。lang: zh/en/ja 等。"""
-    import urllib.request, urllib.parse, json
+    import json
+    import urllib.parse
+    import urllib.request
 
     if not query:
         return "[wikipedia] 需要 query 参数"
@@ -16,15 +18,20 @@ def run(action: str, query: str = "", lang: str = "zh") -> str:
 
     try:
         if action == "search":
-            params = urllib.parse.urlencode({
-                "action": "query", "list": "search", "srsearch": query,
-                "format": "json", "srlimit": 10
-            })
+            params = urllib.parse.urlencode(
+                {
+                    "action": "query",
+                    "list": "search",
+                    "srsearch": query,
+                    "format": "json",
+                    "srlimit": 10,
+                }
+            )
             url = f"{base}?{params}"
             req = urllib.request.Request(url, headers={"User-Agent": "AgentOS/1.0"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read())
-            results = data.get("query",{}).get("search",[])
+            results = data.get("query", {}).get("search", [])
             if not results:
                 return f"[wikipedia] 未找到 '{query}' 相关条目"
             lines = [f"Wikipedia 搜索结果 ({len(results)} 条):"]
@@ -34,21 +41,27 @@ def run(action: str, query: str = "", lang: str = "zh") -> str:
 
         if action in ("summary", "page"):
             # Get page extract
-            params = urllib.parse.urlencode({
-                "action": "query", "prop": "extracts", "exintro": "1",
-                "explaintext": "1", "titles": query, "format": "json",
-                "exchars": "2000" if action == "summary" else "5000"
-            })
+            params = urllib.parse.urlencode(
+                {
+                    "action": "query",
+                    "prop": "extracts",
+                    "exintro": "1",
+                    "explaintext": "1",
+                    "titles": query,
+                    "format": "json",
+                    "exchars": "2000" if action == "summary" else "5000",
+                }
+            )
             url = f"{base}?{params}"
             req = urllib.request.Request(url, headers={"User-Agent": "AgentOS/1.0"})
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = json.loads(resp.read())
-            pages = data.get("query",{}).get("pages",{})
+            pages = data.get("query", {}).get("pages", {})
             for pid, page in pages.items():
                 if pid == "-1":
                     return f"[wikipedia] 页面 '{query}' 不存在"
-                title = page.get("title","")
-                extract = page.get("extract","")
+                title = page.get("title", "")
+                extract = page.get("extract", "")
                 if not extract:
                     return f"[wikipedia] 页面 '{title}' 无内容"
                 return f"=== {title} ===\n\n{extract}"

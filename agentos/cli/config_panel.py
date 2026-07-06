@@ -14,7 +14,6 @@ import sys
 import webbrowser
 from pathlib import Path
 
-
 CONFIG_DIR = Path.home() / ".agentos"
 CONFIG_FILE = CONFIG_DIR / "config.yaml"
 ENV_FILE = CONFIG_DIR / ".env"
@@ -324,6 +323,7 @@ def _test_connection(provider: str, api_key: str) -> tuple[bool, str]:
     """测试 API 连接。"""
     try:
         import httpx
+
         if provider == "openai":
             resp = httpx.get(
                 "https://api.openai.com/v1/models",
@@ -409,6 +409,7 @@ def _save_config(provider: str, api_key: str):
     # Update config.yaml
     config = {"version": "1.4.1", "active_provider": provider}
     import yaml
+
     if CONFIG_FILE.exists():
         existing = yaml.safe_load(CONFIG_FILE.read_text())
         if existing and "providers" in existing:
@@ -451,10 +452,12 @@ class PanelHandler(http.server.BaseHTTPRequestHandler):
             if ok:
                 _save_config(provider, key)
                 info = API_TEMPLATE[provider]
-                self._send_json({
-                    "ok": True,
-                    "model": info["default_model"],
-                })
+                self._send_json(
+                    {
+                        "ok": True,
+                        "model": info["default_model"],
+                    }
+                )
             else:
                 self._send_json({"ok": False, "error": err})
         elif self.path == "/api/verify":

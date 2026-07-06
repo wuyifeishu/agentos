@@ -10,14 +10,15 @@ import heapq
 import threading
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional
-
+from typing import Any
 
 # ============================================================================
 # Task & Result Types
 # ============================================================================
+
 
 class TaskStatus(Enum):
     PENDING = auto()
@@ -31,6 +32,7 @@ class TaskStatus(Enum):
 @dataclass(order=True)
 class _PrioritizedTask:
     """Internal heap item. Lower priority value = higher urgency."""
+
     priority: int
     deadline: float
     seq: int  # tiebreaker for stable ordering
@@ -40,18 +42,19 @@ class _PrioritizedTask:
 @dataclass
 class Task:
     """A schedulable task with metadata."""
+
     task_id: str
     func: Callable
     args: tuple = ()
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
     priority: int = 0
-    deadline: Optional[float] = None
+    deadline: float | None = None
     status: TaskStatus = TaskStatus.PENDING
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     created_at: float = field(default_factory=time.monotonic)
-    started_at: Optional[float] = None
-    completed_at: Optional[float] = None
+    started_at: float | None = None
+    completed_at: float | None = None
 
     def run(self):
         self.started_at = time.monotonic()
@@ -66,7 +69,7 @@ class Task:
             self.completed_at = time.monotonic()
 
     @property
-    def elapsed(self) -> Optional[float]:
+    def elapsed(self) -> float | None:
         if self.started_at is None:
             return None
         return (self.completed_at or time.monotonic()) - self.started_at
@@ -76,6 +79,7 @@ class Task:
 # PriorityTaskQueue
 # ============================================================================
 
+
 class PriorityTaskQueue:
     """Thread-safe bounded priority queue for tasks.
 
@@ -84,8 +88,8 @@ class PriorityTaskQueue:
 
     def __init__(self, max_size: int = 1000):
         self._max_size = max_size
-        self._heap: List[_PrioritizedTask] = []
-        self._lookup: Dict[str, _PrioritizedTask] = {}
+        self._heap: list[_PrioritizedTask] = []
+        self._lookup: dict[str, _PrioritizedTask] = {}
         self._lock = threading.RLock()
         self._seq: int = 0
         self._total_enqueued: int = 0
@@ -99,7 +103,7 @@ class PriorityTaskQueue:
             self._seq += 1
             pt = _PrioritizedTask(
                 priority=task.priority,
-                deadline=task.deadline or float('inf'),
+                deadline=task.deadline or float("inf"),
                 seq=self._seq,
                 task=task,
             )
@@ -108,7 +112,7 @@ class PriorityTaskQueue:
             self._total_enqueued += 1
             return True
 
-    def dequeue(self) -> Optional[Task]:
+    def dequeue(self) -> Task | None:
         with self._lock:
             self._clean_expired()
             while self._heap:
@@ -143,7 +147,7 @@ class PriorityTaskQueue:
             if pt.task.status == TaskStatus.CANCELLED:
                 heapq.heappop(self._heap)
                 self._lookup.pop(pt.task.task_id, None)
-            elif pt.deadline != float('inf') and now > pt.deadline:
+            elif pt.deadline != float("inf") and now > pt.deadline:
                 pt.task.status = TaskStatus.EXPIRED
                 heapq.heappop(self._heap)
                 self._lookup.pop(pt.task.task_id, None)
@@ -157,7 +161,7 @@ class PriorityTaskQueue:
             return len(self._heap)
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "size": len(self._heap),
@@ -172,13 +176,14 @@ class PriorityTaskQueue:
 # TaskScheduler
 # ============================================================================
 
+
 class TaskScheduler:
     """Schedule tasks at intervals or after delays. Runs in a background thread."""
 
     def __init__(self):
         self._queue = PriorityTaskQueue()
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._scheduled_count: int = 0
         self._executed_count: int = 0
@@ -203,9 +208,7 @@ class TaskScheduler:
         self.submit(task)
         return task
 
-    def schedule_at_interval(
-        self, func: Callable, interval: float, *args, **kwargs
-    ) -> None:
+    def schedule_at_interval(self, func: Callable, interval: float, *args, **kwargs) -> None:
         """Repeatedly schedule a task at fixed intervals. Uses a daemon thread."""
 
         def _loop():
@@ -229,7 +232,7 @@ class TaskScheduler:
     def stop(self) -> None:
         self._running = False
 
-    def run_once(self) -> Optional[Task]:
+    def run_once(self) -> Task | None:
         """Pull and run one task. Returns the executed task or None."""
         task = self._queue.dequeue()
         if task:
@@ -259,7 +262,7 @@ class TaskScheduler:
         return self._queue.size
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             **self._queue.stats,
             "scheduled_count": self._scheduled_count,
@@ -272,6 +275,7 @@ class TaskScheduler:
 # WorkerPool
 # ============================================================================
 
+
 class WorkerPool:
     """Simple thread pool pulling from a PriorityTaskQueue."""
 
@@ -279,7 +283,7 @@ class WorkerPool:
         self._num_workers = num_workers
         self._queue = PriorityTaskQueue(max_size=max_queue_size)
         self._running = False
-        self._workers: List[threading.Thread] = []
+        self._workers: list[threading.Thread] = []
         self._lock = threading.Lock()
 
     def submit(self, func: Callable, *args, **kwargs) -> Task:
@@ -320,7 +324,7 @@ class WorkerPool:
         return self._queue.size
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             **self._queue.stats,
             "workers": self._num_workers,

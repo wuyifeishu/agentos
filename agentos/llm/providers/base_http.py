@@ -5,11 +5,16 @@ from __future__ import annotations
 import json
 import os
 import urllib.request
-from typing import Optional
 
 from agentos.llm.base import (
-    LLMProvider, Message, MessageRole, CompletionResult,
-    CompletionChoice, CompletionUsage, Tool, ToolCall,
+    CompletionChoice,
+    CompletionResult,
+    CompletionUsage,
+    LLMProvider,
+    Message,
+    MessageRole,
+    Tool,
+    ToolCall,
 )
 
 
@@ -23,7 +28,7 @@ class BaseHttpProvider(LLMProvider):
     _api_key_env: str = ""
     _default_model: str = ""
 
-    def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
+    def __init__(self, model: str | None = None, api_key: str | None = None):
         super().__init__(model=model or self._default_model)
         self._api_key = api_key or os.getenv(self._api_key_env, "")
 
@@ -60,8 +65,9 @@ class BaseHttpProvider(LLMProvider):
 
     # ── API call ──
 
-    def _call_api(self, messages: list[Message], tools: Optional[list[Tool]] = None,
-                  temperature: float = 0.7) -> CompletionResult:
+    def _call_api(
+        self, messages: list[Message], tools: list[Tool] | None = None, temperature: float = 0.7
+    ) -> CompletionResult:
         body: dict = {
             "model": self.model,
             "messages": self._messages_to_api(messages),
@@ -101,15 +107,17 @@ class BaseHttpProvider(LLMProvider):
         return CompletionResult(
             id=data.get("id", ""),
             model=data.get("model", self.model),
-            choices=[CompletionChoice(
-                index=0,
-                message=Message(
-                    role=MessageRole.ASSISTANT,
-                    content=msg.get("content", ""),
-                    tool_calls=tool_calls,
-                ),
-                finish_reason=choice.get("finish_reason", "stop"),
-            )],
+            choices=[
+                CompletionChoice(
+                    index=0,
+                    message=Message(
+                        role=MessageRole.ASSISTANT,
+                        content=msg.get("content", ""),
+                        tool_calls=tool_calls,
+                    ),
+                    finish_reason=choice.get("finish_reason", "stop"),
+                )
+            ],
             usage=CompletionUsage(
                 prompt_tokens=data.get("usage", {}).get("prompt_tokens", 0),
                 completion_tokens=data.get("usage", {}).get("completion_tokens", 0),

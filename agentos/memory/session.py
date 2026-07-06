@@ -23,22 +23,23 @@ import asyncio
 import json
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 import aiosqlite
 
-
 # ── Session Models ──
 
-class SessionStatus(str, Enum):
-    ACTIVE = "active"       # Currently running
-    IDLE = "idle"           # Alive but no recent activity
-    SUSPENDED = "suspended" # Paused, state saved
-    EXPIRED = "expired"     # Timed out, cleaned up
-    ERROR = "error"         # Crashed but state saved
+
+class SessionStatus(StrEnum):
+    ACTIVE = "active"  # Currently running
+    IDLE = "idle"  # Alive but no recent activity
+    SUSPENDED = "suspended"  # Paused, state saved
+    EXPIRED = "expired"  # Timed out, cleaned up
+    ERROR = "error"  # Crashed but state saved
 
 
 @dataclass
@@ -52,16 +53,20 @@ class SessionState:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_json(self) -> str:
-        return json.dumps({
-            "conversation_history": self.conversation_history,
-            "working_memory": self.working_memory,
-            "agent_context": self.agent_context,
-            "tool_state": self.tool_state,
-            "metadata": self.metadata,
-        }, ensure_ascii=False, default=str)
+        return json.dumps(
+            {
+                "conversation_history": self.conversation_history,
+                "working_memory": self.working_memory,
+                "agent_context": self.agent_context,
+                "tool_state": self.tool_state,
+                "metadata": self.metadata,
+            },
+            ensure_ascii=False,
+            default=str,
+        )
 
     @classmethod
-    def from_json(cls, data: str) -> "SessionState":
+    def from_json(cls, data: str) -> SessionState:
         d = json.loads(data)
         return cls(
             conversation_history=d.get("conversation_history", []),
@@ -88,13 +93,13 @@ class Session:
     state: SessionState = field(default_factory=SessionState)
 
     # Config
-    heartbeat_interval: float = 30.0      # seconds between heartbeats
-    idle_timeout: float = 300.0           # idle → suspend (5 min)
-    absolute_ttl: float = 86400.0         # max lifetime (24h)
+    heartbeat_interval: float = 30.0  # seconds between heartbeats
+    idle_timeout: float = 300.0  # idle → suspend (5 min)
+    absolute_ttl: float = 86400.0  # max lifetime (24h)
     max_history_turns: int = 1000
 
     # Internal
-    _heartbeat_task: Optional[asyncio.Task] = None
+    _heartbeat_task: asyncio.Task | None = None
 
     @property
     def age_seconds(self) -> float:
@@ -125,6 +130,7 @@ class Session:
 
 
 # ── Session Manager ──
+
 
 class SessionManager:
     """Manage PTC sessions with heartbeat, suspend/resume, and persistence.
@@ -173,15 +179,24 @@ class SessionManager:
 
     def on(self, event: str):
         """Decorator: register a hook for session events."""
+
         def decorator(fn):
             self._hooks.setdefault(event, []).append(fn)
             return fn
+
         return decorator
 
-    def on_create(self, fn: Callable[[Session], Any]): self._hooks["create"].append(fn)
-    def on_suspend(self, fn: Callable[[Session], Any]): self._hooks["suspend"].append(fn)
-    def on_resume(self, fn: Callable[[Session], Any]): self._hooks["resume"].append(fn)
-    def on_expire(self, fn: Callable[[Session], Any]): self._hooks["expire"].append(fn)
+    def on_create(self, fn: Callable[[Session], Any]):
+        self._hooks["create"].append(fn)
+
+    def on_suspend(self, fn: Callable[[Session], Any]):
+        self._hooks["suspend"].append(fn)
+
+    def on_resume(self, fn: Callable[[Session], Any]):
+        self._hooks["resume"].append(fn)
+
+    def on_expire(self, fn: Callable[[Session], Any]):
+        self._hooks["expire"].append(fn)
 
     async def _fire(self, event: str, session: Session):
         for hook in self._hooks.get(event, []):
@@ -239,7 +254,7 @@ class SessionManager:
 
         return True
 
-    async def resume(self, session_id: str) -> Optional[Session]:
+    async def resume(self, session_id: str) -> Session | None:
         """Resume a suspended session — restore state, restart heartbeat."""
         session = self._sessions.get(session_id)
 
@@ -345,7 +360,7 @@ class SessionManager:
         await self._persist(session)
         return True
 
-    async def get_state(self, session_id: str) -> Optional[SessionState]:
+    async def get_state(self, session_id: str) -> SessionState | None:
         """Get the latest state snapshot for a session."""
         session = self._sessions.get(session_id)
         if session:
@@ -365,22 +380,24 @@ class SessionManager:
 
     # ── Query ──
 
-    def get(self, session_id: str) -> Optional[Session]:
+    def get(self, session_id: str) -> Session | None:
         """Get an active session by ID."""
         return self._sessions.get(session_id)
 
     def list_active(self, user_id: str = "") -> list[Session]:
         """List all active/idle sessions, optionally filtered by user."""
-        sessions = [s for s in self._sessions.values()
-                    if s.status in (SessionStatus.ACTIVE, SessionStatus.IDLE)]
+        sessions = [
+            s
+            for s in self._sessions.values()
+            if s.status in (SessionStatus.ACTIVE, SessionStatus.IDLE)
+        ]
         if user_id:
             sessions = [s for s in sessions if s.user_id == user_id]
         return sorted(sessions, key=lambda s: s.last_activity, reverse=True)
 
     def list_suspended(self, user_id: str = "") -> list[Session]:
         """List suspended sessions."""
-        sessions = [s for s in self._sessions.values()
-                    if s.status == SessionStatus.SUSPENDED]
+        sessions = [s for s in self._sessions.values() if s.status == SessionStatus.SUSPENDED]
         if user_id:
             sessions = [s for s in sessions if s.user_id == user_id]
         return sorted(sessions, key=lambda s: s.last_activity, reverse=True)
@@ -434,21 +451,30 @@ class SessionManager:
                         state TEXT
                     )
                 """)
-                await db.execute("""
+                await db.execute(
+                    """
                     INSERT OR REPLACE INTO sessions
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (
-                    session.id, session.name, session.user_id,
-                    session.status.value, session.created_at,
-                    session.last_heartbeat, session.last_activity,
-                    session.heartbeat_interval, session.idle_timeout,
-                    session.absolute_ttl, session.state.to_json(),
-                ))
+                """,
+                    (
+                        session.id,
+                        session.name,
+                        session.user_id,
+                        session.status.value,
+                        session.created_at,
+                        session.last_heartbeat,
+                        session.last_activity,
+                        session.heartbeat_interval,
+                        session.idle_timeout,
+                        session.absolute_ttl,
+                        session.state.to_json(),
+                    ),
+                )
                 await db.commit()
         except Exception:
             pass
 
-    async def _load_from_db(self, session_id: str) -> Optional[Session]:
+    async def _load_from_db(self, session_id: str) -> Session | None:
         """Load a session from SQLite."""
         try:
             async with aiosqlite.connect(self._db_path) as db:
@@ -460,19 +486,22 @@ class SessionManager:
                         idle_timeout REAL, absolute_ttl REAL, state TEXT
                     )
                 """)
-                cursor = await db.execute(
-                    "SELECT * FROM sessions WHERE id = ?", (session_id,)
-                )
+                cursor = await db.execute("SELECT * FROM sessions WHERE id = ?", (session_id,))
                 row = await cursor.fetchone()
                 if not row:
                     return None
 
                 session = Session(
-                    id=row[0], name=row[1], user_id=row[2],
+                    id=row[0],
+                    name=row[1],
+                    user_id=row[2],
                     status=SessionStatus(row[3]),
-                    created_at=row[4], last_heartbeat=row[5],
-                    last_activity=row[6], heartbeat_interval=row[7],
-                    idle_timeout=row[8], absolute_ttl=row[9],
+                    created_at=row[4],
+                    last_heartbeat=row[5],
+                    last_activity=row[6],
+                    heartbeat_interval=row[7],
+                    idle_timeout=row[8],
+                    absolute_ttl=row[9],
                     state=SessionState.from_json(row[10]),
                 )
                 self._sessions[session.id] = session

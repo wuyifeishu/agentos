@@ -9,11 +9,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class ModelFamily(Enum):
-
     """模型系列枚举。"""
 
     GPT4 = "gpt-4"
@@ -45,7 +43,7 @@ class CostEstimate:
     completion_cost: float = 0.0
     total_cost: float = 0.0
     currency: str = "USD"
-    token_count: Optional[TokenCount] = None
+    token_count: TokenCount | None = None
 
 
 # Pricing per 1M tokens (input, output) — updated mid-2025
@@ -107,6 +105,7 @@ class TokenCounter:
     def _try_load_tiktoken(self) -> bool:
         try:
             import tiktoken
+
             self._tiktoken = tiktoken
             return True
         except ImportError:
@@ -159,7 +158,9 @@ class TokenCounter:
         return result
 
     def count_messages(
-        self, messages: list[dict[str, str]], model: str = "gpt-4o",
+        self,
+        messages: list[dict[str, str]],
+        model: str = "gpt-4o",
     ) -> TokenCount:
         """
         Count tokens for a list of chat messages.
@@ -187,7 +188,9 @@ class TokenCounter:
         return result
 
     def estimate_cost(
-        self, token_count: TokenCount, model: Optional[str] = None,
+        self,
+        token_count: TokenCount,
+        model: str | None = None,
     ) -> CostEstimate:
         """
         Estimate USD cost from token usage.

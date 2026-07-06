@@ -21,13 +21,15 @@ import json
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Constants & Enums
 # ---------------------------------------------------------------------------
+
 
 class AuthMethod(Enum):
     NONE = "none"
@@ -52,50 +54,55 @@ class Algorithm(Enum):
 @dataclass(frozen=True, slots=True)
 class Permission:
     """Fine-grained permission atom."""
-    resource: str       # e.g. "agent", "model", "user"
-    action: str         # e.g. "read", "write", "delete", "execute"
-    scope: str = "*"    # e.g. "own", "team", "org:*"
+
+    resource: str  # e.g. "agent", "model", "user"
+    action: str  # e.g. "read", "write", "delete", "execute"
+    scope: str = "*"  # e.g. "own", "team", "org:*"
 
 
 @dataclass(frozen=True, slots=True)
 class Role:
     """Named collection of permissions."""
+
     name: str
-    permissions: Tuple[Permission, ...] = field(default_factory=tuple)
+    permissions: tuple[Permission, ...] = field(default_factory=tuple)
 
 
 @dataclass
 class AuthContext:
     """Authentication result passed through the request lifecycle."""
+
     authenticated: bool = False
     method: AuthMethod = AuthMethod.NONE
-    subject: Optional[str] = None       # user ID / API key ID
-    issuer: Optional[str] = None
-    roles: Set[str] = field(default_factory=set)
-    permissions: Set[Permission] = field(default_factory=set)
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    expires_at: Optional[float] = None
-    token_id: Optional[str] = None      # jti
+    subject: str | None = None  # user ID / API key ID
+    issuer: str | None = None
+    roles: set[str] = field(default_factory=set)
+    permissions: set[Permission] = field(default_factory=set)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    expires_at: float | None = None
+    token_id: str | None = None  # jti
 
 
 # ---------------------------------------------------------------------------
 # Token Model
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TokenClaims:
     """Standard JWT claims as specified in RFC 7519."""
+
     sub: str
     iat: float = field(default_factory=time.time)
-    exp: Optional[float] = None
+    exp: float | None = None
     iss: str = "agentos"
-    aud: Optional[Union[str, List[str]]] = None
+    aud: str | list[str] | None = None
     jti: str = field(default_factory=lambda: uuid.uuid4().hex)
-    roles: List[str] = field(default_factory=list)
-    permissions: List[str] = field(default_factory=list)
-    extra: Dict[str, Any] = field(default_factory=dict)
+    roles: list[str] = field(default_factory=list)
+    permissions: list[str] = field(default_factory=list)
+    extra: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = {
             "sub": self.sub,
             "iat": int(self.iat),
@@ -112,7 +119,7 @@ class TokenClaims:
         return d
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "TokenClaims":
+    def from_dict(cls, d: dict[str, Any]) -> TokenClaims:
         return cls(
             sub=d["sub"],
             iat=float(d.get("iat", time.time())),
@@ -122,14 +129,18 @@ class TokenClaims:
             jti=d.get("jti", uuid.uuid4().hex),
             roles=d.get("roles", []),
             permissions=d.get("permissions", []),
-            extra={k: v for k, v in d.items()
-                   if k not in {"sub", "iat", "exp", "iss", "aud", "jti", "roles", "permissions"}},
+            extra={
+                k: v
+                for k, v in d.items()
+                if k not in {"sub", "iat", "exp", "iss", "aud", "jti", "roles", "permissions"}
+            },
         )
 
 
 # ---------------------------------------------------------------------------
 # Abstract Providers
 # ---------------------------------------------------------------------------
+
 
 class TokenProvider(ABC):
     """Abstract interface for creating and validating tokens."""
@@ -138,14 +149,14 @@ class TokenProvider(ABC):
     async def create_token(self, claims: TokenClaims) -> str: ...
 
     @abstractmethod
-    async def validate_token(self, token: str) -> Optional[TokenClaims]: ...
+    async def validate_token(self, token: str) -> TokenClaims | None: ...
 
 
 class CredentialStore(ABC):
     """Abstract store for API keys and secrets."""
 
     @abstractmethod
-    async def lookup_by_key(self, api_key: str) -> Optional[Dict[str, Any]]: ...
+    async def lookup_by_key(self, api_key: str) -> dict[str, Any] | None: ...
 
     @abstractmethod
     async def revoke(self, api_key: str) -> bool: ...
@@ -165,11 +176,12 @@ class TokenBlacklist(ABC):
 # In-Memory Token Blacklist
 # ---------------------------------------------------------------------------
 
+
 class InMemoryTokenBlacklist(TokenBlacklist):
     """Simple in-memory blacklist with TTL-based eviction."""
 
     def __init__(self):
-        self._store: Dict[str, float] = {}  # jti → expiry_time
+        self._store: dict[str, float] = {}  # jti → expiry_time
 
     async def is_blacklisted(self, jti: str) -> bool:
         now = time.monotonic()
@@ -191,16 +203,17 @@ class InMemoryTokenBlacklist(TokenBlacklist):
 # In-Memory Credential Store
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ApiKeyEntry:
     key_hash: str
     subject: str
     name: str
-    scopes: List[str]
-    roles: List[str]
-    permissions: List[str]
+    scopes: list[str]
+    roles: list[str]
+    permissions: list[str]
     created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None
+    expires_at: float | None = None
     revoked: bool = False
 
 
@@ -208,7 +221,7 @@ class InMemoryCredentialStore(CredentialStore):
     """In-memory API key store with SHA-256 hashing."""
 
     def __init__(self):
-        self._keys: Dict[str, ApiKeyEntry] = {}
+        self._keys: dict[str, ApiKeyEntry] = {}
 
     @staticmethod
     def _hash_key(raw_key: str) -> str:
@@ -218,7 +231,7 @@ class InMemoryCredentialStore(CredentialStore):
         entry.key_hash = self._hash_key(raw_key)
         self._keys[entry.key_hash] = entry
 
-    async def lookup_by_key(self, api_key: str) -> Optional[Dict[str, Any]]:
+    async def lookup_by_key(self, api_key: str) -> dict[str, Any] | None:
         key_hash = self._hash_key(api_key)
         entry = self._keys.get(key_hash)
         if entry is None or entry.revoked:
@@ -246,13 +259,13 @@ class InMemoryCredentialStore(CredentialStore):
 # JWT Provider (HS256-only; RS/ES require cryptography)
 # ---------------------------------------------------------------------------
 
+
 class HS256TokenProvider(TokenProvider):
     """HS256 HMAC-based JWT provider with key rotation support."""
 
-    def __init__(self, secret: str, issuer: str = "agentos",
-                 default_ttl: float = 3600.0):
+    def __init__(self, secret: str, issuer: str = "agentos", default_ttl: float = 3600.0):
         self._current_secret = secret.encode()
-        self._previous_secret: Optional[bytes] = None
+        self._previous_secret: bytes | None = None
         self._issuer = issuer
         self._default_ttl = default_ttl
 
@@ -272,7 +285,7 @@ class HS256TokenProvider(TokenProvider):
         segments.append(_b64url_encode(signature))
         return ".".join(segments)
 
-    def _decode(self, token: str) -> Optional[TokenClaims]:
+    def _decode(self, token: str) -> TokenClaims | None:
         parts = token.split(".")
         if len(parts) != 3:
             return None
@@ -280,9 +293,7 @@ class HS256TokenProvider(TokenProvider):
             if secret is None:
                 continue
             signing_input = f"{parts[0]}.{parts[1]}".encode()
-            expected_sig = hmac.new(
-                secret, signing_input, hashlib.sha256
-            ).digest()
+            expected_sig = hmac.new(secret, signing_input, hashlib.sha256).digest()
             actual_sig = _b64url_decode(parts[2])
             if hmac.compare_digest(expected_sig, actual_sig):
                 payload = json.loads(_b64url_decode(parts[1]))
@@ -296,7 +307,7 @@ class HS256TokenProvider(TokenProvider):
             claims.iss = self._issuer
         return self._encode(claims)
 
-    async def validate_token(self, token: str) -> Optional[TokenClaims]:
+    async def validate_token(self, token: str) -> TokenClaims | None:
         claims = self._decode(token)
         if claims is None:
             return None
@@ -309,43 +320,41 @@ class HS256TokenProvider(TokenProvider):
 # RBAC Engine
 # ---------------------------------------------------------------------------
 
+
 class RBACEngine:
     """Role-based access control engine with role-permission resolution."""
 
     def __init__(self):
-        self._roles: Dict[str, Role] = {}
+        self._roles: dict[str, Role] = {}
 
     def register_role(self, role: Role) -> None:
         self._roles[role.name] = role
 
-    def register_roles(self, roles: List[Role]) -> None:
+    def register_roles(self, roles: list[Role]) -> None:
         for role in roles:
             self.register_role(role)
 
-    def get_permissions(self, role_names: Set[str]) -> Set[Permission]:
-        result: Set[Permission] = set()
+    def get_permissions(self, role_names: set[str]) -> set[Permission]:
+        result: set[Permission] = set()
         for name in role_names:
             role = self._roles.get(name)
             if role is not None:
                 result.update(role.permissions)
         return result
 
-    def check(self, role_names: Set[str], required: Permission) -> bool:
+    def check(self, role_names: set[str], required: Permission) -> bool:
         for perm in self.get_permissions(role_names):
             if self._match(perm, required):
                 return True
         return False
 
-    def check_any(self, role_names: Set[str], required: List[Permission]) -> bool:
+    def check_any(self, role_names: set[str], required: list[Permission]) -> bool:
         perms = self.get_permissions(role_names)
         return any(self._match(p, r) for r in required for p in perms)
 
-    def check_all(self, role_names: Set[str], required: List[Permission]) -> bool:
+    def check_all(self, role_names: set[str], required: list[Permission]) -> bool:
         perms = self.get_permissions(role_names)
-        return all(
-            any(self._match(p, r) for p in perms)
-            for r in required
-        )
+        return all(any(self._match(p, r) for p in perms) for r in required)
 
     @staticmethod
     def _match(perm: Permission, required: Permission) -> bool:
@@ -358,8 +367,9 @@ class RBACEngine:
                 parts_have = have.split(":")
                 if len(parts_have) < len(parts_need):
                     return False
-                return all(h == n for h, n in zip(parts_have[:len(parts_need)], parts_need))
+                return all(h == n for h, n in zip(parts_have[: len(parts_need)], parts_need))
             return have == need
+
         return (
             _seg_match(perm.resource, required.resource)
             and _seg_match(perm.action, required.action)
@@ -371,11 +381,15 @@ class RBACEngine:
 # Authenticator
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AuthenticatorConfig:
     """Authenticator configuration."""
-    allowed_methods: Tuple[AuthMethod, ...] = (
-        AuthMethod.JWT, AuthMethod.API_KEY, AuthMethod.OAUTH2_BEARER
+
+    allowed_methods: tuple[AuthMethod, ...] = (
+        AuthMethod.JWT,
+        AuthMethod.API_KEY,
+        AuthMethod.OAUTH2_BEARER,
     )
     default_issuer: str = "agentos"
     api_key_header: str = "X-API-Key"
@@ -403,11 +417,11 @@ class Authenticator:
     def __init__(
         self,
         *,
-        token_provider: Optional[TokenProvider] = None,
-        credential_store: Optional[CredentialStore] = None,
-        blacklist: Optional[TokenBlacklist] = None,
-        rbac: Optional[RBACEngine] = None,
-        config: Optional[AuthenticatorConfig] = None,
+        token_provider: TokenProvider | None = None,
+        credential_store: CredentialStore | None = None,
+        blacklist: TokenBlacklist | None = None,
+        rbac: RBACEngine | None = None,
+        config: AuthenticatorConfig | None = None,
     ):
         self._token_provider = token_provider
         self._credential_store = credential_store
@@ -421,8 +435,8 @@ class Authenticator:
 
     async def authenticate(
         self,
-        headers: Dict[str, str],
-        query_params: Optional[Dict[str, str]] = None,
+        headers: dict[str, str],
+        query_params: dict[str, str] | None = None,
     ) -> AuthContext:
         """Authenticate a request from headers and query parameters.
         Returns AuthContext with authenticated=False if auth fails.
@@ -436,7 +450,10 @@ class Authenticator:
                 return ctx
 
         # Try OAuth2 Bearer
-        if auth_header.startswith("Bearer ") and AuthMethod.OAUTH2_BEARER in self._config.allowed_methods:
+        if (
+            auth_header.startswith("Bearer ")
+            and AuthMethod.OAUTH2_BEARER in self._config.allowed_methods
+        ):
             token = auth_header[7:]
             ctx = await self._authenticate_oauth2_bearer(token)
             if ctx.authenticated:
@@ -514,7 +531,8 @@ class Authenticator:
 # Decorators
 # ---------------------------------------------------------------------------
 
-def require_auth(permission: Optional[Permission] = None, permissions: Optional[List[Permission]] = None):
+
+def require_auth(permission: Permission | None = None, permissions: list[Permission] | None = None):
     """Decorator to require authentication and optional permissions.
     To be used with a framework that provides `auth_context` in the call scope.
     """
@@ -536,9 +554,11 @@ def require_auth(permission: Optional[Permission] = None, permissions: Optional[
                         f"missing permissions: {[f'{p.resource}:{p.action}' for p in required]}"
                     )
             return await fn(*args, **kwargs)
+
         wrapper.__name__ = fn.__name__
         wrapper.__doc__ = fn.__doc__
         return wrapper
+
     return decorator
 
 
@@ -546,13 +566,16 @@ def require_auth(permission: Optional[Permission] = None, permissions: Optional[
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _b64url_encode(data: bytes) -> str:
     import base64
+
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
 
 
 def _b64url_decode(data: str) -> bytes:
     import base64
+
     padding = 4 - len(data) % 4
     if padding != 4:
         data += "=" * padding
@@ -564,29 +587,36 @@ def _b64url_decode(data: str) -> bytes:
 # ---------------------------------------------------------------------------
 
 DEFAULT_ROLES = [
-    Role("admin", (
-        Permission("*", "*", "*"),
-    )),
-    Role("developer", (
-        Permission("agent", "*"),
-        Permission("model", "read"),
-        Permission("model", "execute"),
-        Permission("tool", "*"),
-        Permission("log", "read"),
-    )),
-    Role("viewer", (
-        Permission("agent", "read"),
-        Permission("model", "read"),
-        Permission("log", "read"),
-        Permission("metric", "read"),
-    )),
-    Role("operator", (
-        Permission("agent", "read"),
-        Permission("agent", "execute"),
-        Permission("model", "read"),
-        Permission("model", "execute"),
-        Permission("tool", "execute"),
-        Permission("log", "read"),
-        Permission("metric", "read"),
-    )),
+    Role("admin", (Permission("*", "*", "*"),)),
+    Role(
+        "developer",
+        (
+            Permission("agent", "*"),
+            Permission("model", "read"),
+            Permission("model", "execute"),
+            Permission("tool", "*"),
+            Permission("log", "read"),
+        ),
+    ),
+    Role(
+        "viewer",
+        (
+            Permission("agent", "read"),
+            Permission("model", "read"),
+            Permission("log", "read"),
+            Permission("metric", "read"),
+        ),
+    ),
+    Role(
+        "operator",
+        (
+            Permission("agent", "read"),
+            Permission("agent", "execute"),
+            Permission("model", "read"),
+            Permission("model", "execute"),
+            Permission("tool", "execute"),
+            Permission("log", "read"),
+            Permission("metric", "read"),
+        ),
+    ),
 ]

@@ -13,8 +13,7 @@ import hashlib
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Any, Optional
-
+from typing import Any
 
 __all__ = [
     "CacheConfig",
@@ -26,6 +25,7 @@ __all__ = [
 
 # ── Config & Stats ─────────────────────────────────────────────────
 
+
 @dataclass
 class CacheConfig:
     """Configuration for SmartCache.
@@ -36,8 +36,9 @@ class CacheConfig:
         enable_fuzzy: Enable semantic similarity matching.
         fuzzy_threshold: Similarity threshold for fuzzy matching (0-1).
     """
+
     max_entries: int = 1000
-    ttl_seconds: int = 3600        # 1 hour default
+    ttl_seconds: int = 3600  # 1 hour default
     enable_fuzzy: bool = False
     fuzzy_threshold: float = 0.85
 
@@ -54,6 +55,7 @@ class CacheStats:
         entries: Current number of cached entries.
         evictions: Total evicted entries (LRU + TTL).
     """
+
     hits: int = 0
     fuzzy_hits: int = 0
     misses: int = 0
@@ -82,6 +84,7 @@ class CacheStats:
 
 # ── Cache Entry ───────────────────────────────────────────────────
 
+
 @dataclass
 class CacheEntry:
     """A single cached LLM response.
@@ -97,6 +100,7 @@ class CacheEntry:
         ttl: Time-to-live in seconds.
         hit_count: Number of times this entry was used.
     """
+
     key: str
     prompt: str
     response: Any
@@ -121,6 +125,7 @@ class CacheEntry:
 
 # ── Smart Cache ──────────────────────────────────────────────────
 
+
 class SmartCache:
     """LLM response cache with exact + fuzzy matching and cost tracking.
 
@@ -135,7 +140,7 @@ class SmartCache:
     Keys are derived from a hash of (prompt + model) for exact matching.
     """
 
-    def __init__(self, config: Optional[CacheConfig] = None):
+    def __init__(self, config: CacheConfig | None = None):
         self._config = config or CacheConfig()
         self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self.stats = CacheStats()
@@ -147,7 +152,7 @@ class SmartCache:
         prompt: str,
         model: str = "",
         use_fuzzy: bool = False,
-    ) -> Optional[CacheEntry]:
+    ) -> CacheEntry | None:
         """Look up a cached response for the given prompt.
 
         Args:
@@ -271,7 +276,7 @@ class SmartCache:
         content = f"{model or 'default'}:{prompt}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
 
-    def _fuzzy_lookup(self, prompt: str, model: str = "") -> Optional[CacheEntry]:
+    def _fuzzy_lookup(self, prompt: str, model: str = "") -> CacheEntry | None:
         """Semantic similarity lookup using simple keyword overlap.
 
         For production, replace with embedding-based similarity (cosine).
@@ -281,7 +286,7 @@ class SmartCache:
             return None
 
         best_score = 0.0
-        best_entry: Optional[CacheEntry] = None
+        best_entry: CacheEntry | None = None
         best_key = ""
 
         for key, entry in self._cache.items():

@@ -7,9 +7,10 @@ v1.3.36: +Function Calling / Tool Use 抽象。
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Iterator
+from enum import StrEnum
+from typing import Any
 
 __all__ = [
     "MessageRole",
@@ -27,7 +28,7 @@ __all__ = [
 ]
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
@@ -65,9 +66,11 @@ class Message:
 
 # --- Function Calling / Tool Use ---
 
+
 @dataclass
 class ToolParameter:
     """JSON Schema 属性定义。"""
+
     type: str = "string"
     description: str = ""
     enum: list[str] | None = None
@@ -85,6 +88,7 @@ class ToolParameter:
 @dataclass
 class ToolFunction:
     """函数定义。"""
+
     name: str
     description: str = ""
     parameters: dict[str, ToolParameter] = field(default_factory=dict)
@@ -100,7 +104,8 @@ class ToolFunction:
                 "parameters": {
                     "type": "object",
                     "properties": props,
-                    "required": self.required or [k for k, v in self.parameters.items() if v.required],
+                    "required": self.required
+                    or [k for k, v in self.parameters.items() if v.required],
                 },
             },
         }
@@ -109,6 +114,7 @@ class ToolFunction:
 @dataclass
 class Tool:
     """顶层 Tool 包装。"""
+
     function: ToolFunction
 
     def as_schema(self) -> dict[str, Any]:
@@ -124,7 +130,8 @@ class Tool:
     ) -> Tool:
         return cls(
             function=ToolFunction(
-                name=name, description=description,
+                name=name,
+                description=description,
                 parameters=parameters or {},
                 required=required or [],
             )
@@ -134,6 +141,7 @@ class Tool:
 @dataclass
 class ToolCall:
     """模型请求的工具调用。"""
+
     id: str
     name: str
     arguments: str  # JSON string
@@ -141,6 +149,7 @@ class ToolCall:
     @property
     def parsed_arguments(self) -> dict[str, Any]:
         import json
+
         return json.loads(self.arguments)
 
 
@@ -218,9 +227,13 @@ class LLMProvider(ABC):
         **kwargs: Any,
     ) -> Iterator[StreamChunk]:
         """流式聊天补全。默认调用非流式包装。"""
-        result = self.chat(messages, temperature=temperature, max_tokens=max_tokens, tools=tools, **kwargs)
+        result = self.chat(
+            messages, temperature=temperature, max_tokens=max_tokens, tools=tools, **kwargs
+        )
         for c in result.choices:
-            yield StreamChunk(content=c.message.content, finish_reason=c.finish_reason, index=c.index)
+            yield StreamChunk(
+                content=c.message.content, finish_reason=c.finish_reason, index=c.index
+            )
 
     async def astream(
         self,
@@ -232,11 +245,14 @@ class LLMProvider(ABC):
         **kwargs: Any,
     ):
         """异步流式补全。默认调用 achat 包装。"""
-        result = await self.achat(messages, temperature=temperature, max_tokens=max_tokens, tools=tools, **kwargs)
+        result = await self.achat(
+            messages, temperature=temperature, max_tokens=max_tokens, tools=tools, **kwargs
+        )
         for c in result.choices:
-            yield StreamChunk(content=c.message.content, finish_reason=c.finish_reason, index=c.index)
+            yield StreamChunk(
+                content=c.message.content, finish_reason=c.finish_reason, index=c.index
+            )
 
     @property
     @abstractmethod
-    def provider_name(self) -> str:
-        ...
+    def provider_name(self) -> str: ...

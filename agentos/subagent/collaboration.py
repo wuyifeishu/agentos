@@ -19,20 +19,20 @@ from __future__ import annotations
 import re
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Awaitable
+from enum import StrEnum
+from typing import Any
 
-from .manager import SubAgentManager, SubAgentSpec, SubAgentResult
+from .manager import SubAgentManager, SubAgentResult, SubAgentSpec
 from .parent_child import ChildContext, SharedState
-
 
 # ──────────────────────────────────────────────
 # 枚举与数据类型
 # ──────────────────────────────────────────────
 
 
-class CollaborationMode(str, Enum):
+class CollaborationMode(StrEnum):
     DEBATE = "debate"
     VOTE = "vote"
     REVIEW = "review"
@@ -40,7 +40,7 @@ class CollaborationMode(str, Enum):
     ENSEMBLE = "ensemble"
 
 
-class VoteStrategy(str, Enum):
+class VoteStrategy(StrEnum):
     MAJORITY = "majority"
     WEIGHTED = "weighted"
     RANKED = "ranked"
@@ -50,15 +50,17 @@ class VoteStrategy(str, Enum):
 @dataclass
 class DebateRound:
     """一轮辩论。"""
+
     round: int
-    arguments: list[str]     # 各方论点
-    rebuttals: list[str]     # 反驳
+    arguments: list[str]  # 各方论点
+    rebuttals: list[str]  # 反驳
     winner: int | None = None
 
 
 @dataclass
 class VoteBallot:
     """一张选票。"""
+
     agent_id: str
     choice: str
     confidence: float = 1.0
@@ -68,6 +70,7 @@ class VoteBallot:
 @dataclass
 class ReviewPass:
     """一轮审查。"""
+
     round: int
     draft: str
     feedback: str
@@ -78,6 +81,7 @@ class ReviewPass:
 @dataclass
 class CollaborationResult:
     """协作结果。"""
+
     mode: CollaborationMode
     agents: list[str]
     rounds: int
@@ -150,7 +154,9 @@ class AgentCollaboration:
             timeout=timeout or self._timeout,
         )
 
-    async def _spawn_many(self, tasks: list[str], timeout: float | None = None) -> list[SubAgentResult]:
+    async def _spawn_many(
+        self, tasks: list[str], timeout: float | None = None
+    ) -> list[SubAgentResult]:
         """Swarm 并行执行多个 task。"""
         return await self._mgr.spawn_swarm(
             tasks=tasks,
@@ -161,31 +167,29 @@ class AgentCollaboration:
     @staticmethod
     def _parse_score(output: str) -> float:
         """从输出中解析 SCORE: N 格式的评分。"""
-        m = re.search(r'SCORE:\s*([\d.]+)', output, re.IGNORECASE)
+        m = re.search(r"SCORE:\s*([\d.]+)", output, re.IGNORECASE)
         if m:
             return max(0.0, min(10.0, float(m.group(1)))) / 10.0
         return 0.7
 
     @staticmethod
-    def _parse_choice(
-        output: str, option_count: int
-    ) -> tuple[int | None, float, str]:
+    def _parse_choice(output: str, option_count: int) -> tuple[int | None, float, str]:
         """解析 CHOICE: N | CONFIDENCE: X | REASONING: text。"""
         choice = None
         confidence = 0.5
         reasoning = output[:200]
 
-        m_choice = re.search(r'CHOICE:\s*(\d+)', output, re.IGNORECASE)
+        m_choice = re.search(r"CHOICE:\s*(\d+)", output, re.IGNORECASE)
         if m_choice:
             num = int(m_choice.group(1))
             if 1 <= num <= option_count:
                 choice = num
 
-        m_conf = re.search(r'CONFIDENCE:\s*([\d.]+)', output, re.IGNORECASE)
+        m_conf = re.search(r"CONFIDENCE:\s*([\d.]+)", output, re.IGNORECASE)
         if m_conf:
             confidence = max(0.0, min(1.0, float(m_conf.group(1))))
 
-        m_reason = re.search(r'REASONING:\s*(.+?)(?:\n|$)', output, re.IGNORECASE | re.DOTALL)
+        m_reason = re.search(r"REASONING:\s*(.+?)(?:\n|$)", output, re.IGNORECASE | re.DOTALL)
         if m_reason:
             reasoning = m_reason.group(1).strip()[:200]
 
@@ -229,10 +233,7 @@ class AgentCollaboration:
         for rnd in range(1, rounds):
             rebut_tasks = []
             for i in range(agents):
-                opponent_args = [
-                    history[-1].arguments[j]
-                    for j in range(agents) if j != i
-                ]
+                opponent_args = [history[-1].arguments[j] for j in range(agents) if j != i]
                 rebut_tasks.append(
                     f"Debate topic: {topic}\n"
                     f"You are debater {chr(65+i)}. {_PERSONAS[i % len(_PERSONAS)]}\n"
@@ -241,20 +242,24 @@ class AgentCollaboration:
                 )
             rebut_results = await self._spawn_many(rebut_tasks, timeout)
             rebuttals = [r.output for r in rebut_results]
-            history.append(DebateRound(
-                round=rnd,
-                arguments=[history[-1].arguments[i] for i in range(agents)],
-                rebuttals=rebuttals,
-            ))
+            history.append(
+                DebateRound(
+                    round=rnd,
+                    arguments=[history[-1].arguments[i] for i in range(agents)],
+                    rebuttals=rebuttals,
+                )
+            )
             all_agent_ids.extend(r.agent_id for r in rebut_results)
 
         # 裁判总结
-        all_args = "\n\n".join([
-            f"Debater {chr(65+i)} initial: {history[0].arguments[i]}\n"
-            f"Debater {chr(65+i)} final rebuttal: "
-            f"{history[-1].rebuttals[i] if i < len(history[-1].rebuttals) else 'N/A'}"
-            for i in range(agents)
-        ])
+        all_args = "\n\n".join(
+            [
+                f"Debater {chr(65+i)} initial: {history[0].arguments[i]}\n"
+                f"Debater {chr(65+i)} final rebuttal: "
+                f"{history[-1].rebuttals[i] if i < len(history[-1].rebuttals) else 'N/A'}"
+                for i in range(agents)
+            ]
+        )
         judge = await self._spawn(
             f"As an impartial judge, synthesize this debate on '{topic}' and give your verdict:\n"
             f"{all_args}",
@@ -305,12 +310,14 @@ class AgentCollaboration:
         for r in results:
             c, conf, reason = self._parse_choice(r.output, len(options))
             if c is not None:
-                ballots.append(VoteBallot(
-                    agent_id=r.agent_id,
-                    choice=options[c - 1],
-                    confidence=conf,
-                    reasoning=reason,
-                ))
+                ballots.append(
+                    VoteBallot(
+                        agent_id=r.agent_id,
+                        choice=options[c - 1],
+                        confidence=conf,
+                        reasoning=reason,
+                    )
+                )
 
         _tally: dict[str, int] = {}
         _weighted: dict[str, float] = {}
@@ -382,7 +389,8 @@ class AgentCollaboration:
         reviewer_id = uuid.uuid4().hex[:8]
 
         draft_result = await self._spawn(
-            f"As a writer, complete: {task}", timeout,
+            f"As a writer, complete: {task}",
+            timeout,
         )
         draft = draft_result.output
 
@@ -402,13 +410,15 @@ class AgentCollaboration:
             )
             revised = revise_result.output
 
-            passes.append(ReviewPass(
-                round=rnd + 1,
-                draft=draft,
-                feedback=feedback,
-                revised=revised,
-                score=score,
-            ))
+            passes.append(
+                ReviewPass(
+                    round=rnd + 1,
+                    draft=draft,
+                    feedback=feedback,
+                    revised=revised,
+                    score=score,
+                )
+            )
             draft = revised
 
         return CollaborationResult(
@@ -503,7 +513,8 @@ class AgentCollaboration:
         if not scored:
             return CollaborationResult(
                 mode=CollaborationMode.ENSEMBLE,
-                agents=[], rounds=1,
+                agents=[],
+                rounds=1,
                 final_output="No results.",
                 duration=time.time() - t0,
             )

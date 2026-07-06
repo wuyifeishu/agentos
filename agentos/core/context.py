@@ -43,6 +43,7 @@ class Message:
 @dataclass
 class AgentContext:
     """传给模型的完整上下文。"""
+
     messages: list[Message]
     tools: list[dict] | None = None
     model_type: str = "openai"
@@ -74,14 +75,12 @@ class ContextManager:
         self, model_type: str = "openai", tools: list[dict] | None = None
     ) -> AgentContext:
         self._step_count += 1
-        messages = self._messages[-self.max_history:]
+        messages = self._messages[-self.max_history :]
         return AgentContext(messages=messages, tools=tools, model_type=model_type)
 
     def update_plan(self, new_plan: str):
         self._plan = new_plan
-        self._messages.append(
-            Message(role="system", content=f"[计划更新] {new_plan}")
-        )
+        self._messages.append(Message(role="system", content=f"[计划更新] {new_plan}"))
 
     def append_tool_results(self, results: list[ToolResult]):
         for r in results:
@@ -94,9 +93,7 @@ class ContextManager:
             )
 
     def add_assistant_message(self, content: str, tool_calls: list[ToolCall] | None = None):
-        self._messages.append(
-            Message(role="assistant", content=content, tool_calls=tool_calls)
-        )
+        self._messages.append(Message(role="assistant", content=content, tool_calls=tool_calls))
 
     def add_user_message(self, content: str):
         self._messages.append(Message(role="user", content=content))

@@ -6,7 +6,6 @@ v1.3.36: 首个实现，支持 Function Calling。
 
 from __future__ import annotations
 
-
 from agentos.llm.openai_provider import OpenAIProvider
 
 __all__ = ["DeepSeekProvider"]
@@ -38,6 +37,7 @@ class DeepSeekProvider(OpenAIProvider):
         super().__init__(model=model, api_key=api_key, base_url=base_url, timeout=timeout)
         if not self._pricing_injected:
             from agentos.llm.openai_provider import _PRICING
+
             _PRICING.update(_DEEPSEEK_PRICING)
             DeepSeekProvider._pricing_injected = True
 

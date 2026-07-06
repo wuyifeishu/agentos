@@ -36,7 +36,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 # ── Snapshot Data Models ──────────────────────
 
 
@@ -61,8 +60,12 @@ class MemorySnapshot:
             "created_at": self.created_at,
         }
         for field_name in [
-            "pyramid_state", "working_state", "conversation_state",
-            "long_term_state", "reflection_state", "consolidation_state",
+            "pyramid_state",
+            "working_state",
+            "conversation_state",
+            "long_term_state",
+            "reflection_state",
+            "consolidation_state",
             "retriever_index_state",
         ]:
             val = getattr(self, field_name)
@@ -71,7 +74,7 @@ class MemorySnapshot:
         return result
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "MemorySnapshot":
+    def from_dict(cls, d: dict[str, Any]) -> MemorySnapshot:
         return cls(
             version=d.get("version", "1.14.9"),
             created_at=d.get("created_at", time.time()),
@@ -350,7 +353,8 @@ class MemoryPersistenceManager:
             snapshot = self.load_sync()
 
             subsystems_saved = sum(
-                1 for v in [
+                1
+                for v in [
                     snapshot.pyramid_state,
                     snapshot.working_state,
                     snapshot.conversation_state,
@@ -358,7 +362,8 @@ class MemoryPersistenceManager:
                     snapshot.reflection_state,
                     snapshot.consolidation_state,
                     snapshot.retriever_index_state,
-                ] if v
+                ]
+                if v
             )
 
             return {
@@ -396,11 +401,13 @@ class MemoryPersistenceManager:
         for path in sorted(self.base_dir.glob("snapshot*.json*")):
             try:
                 stat = path.stat()
-                results.append({
-                    "name": path.name,
-                    "size_bytes": stat.st_size,
-                    "mtime": stat.st_mtime,
-                })
+                results.append(
+                    {
+                        "name": path.name,
+                        "size_bytes": stat.st_size,
+                        "mtime": stat.st_mtime,
+                    }
+                )
             except OSError:
                 continue
         return results

@@ -7,18 +7,38 @@ Thread-safe, zero external dependencies, Prometheus-style text exposition.
 
 import threading
 import time
-from typing import Any, Callable, Dict, List, Optional
-
+from collections.abc import Callable
+from typing import Any
 
 # ============================================================================
 # Histogram buckets (pre-defined for common latency ranges)
 # ============================================================================
 
 DEFAULT_BUCKETS = (
-    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.1,
+    0.25,
+    0.5,
+    1.0,
+    2.5,
+    5.0,
+    10.0,
 )
 LARGE_BUCKETS = (
-    0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 300.0, 600.0, 1800.0, 3600.0,
+    0.1,
+    0.5,
+    1.0,
+    5.0,
+    10.0,
+    30.0,
+    60.0,
+    300.0,
+    600.0,
+    1800.0,
+    3600.0,
 )
 
 
@@ -26,10 +46,11 @@ LARGE_BUCKETS = (
 # Metric types
 # ============================================================================
 
+
 class Counter:
     """Monotonically increasing counter. Thread-safe."""
 
-    def __init__(self, name: str, help_text: str = "", labels: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, help_text: str = "", labels: dict[str, str] | None = None):
         self.name = name
         self.help = help_text
         self.labels = labels or {}
@@ -53,7 +74,7 @@ class Counter:
 class Gauge:
     """Value that can go up and down. Thread-safe."""
 
-    def __init__(self, name: str, help_text: str = "", labels: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, help_text: str = "", labels: dict[str, str] | None = None):
         self.name = name
         self.help = help_text
         self.labels = labels or {}
@@ -89,7 +110,7 @@ class Histogram:
         self,
         name: str,
         help_text: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
         buckets: tuple = DEFAULT_BUCKETS,
     ):
         self.name = name
@@ -97,7 +118,7 @@ class Histogram:
         self.labels = labels or {}
         self.buckets = tuple(sorted(buckets))
         self._lock = threading.Lock()
-        self._bucket_counts: List[int] = [0] * (len(self.buckets) + 1)  # +1 for +Inf
+        self._bucket_counts: list[int] = [0] * (len(self.buckets) + 1)  # +1 for +Inf
         self._sum: float = 0.0
         self._count: int = 0
 
@@ -111,7 +132,7 @@ class Histogram:
                     return
             self._bucket_counts[-1] += 1  # +Inf bucket
 
-    def get(self) -> Dict[str, Any]:
+    def get(self) -> dict[str, Any]:
         with self._lock:
             return {
                 "sum": self._sum,
@@ -155,7 +176,7 @@ class Timer:
         self,
         name: str,
         help_text: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
         buckets: tuple = DEFAULT_BUCKETS,
     ):
         self.name = name
@@ -181,7 +202,7 @@ class Timer:
         self.histogram.observe(elapsed)
         self._call_count.inc()
 
-    def get(self) -> Dict[str, Any]:
+    def get(self) -> dict[str, Any]:
         return {
             "histogram": self.histogram.get(),
             "count": self._call_count.get(),
@@ -192,12 +213,13 @@ class Timer:
 # MetricsCollector (Registry)
 # ============================================================================
 
+
 class MetricsCollector:
     """Global registry for metrics. Provides Prometheus text format exposition."""
 
     def __init__(self, namespace: str = ""):
         self.namespace = namespace
-        self._metrics: Dict[str, Any] = {}
+        self._metrics: dict[str, Any] = {}
         self._lock = threading.Lock()
 
     def _full_name(self, name: str) -> str:
@@ -205,14 +227,16 @@ class MetricsCollector:
             return f"{self.namespace}_{name}"
         return name
 
-    def counter(self, name: str, help_text: str = "", labels: Optional[Dict[str, str]] = None) -> Counter:
+    def counter(
+        self, name: str, help_text: str = "", labels: dict[str, str] | None = None
+    ) -> Counter:
         full = self._full_name(name)
         with self._lock:
             if full not in self._metrics:
                 self._metrics[full] = Counter(full, help_text, labels)
             return self._metrics[full]
 
-    def gauge(self, name: str, help_text: str = "", labels: Optional[Dict[str, str]] = None) -> Gauge:
+    def gauge(self, name: str, help_text: str = "", labels: dict[str, str] | None = None) -> Gauge:
         full = self._full_name(name)
         with self._lock:
             if full not in self._metrics:
@@ -223,7 +247,7 @@ class MetricsCollector:
         self,
         name: str,
         help_text: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
         buckets: tuple = DEFAULT_BUCKETS,
     ) -> Histogram:
         full = self._full_name(name)
@@ -236,7 +260,7 @@ class MetricsCollector:
         self,
         name: str,
         help_text: str = "",
-        labels: Optional[Dict[str, str]] = None,
+        labels: dict[str, str] | None = None,
         buckets: tuple = DEFAULT_BUCKETS,
     ) -> Timer:
         full = self._full_name(name)
@@ -245,14 +269,14 @@ class MetricsCollector:
                 self._metrics[full] = Timer(full, help_text, labels, buckets)
             return self._metrics[full]
 
-    def get(self, name: str) -> Optional[Any]:
+    def get(self, name: str) -> Any | None:
         return self._metrics.get(self._full_name(name))
 
-    def list_metrics(self) -> List[str]:
+    def list_metrics(self) -> list[str]:
         with self._lock:
             return list(self._metrics.keys())
 
-    def get_all(self) -> Dict[str, Any]:
+    def get_all(self) -> dict[str, Any]:
         """Return raw values for all metrics (for programmatic use)."""
         result = {}
         with self._lock:
@@ -268,9 +292,15 @@ class MetricsCollector:
             for name, metric in self._metrics.items():
                 if metric.help:
                     lines.append(f"# HELP {name} {metric.help}")
-                lines.append(f"# TYPE {name} histogram" if isinstance(metric, (Histogram, Timer)) else
-                             f"# TYPE {name} gauge" if isinstance(metric, Gauge) else
-                             f"# TYPE {name} counter")
+                lines.append(
+                    f"# TYPE {name} histogram"
+                    if isinstance(metric, (Histogram, Timer))
+                    else (
+                        f"# TYPE {name} gauge"
+                        if isinstance(metric, Gauge)
+                        else f"# TYPE {name} counter"
+                    )
+                )
 
                 if isinstance(metric, Counter):
                     lbl = metric._format_labels()
@@ -305,7 +335,7 @@ class MetricsCollector:
 # Global singleton
 # ============================================================================
 
-_default_collector: Optional[MetricsCollector] = None
+_default_collector: MetricsCollector | None = None
 _collector_lock = threading.Lock()
 
 

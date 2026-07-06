@@ -5,7 +5,7 @@ toxicity heuristics, and code injection detection.
 
 import re
 
-from agentos.guardrails.engine import GuardrailRule, GuardrailAction, GuardrailCategory
+from agentos.guardrails.engine import GuardrailAction, GuardrailCategory, GuardrailRule
 
 
 def PIIRule(
@@ -120,10 +120,20 @@ def ToxicityRule(
     """Heuristic toxicity detection via keyword lists (offline, no API call)."""
 
     _toxic = [
-        "kill yourself", "kys", "die in a fire", "i hope you die",
-        "nigger", "faggot", "retard", "cunt",
-        "terrorist", "bomb making", "how to make a bomb",
-        "child porn", "cp ", "lolicon",
+        "kill yourself",
+        "kys",
+        "die in a fire",
+        "i hope you die",
+        "nigger",
+        "faggot",
+        "retard",
+        "cunt",
+        "terrorist",
+        "bomb making",
+        "how to make a bomb",
+        "child porn",
+        "cp ",
+        "lolicon",
     ]
 
     def _check(text: str) -> bool:
