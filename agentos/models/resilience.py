@@ -328,13 +328,13 @@ class ResilientCall:
 # ── Auto-generated compat stubs ──
 
 
-def retry_with_backoff(*args, **kwargs):
+def retry_with_backoff(*args, **kwargs):  # noqa: F811
     pass
 
 
-def with_timeout(*args, **kwargs):
+def with_timeout(*args, **kwargs):  # noqa: F811
     pass
 
 
-def with_fallback(*args, **kwargs):
+def with_fallback(*args, **kwargs):  # noqa: F811
     pass

@@ -180,7 +180,6 @@ from agentos.core import (
     StateTransition,
     StreamChunk,
     StreamEmitter,
-    StreamEvent,
     TransitionError,
 )
 
@@ -219,7 +218,6 @@ from agentos.core.handoff import (
 # Agent Loop (v1.3.2)
 from agentos.core.loop import (
     AgentLoop,
-    AgentResult,
     HumanInterruptNeeded,
     LoopConfig,
     LoopState,
@@ -246,10 +244,7 @@ from agentos.cost import (
 # Cost tracking (v1.1.4)
 from agentos.cost.tracker import (
     PRICING,
-    CostTracker,
-    ModelPricing,
     RunCostSession,
-    UsageRecord,
 )
 
 # Deployment (v1.2.8)
@@ -611,12 +606,6 @@ from agentos.security.auditor import (
     SecurityAuditor,
 )
 
-# Content Safety Guardrails (v1.20.0)
-from agentos.security.guardrails import (
-    GuardAction,
-    GuardResult,
-)
-
 # Security - Sandbox (v1.2.1)
 from agentos.security.sandbox_executor import (
     DockerSandbox,
@@ -629,9 +618,6 @@ from agentos.security.sandbox_executor import (
 # MCP Server (v1.3.0)
 from agentos.server.mcp_server import (
     MCPPrompt,
-    MCPResource,
-    MCPServer,
-    MCPServerConfig,
     MCPTool,
 )
 
@@ -1493,7 +1479,6 @@ from agentos.eval.benchmark import (
     EvalCase,
     EvalMetric,
     EvalRegistry,
-    EvalReport,
     EvalResult,
     EvalRunner,
     EvalSample,
@@ -1502,7 +1487,6 @@ from agentos.eval.benchmark import (
     F1Scorer,
     GAIALoader,
     ROUGELScorer,
-    Scorer,
     SWEBenchLoader,
     evaluate_quick,
     get_scorer,
@@ -1510,10 +1494,6 @@ from agentos.eval.benchmark import (
 
 # Guardrails (v1.3.11)
 # HITL (v1.3.11)
-from agentos.hitl.approver import (
-    RiskLevel,
-)
-
 # LLM Provider Module (v1.3.36)
 from agentos.llm import (
     AnthropicProvider,
@@ -1599,7 +1579,6 @@ from agentos.protocols.a2a_streaming import (
     A2AStreamEvent,
     A2AStreamManager,
     A2AStreamSession,
-    TaskProgress,
 )
 from agentos.system.browser import (
     BrowserAction,

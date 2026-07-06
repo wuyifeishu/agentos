@@ -231,9 +231,6 @@ class CostTracker:
             raise BudgetExceededError(...)
     """
 
-    total_cost: float = 0.0
-    total_tokens: int = 0
-
     @classmethod
     def noop(cls) -> CostTracker:
         """Return a minimal no-op tracker that does not record anything."""

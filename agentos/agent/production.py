@@ -486,14 +486,6 @@ class ProductionAgent:
     def session_id(self) -> str:
         return self._session_id
 
-    @property
-    def last_route(self) -> RequestSpec | None:
-        return self._last_route
-
-    @property
-    def last_model(self) -> ModelSpec | None:
-        return self._last_model
-
     def route_summary(self) -> dict:
         """Return routing + audit summary for the current session."""
         summary = {

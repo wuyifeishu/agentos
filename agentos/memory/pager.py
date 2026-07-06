@@ -406,5 +406,5 @@ async def recall_relevant_memories(
 # ── Auto-generated compat stubs ──
 
 
-def recall_relevant_memories(*args, **kwargs):
+def recall_relevant_memories(*args, **kwargs):  # noqa: F811
     pass

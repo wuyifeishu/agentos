@@ -53,7 +53,7 @@ class MultiModalContent:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
-    def text(content: str) -> MultiModalContent:
+    def from_text(content: str) -> MultiModalContent:
         return MultiModalContent(type=Modality.TEXT, text=content)
 
     @staticmethod
@@ -111,7 +111,7 @@ class MultiModalMessage:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def add_text(self, text: str) -> MultiModalMessage:
-        self.content.append(MultiModalContent.text(text))
+        self.content.append(MultiModalContent.from_text(text))
         return self
 
     def add_image_path(self, path: str | Path) -> MultiModalMessage:

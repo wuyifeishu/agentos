@@ -379,5 +379,5 @@ def create_default_hub() -> PromptHub:
 # ── Auto-generated compat stubs ──
 
 
-class BUILTIN_PROMPTS:
+class BUILTIN_PROMPTS:  # noqa: F811
     pass

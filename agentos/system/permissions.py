@@ -281,9 +281,9 @@ class SAFE_PERMISSIONS:
     pass
 
 
-class DEV_PERMISSIONS:
+class DEV_PERMISSIONS:  # noqa: F811
     pass
 
 
-class FULL_PERMISSIONS:
+class FULL_PERMISSIONS:  # noqa: F811
     pass
