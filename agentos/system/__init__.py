@@ -19,34 +19,34 @@ System Operations Layer — 系统底层操作模块 (v1.7.1)
   ADMIN          — 系统管理（安装/卸载/配置）
 """
 
-from agentos.system.permissions import (
-    SystemPermission,
-    PermissionTier,
-    PermissionContext,
-    PermissionDenied,
-    SystemPermissionManager,
+from agentos.system.approval import (
+    ApprovalEngine,
+    ApprovalStatus,
+    ApprovalTicket,
+)
+from agentos.system.browser import (
+    BrowserAction,
+    BrowserResult,
+    BrowserSession,
+    CDPBrowser,
 )
 from agentos.system.file_ops import (
+    FileListing,
     FileOperator,
     FileOpResult,
-    FileListing,
+)
+from agentos.system.permissions import (
+    PermissionContext,
+    PermissionDenied,
+    PermissionTier,
+    SystemPermission,
+    SystemPermissionManager,
 )
 from agentos.system.shell_exec import (
     ShellExecutor,
+    ShellPolicy,
     ShellResult,
     ShellSandbox,
-    ShellPolicy,
-)
-from agentos.system.browser import (
-    BrowserSession,
-    BrowserAction,
-    BrowserResult,
-    CDPBrowser,
-)
-from agentos.system.approval import (
-    ApprovalEngine,
-    ApprovalTicket,
-    ApprovalStatus,
 )
 
 __all__ = [

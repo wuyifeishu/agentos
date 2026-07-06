@@ -1,4 +1,4 @@
-"""
+"""  # noqa: E501
 Workflow Templates — Declarative, reusable multi-step agent workflows.
 
 Define workflows as YAML/JSON templates with conditional branching,
@@ -8,14 +8,14 @@ parallel execution, retry policies, and human-in-the-loop checkpoints.
 from __future__ import annotations
 
 import json
-import yaml
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
+
+import yaml
 
 
 class StepType(Enum):
-
     """步骤类型枚举。"""
 
     AGENT = "agent"
@@ -28,7 +28,6 @@ class StepType(Enum):
 
 
 class RetryPolicy(Enum):
-
     """重试策略类。"""
 
     NONE = "none"
@@ -53,11 +52,11 @@ class WorkflowStep:
     condition: str = ""
     """Python expression evaluated with step outputs as variables."""
 
-    then_steps: list["WorkflowStep"] = field(default_factory=list)
-    else_steps: list["WorkflowStep"] = field(default_factory=list)
+    then_steps: list[WorkflowStep] = field(default_factory=list)
+    else_steps: list[WorkflowStep] = field(default_factory=list)
 
     # Parallel step
-    sub_steps: list["WorkflowStep"] = field(default_factory=list)
+    sub_steps: list[WorkflowStep] = field(default_factory=list)
     max_concurrency: int = 5
 
     # Human review
@@ -153,7 +152,7 @@ class WorkflowTemplate:
         return d
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "WorkflowTemplate":
+    def from_dict(cls, data: dict[str, Any]) -> WorkflowTemplate:
         """Deserialize from dict."""
         return cls(
             name=data["name"],
@@ -193,18 +192,18 @@ class WorkflowTemplate:
         return json.dumps(self.to_dict(), indent=indent, ensure_ascii=False)
 
     @classmethod
-    def from_yaml(cls, yaml_str: str) -> "WorkflowTemplate":
+    def from_yaml(cls, yaml_str: str) -> WorkflowTemplate:
         """Load workflow from YAML string."""
         data = yaml.safe_load(yaml_str)
         return cls.from_dict(data)
 
     @classmethod
-    def from_json(cls, json_str: str) -> "WorkflowTemplate":
+    def from_json(cls, json_str: str) -> WorkflowTemplate:
         """Load workflow from JSON string."""
         data = json.loads(json_str)
         return cls.from_dict(data)
 
-    def get_step(self, name: str) -> Optional[WorkflowStep]:
+    def get_step(self, name: str) -> WorkflowStep | None:
         """Find a step by name (searches recursively)."""
         for step in self.steps:
             result = self._find_step(step, name)
@@ -212,7 +211,7 @@ class WorkflowTemplate:
                 return result
         return None
 
-    def _find_step(self, step: WorkflowStep, name: str) -> Optional[WorkflowStep]:
+    def _find_step(self, step: WorkflowStep, name: str) -> WorkflowStep | None:
         if step.name == name:
             return step
         for sub in step.then_steps + step.else_steps + step.sub_steps:
@@ -298,7 +297,7 @@ def _init_builtins() -> None:
                 name="apply_fixes",
                 step_type=StepType.AGENT,
                 agent_type="coder",
-                task_template="Apply fixes based on review:\\n{{review_feedback}}\\n\\nOriginal code:\\n```\\n{{input.code}}\\n```",
+                task_template="Apply fixes based on review:\\n{{review_feedback}}\\n\\nOriginal code:\\n```\\n{{input.code}}\\n```",  # noqa: E501
                 depends_on=["human_approval"],
                 output_key="fixed_code",
                 retry_policy=RetryPolicy.EXPONENTIAL,

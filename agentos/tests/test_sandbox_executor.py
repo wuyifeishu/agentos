@@ -2,8 +2,8 @@
 
 import os
 import tempfile
-import pytest
-from agentos.security.sandbox import SandboxExecutor, SandboxConfig, SandboxMode, SandboxResult
+
+from agentos.security.sandbox import SandboxConfig, SandboxExecutor, SandboxMode
 
 
 class TestProcessSandbox:

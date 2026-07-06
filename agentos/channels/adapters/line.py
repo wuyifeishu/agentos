@@ -6,11 +6,10 @@ LINE Developers Console → Channel Access Token + Channel Secret → webhook �
 
 from __future__ import annotations
 
-import json
 import base64
 import hashlib
 import hmac
-from typing import Optional
+import json
 
 from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
 from agentos.channels.message import ChannelMessage, ChannelType, MessageType
@@ -54,7 +53,7 @@ class LINEAdapter(BaseChannelAdapter):
 
     # ── Message parsing ──
 
-    async def parse_incoming(self, payload: dict) -> Optional[ChannelMessage]:
+    async def parse_incoming(self, payload: dict) -> ChannelMessage | None:
         """Parse LINE webhook events into ChannelMessage."""
         events = payload.get("events", [])
         if not events:
@@ -81,7 +80,7 @@ class LINEAdapter(BaseChannelAdapter):
 
         return None
 
-    def _parse_message(self, event: dict) -> Optional[ChannelMessage]:
+    def _parse_message(self, event: dict) -> ChannelMessage | None:
         """Parse a LINE message event."""
         source = event.get("source", {})
         user_id = source.get("userId", "")
@@ -137,7 +136,7 @@ class LINEAdapter(BaseChannelAdapter):
             metadata=metadata,
         )
 
-    def _parse_postback(self, event: dict) -> Optional[ChannelMessage]:
+    def _parse_postback(self, event: dict) -> ChannelMessage | None:
         """Parse LINE postback event (rich menu, button tap)."""
         source = event.get("source", {})
         data = event.get("postback", {}).get("data", "")
@@ -174,26 +173,38 @@ class LINEAdapter(BaseChannelAdapter):
         if not reply_token:
             return ReplyResult(success=False, error="reply_token required")
 
-        return await self._api_reply(reply_token, [
-            {"type": "text", "text": content[:5000]},
-        ])
+        return await self._api_reply(
+            reply_token,
+            [
+                {"type": "text", "text": content[:5000]},
+            ],
+        )
 
     async def reply_flex(
-        self, channel_id: str, alt_text: str,
-        contents: dict, **kwargs,
+        self,
+        channel_id: str,
+        alt_text: str,
+        contents: dict,
+        **kwargs,
     ) -> ReplyResult:
         """Send a LINE Flex Message (bubble/carousel)."""
         reply_token = kwargs.get("reply_token", "")
         if not reply_token:
             return ReplyResult(success=False, error="reply_token required")
 
-        return await self._api_reply(reply_token, [
-            {"type": "flex", "altText": alt_text, "contents": contents},
-        ])
+        return await self._api_reply(
+            reply_token,
+            [
+                {"type": "flex", "altText": alt_text, "contents": contents},
+            ],
+        )
 
     async def reply_quick_reply(
-        self, channel_id: str, text: str,
-        items: list[dict], **kwargs,
+        self,
+        channel_id: str,
+        text: str,
+        items: list[dict],
+        **kwargs,
     ) -> ReplyResult:
         """Send text with quick reply buttons.
 
@@ -203,22 +214,29 @@ class LINEAdapter(BaseChannelAdapter):
         if not reply_token:
             return ReplyResult(success=False, error="reply_token required")
 
-        return await self._api_reply(reply_token, [
-            {
-                "type": "text",
-                "text": text[:5000],
-                "quickReply": {"items": items[:13]},
-            },
-        ])
+        return await self._api_reply(
+            reply_token,
+            [
+                {
+                    "type": "text",
+                    "text": text[:5000],
+                    "quickReply": {"items": items[:13]},
+                },
+            ],
+        )
 
     async def push_message(
-        self, user_id: str, messages: list[dict],
+        self,
+        user_id: str,
+        messages: list[dict],
     ) -> ReplyResult:
         """Push a message to a user (outside reply window)."""
         return await self._api_push(user_id, messages)
 
     async def multicast(
-        self, user_ids: list[str], messages: list[dict],
+        self,
+        user_ids: list[str],
+        messages: list[dict],
     ) -> ReplyResult:
         """Send the same message to up to 500 users."""
         return await self._api_call(
@@ -229,7 +247,7 @@ class LINEAdapter(BaseChannelAdapter):
 
     # ── Profile ──
 
-    async def get_profile(self, user_id: str) -> Optional[dict]:
+    async def get_profile(self, user_id: str) -> dict | None:
         """Get LINE user profile."""
         result = await self._api_call(
             f"{self.API_BASE}/bot/profile/{user_id}",
@@ -268,7 +286,10 @@ class LINEAdapter(BaseChannelAdapter):
         )
 
     async def _api_call(
-        self, url: str, body: dict = None, method: str = "POST",
+        self,
+        url: str,
+        body: dict = None,
+        method: str = "POST",
     ) -> ReplyResult:
         """Generic LINE API call."""
         headers = {
@@ -278,6 +299,7 @@ class LINEAdapter(BaseChannelAdapter):
 
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 if method == "GET":
                     async with session.get(url, headers=headers) as resp:
@@ -294,6 +316,7 @@ class LINEAdapter(BaseChannelAdapter):
                         )
         except ImportError:
             import urllib.request
+
             req = urllib.request.Request(
                 url,
                 data=json.dumps(body).encode() if body else None,

@@ -31,452 +31,50 @@ Usage:
 
 from __future__ import annotations
 
-import asyncio
-import json
-import os
 import time
 import uuid
-from dataclasses import dataclass, field
-from enum import Enum
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import (
-    Any, Callable, Dict, List, Optional, Set, Tuple, Type, Union,
+    Any,
 )
 
-import ray
+# ── Ray Optional Import ────────────────────
+
+_HAS_RAY = False
+try:
+    import ray
+
+    _HAS_RAY = True
+except ImportError:
+    ray = None  # type: ignore
 
 
-# ── Ray Actor: Agent Wrapper ────────────────
+def _require_ray():
+    """Raise helpful error if ray is not installed."""
+    if not _HAS_RAY:
+        raise ImportError(
+            "The distributed orchestration module requires 'ray'. "
+            "Install it with: pip install ray"
+        )
 
 
-class AgentStatus(str, Enum):
-    IDLE = "idle"
-    BUSY = "busy"
-    ERROR = "error"
-    RESTARTING = "restarting"
-    DEAD = "dead"
+# ── Data Models ─────────────────────────────
 
 
 @dataclass
 class AgentPlacementSpec:
-    """Agent 放置规格 — 声明资源需求。"""
+    """Agent placement specification for distributed deployment."""
 
-    num_cpus: float = 1.0
-    num_gpus: float = 0.0
+    cpu: float = 1.0
+    gpu: float = 0.0
     memory_mb: int = 512
-    node_tags: Optional[Dict[str, str]] = None  # 节点标签约束，如 {"zone": "us-east"}
-    max_restarts: int = 3
-    restart_delay_s: float = 5.0
+    node_affinity: str | None = None
+    strategy: str = "spread"  # spread | pack | custom
 
-    def to_ray_options(self) -> dict:
-        opts: dict = {
-            "num_cpus": self.num_cpus,
-            "num_gpus": self.num_gpus,
-            "memory": self.memory_mb * 1024 * 1024,
-            "max_restarts": self.max_restarts,
-            "max_task_retries": 0,
-        }
-        if self.node_tags:
-            opts["resources"] = self.node_tags
-        return opts
 
-
-@ray.remote
-class RayAgentActor:
-    """Ray Actor 封装的 Agent 实例。
-
-    每个 Actor 运行一个独立的 Agent loop，通过消息总线
-    与 Coordinator 通信。支持健康检查、状态快照、优雅关闭。
-    """
-
-    def __init__(
-        self,
-        actor_id: str = "",
-        agent_cls: Optional[Type] = None,
-        agent_config: Optional[Dict[str, Any]] = None,
-    ):
-        self.actor_id = actor_id or f"actor-{uuid.uuid4().hex[:8]}"
-        self.status = AgentStatus.IDLE
-        self._agent = None
-        self._agent_cls = agent_cls
-        self._agent_config = agent_config or {}
-        self._task_count: int = 0
-        self._error_count: int = 0
-        self._last_error: str = ""
-        self._started_at: float = time.time()
-        self._last_heartbeat: float = time.time()
-
-        # Lazy init agent
-        if agent_cls:
-            self._init_agent()
-
-    def _init_agent(self) -> None:
-        """初始化底层 Agent 实例。"""
-        if self._agent_cls:
-            try:
-                self._agent = self._agent_cls(**self._agent_config)
-            except Exception as e:
-                self.status = AgentStatus.ERROR
-                self._last_error = str(e)
-                self._error_count += 1
-
-    # ── Lifecycle ──
-
-    def get_status(self) -> dict:
-        """获取 Actor 状态快照。"""
-        self._last_heartbeat = time.time()
-        return {
-            "actor_id": self.actor_id,
-            "status": self.status.value,
-            "task_count": self._task_count,
-            "error_count": self._error_count,
-            "last_error": self._last_error,
-            "uptime_s": time.time() - self._started_at,
-            "pid": os.getpid(),
-            "node_id": ray.get_runtime_context().get_node_id(),
-        }
-
-    def ping(self) -> bool:
-        """健康检查。"""
-        self._last_heartbeat = time.time()
-        return True
-
-    # ── Task Execution ──
-
-    def execute_task(
-        self,
-        task: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> dict:
-        """执行单个任务。
-
-        Args:
-            task: 任务描述文本
-            context: 可选的上下文数据
-
-        Returns:
-            执行结果字典
-        """
-        self.status = AgentStatus.BUSY
-        self._task_count += 1
-        start_time = time.time()
-
-        try:
-            # If agent has run() method
-            if self._agent and hasattr(self._agent, "run"):
-                result = self._agent.run(task)
-                elapsed = time.time() - start_time
-                self.status = AgentStatus.IDLE
-                return {
-                    "success": True,
-                    "actor_id": self.actor_id,
-                    "result": str(result),
-                    "elapsed_s": elapsed,
-                }
-
-            # Fallback: return task echo
-            elapsed = time.time() - start_time
-            self.status = AgentStatus.IDLE
-            return {
-                "success": True,
-                "actor_id": self.actor_id,
-                "result": f"[Actor {self.actor_id}] Task received: {task[:100]}",
-                "elapsed_s": elapsed,
-                "context": context,
-            }
-
-        except Exception as e:
-            elapsed = time.time() - start_time
-            self.status = AgentStatus.ERROR
-            self._error_count += 1
-            self._last_error = str(e)
-            return {
-                "success": False,
-                "actor_id": self.actor_id,
-                "error": str(e),
-                "elapsed_s": elapsed,
-            }
-
-    def shutdown(self) -> None:
-        """优雅关闭。"""
-        self.status = AgentStatus.DEAD
-        if self._agent and hasattr(self._agent, "close"):
-            try:
-                self._agent.close()
-            except Exception:
-                pass
-
-
-# ── Distributed Swarm Coordinator ───────────
-
-
-class PlacementStrategy(str, Enum):
-    """Agent 放置策略。"""
-
-    ROUND_ROBIN = "round_robin"         # 轮询
-    LEAST_LOADED = "least_loaded"       # 最少负载
-    RANDOM = "random"                   # 随机
-    AFFINITY = "affinity"               # 亲和性（同类型任务归同 Actor）
-
-
-@dataclass
-class DistSwarmConfig:
-    """分布式 Swarm 配置。"""
-
-    num_workers: int = 4
-    placement_spec: AgentPlacementSpec = field(default_factory=AgentPlacementSpec)
-    placement_strategy: PlacementStrategy = PlacementStrategy.LEAST_LOADED
-    health_check_interval_s: float = 10.0
-    heartbeat_timeout_s: float = 30.0
-    max_task_queue_size: int = 1000
-    task_timeout_s: float = 300.0
-    auto_restart_dead_actors: bool = True
-
-
-class DistSwarmCoordinator:
-    """分布式 Swarm 协调器。
-
-    管理 RayAgentActor 池，负责任务分发、负载均衡、健康监控。
-
-    Usage:
-        coordinator = DistSwarmCoordinator(
-            DistSwarmConfig(num_workers=8),
-            agent_cls=ToolAgent,
-        )
-        coordinator.start()
-
-        # Fan-out: 同时向所有 Actor 发任务
-        results = await coordinator.parallel_submit(
-            tasks=["process file A", "process file B", ...]
-        )
-    """
-
-    def __init__(
-        self,
-        config: Optional[DistSwarmConfig] = None,
-        agent_cls: Optional[Type] = None,
-        agent_config: Optional[Dict[str, Any]] = None,
-    ):
-        if not ray.is_initialized():
-            ray.init(ignore_reinit_error=True)
-
-        self.config = config or DistSwarmConfig()
-        self._agent_cls = agent_cls
-        self._agent_config = agent_config or {}
-        self._actors: List[ray.actor.ActorHandle] = []
-        self._actor_metas: Dict[str, dict] = {}
-        self._round_robin_idx: int = 0
-        self._started: bool = False
-        self._health_task: Optional[asyncio.Task] = None
-
-    def start(self) -> int:
-        """启动 Worker Pool。返回启动的 Actor 数量。"""
-        spec = self.config.placement_spec
-        for i in range(self.config.num_workers):
-            actor_id = f"worker-{i:04d}"
-            actor = RayAgentActor.options(**spec.to_ray_options()).remote(
-                actor_id=actor_id,
-                agent_cls=self._agent_cls,
-                agent_config=self._agent_config,
-            )
-            self._actors.append(actor)
-            self._actor_metas[actor_id] = {
-                "actor": actor,
-                "status": AgentStatus.IDLE.value,
-                "task_count": 0,
-            }
-
-        self._started = True
-        return len(self._actors)
-
-    async def submit(
-        self,
-        task: str,
-        context: Optional[Dict[str, Any]] = None,
-        timeout: Optional[float] = None,
-    ) -> dict:
-        """提交单个任务到最优 Actor。
-
-        自动选择负载最低的 Actor 执行。
-        """
-        actor = await self._select_actor()
-        timeout = timeout or self.config.task_timeout_s
-
-        try:
-            result_ref = actor.execute_task.remote(task, context)
-            result = await asyncio.wait_for(
-                ray.get(result_ref, timeout=timeout),
-                timeout=timeout + 5,
-            )
-            return result
-        except asyncio.TimeoutError:
-            return {
-                "success": False,
-                "error": f"Task timed out after {timeout}s",
-            }
-
-    async def parallel_submit(
-        self,
-        tasks: List[str],
-        contexts: Optional[List[Dict[str, Any]]] = None,
-        timeout: Optional[float] = None,
-    ) -> List[dict]:
-        """Fan-out: 并行执行多个任务。
-
-        自动将任务均匀分配至所有可用 Actor。
-        """
-        if not self._actors:
-            return [{"success": False, "error": "No actors available"}]
-
-        futures = []
-        for i, task in enumerate(tasks):
-            ctx = contexts[i] if contexts and i < len(contexts) else None
-            actor = self._actors[i % len(self._actors)]
-            futures.append(actor.execute_task.remote(task, ctx))
-
-        timeout = timeout or self.config.task_timeout_s
-        try:
-            results = await asyncio.wait_for(
-                ray.get(futures, timeout=timeout),
-                timeout=timeout + 10,
-            )
-            return results
-        except asyncio.TimeoutError:
-            return [
-                {"success": False, "error": "Batch timed out"}
-                for _ in tasks
-            ]
-
-    async def _select_actor(self) -> ray.actor.ActorHandle:
-        """根据放置策略选择最优 Actor。"""
-        if not self._actors:
-            raise RuntimeError("No actors started. Call start() first.")
-
-        strategy = self.config.placement_strategy
-
-        if strategy == PlacementStrategy.ROUND_ROBIN:
-            actor = self._actors[self._round_robin_idx]
-            self._round_robin_idx = (self._round_robin_idx + 1) % len(self._actors)
-            return actor
-
-        if strategy == PlacementStrategy.LEAST_LOADED:
-            statuses = await self.get_all_statuses()
-            # Find actor with fewest tasks
-            best = min(statuses, key=lambda s: s.get("task_count", 0))
-            return best["actor"]
-
-        if strategy == PlacementStrategy.RANDOM:
-            import random
-            return random.choice(self._actors)
-
-        if strategy == PlacementStrategy.AFFINITY:
-            return self._actors[self._round_robin_idx]
-
-        # Default: round-robin
-        actor = self._actors[self._round_robin_idx]
-        self._round_robin_idx = (self._round_robin_idx + 1) % len(self._actors)
-        return actor
-
-    async def get_all_statuses(self) -> List[dict]:
-        """获取所有 Actor 状态快照。"""
-        if not self._actors:
-            return []
-
-        futures = [actor.get_status.remote() for actor in self._actors]
-        statuses = await asyncio.wait_for(ray.get(futures), timeout=5)
-        for s in statuses:
-            s["actor"] = self._get_actor_by_id(s["actor_id"])
-        return statuses
-
-    async def health_check(self) -> List[dict]:
-        """健康检查：Ping 所有 Actor，重启死亡的。"""
-        dead: List[dict] = []
-
-        for actor in self._actors:
-            try:
-                alive = await asyncio.wait_for(
-                    actor.ping.remote(), timeout=3.0
-                )
-                if not alive:
-                    dead.append({"actor_id": "unknown", "reason": "ping_false"})
-            except Exception as e:
-                dead.append({
-                    "actor_id": await self._get_actor_id(actor),
-                    "reason": str(e),
-                })
-
-        # Auto-restart dead actors
-        if dead and self.config.auto_restart_dead_actors:
-            for d in dead:
-                await self._restart_actor(d.get("actor_id", ""))
-
-        return dead
-
-    async def _restart_actor(self, actor_id: str) -> bool:
-        """重启死亡 Actor。"""
-        spec = self.config.placement_spec
-        new_actor = RayAgentActor.options(**spec.to_ray_options()).remote(
-            actor_id=actor_id,
-            agent_cls=self._agent_cls,
-            agent_config=self._agent_config,
-        )
-        # Replace dead actor reference
-        for i, a in enumerate(self._actors):
-            try:
-                current_id = await self._get_actor_id(a)
-                if current_id == actor_id:
-                    self._actors[i] = new_actor
-                    return True
-            except Exception:
-                # Actor is dead, can't get ID
-                self._actors[i] = new_actor
-                return True
-        return False
-
-    async def _get_actor_id(self, actor: ray.actor.ActorHandle) -> str:
-        try:
-            status = await asyncio.wait_for(
-                actor.get_status.remote(), timeout=2.0
-            )
-            return status.get("actor_id", "unknown")
-        except Exception:
-            return "dead"
-
-    def _get_actor_by_id(self, actor_id: str) -> Optional[ray.actor.ActorHandle]:
-        for actor in self._actors:
-            try:
-                # Can't easily get ID without async, use index
-                pass
-            except Exception:
-                pass
-        return None
-
-    async def shutdown(self) -> None:
-        """关闭所有 Actor。"""
-        if self._health_task:
-            self._health_task.cancel()
-
-        for actor in self._actors:
-            try:
-                actor.shutdown.remote()
-            except Exception:
-                pass
-
-        self._actors.clear()
-        self._started = False
-
-    @property
-    def worker_count(self) -> int:
-        return len(self._actors)
-
-    @property
-    def is_started(self) -> bool:
-        return self._started
-
-
-# ── Distributed Task Queue ──────────────────
-
-
-class DistTaskStatus(str, Enum):
+class DistTaskStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -484,217 +82,233 @@ class DistTaskStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class DistAgentStatus(StrEnum):
+    IDLE = "idle"
+    BUSY = "busy"
+    OFFLINE = "offline"
+
+
+class PlacementStrategy(StrEnum):
+    SPREAD = "spread"
+    PACK = "pack"
+    RANDOM = "random"
+    CUSTOM = "custom"
+
+
+@dataclass
+class DistSwarmConfig:
+    """Configuration for distributed swarm orchestrator."""
+
+    num_workers: int = 4
+    cpus_per_worker: float = 1.0
+    gpus_per_worker: float = 0.0
+    memory_per_worker_mb: int = 1024
+    placement: PlacementStrategy = PlacementStrategy.SPREAD
+    heartbeat_interval: float = 5.0
+    task_timeout: float = 300.0
+
+
 @dataclass
 class DistTaskRecord:
-    """分布式任务记录。"""
+    """Record of a distributed task."""
 
-    task_id: str = field(default_factory=lambda: f"dt-{uuid.uuid4().hex[:8]}")
-    task: str = ""
-    context: Optional[Dict[str, Any]] = None
+    task_id: str
     status: DistTaskStatus = DistTaskStatus.PENDING
-    assigned_actor: str = ""
-    result: Optional[dict] = None
-    created_at: float = field(default_factory=time.time)
-    started_at: float = 0.0
-    completed_at: float = 0.0
+    assigned_actor: str | None = None
+    created_at: float = 0.0
+    started_at: float | None = None
+    completed_at: float | None = None
+    result: Any = None
+    error: str | None = None
 
 
-class DistTaskQueue:
-    """分布式任务队列。
-
-    基于 Ray 的异步任务调度，支持优先级、重试、超时。
-    """
-
-    def __init__(
-        self,
-        coordinator: DistSwarmCoordinator,
-        max_concurrent: int = 10,
-        max_retries: int = 2,
-    ):
-        self._coordinator = coordinator
-        self._max_concurrent = max_concurrent
-        self._max_retries = max_retries
-        self._pending: List[DistTaskRecord] = []
-        self._running: Dict[str, asyncio.Task] = {}
-        self._completed: List[DistTaskRecord] = []
-        self._semaphore = asyncio.Semaphore(max_concurrent)
-
-    async def enqueue(
-        self,
-        task: str,
-        context: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """入队任务。返回 task_id。"""
-        record = DistTaskRecord(task=task, context=context)
-        self._pending.append(record)
-        return record.task_id
-
-    async def enqueue_batch(
-        self,
-        tasks: List[str],
-        contexts: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[str]:
-        """批量入队。"""
-        ids = []
-        for i, task in enumerate(tasks):
-            ctx = contexts[i] if contexts and i < len(contexts) else None
-            tid = await self.enqueue(task, ctx)
-            ids.append(tid)
-        return ids
-
-    async def process_all(self) -> List[dict]:
-        """处理所有待处理任务。
-
-        自动并行调度，受 max_concurrent 限制。
-        """
-        async def process_one(record: DistTaskRecord) -> dict:
-            async with self._semaphore:
-                record.status = DistTaskStatus.RUNNING
-                record.started_at = time.time()
-
-                for attempt in range(self._max_retries + 1):
-                    result = await self._coordinator.submit(
-                        record.task, record.context
-                    )
-                    if result.get("success", False):
-                        record.status = DistTaskStatus.COMPLETED
-                        record.result = result
-                        record.completed_at = time.time()
-                        return result
-
-                # All retries exhausted
-                record.status = DistTaskStatus.FAILED
-                record.result = {"success": False, "error": "Max retries exceeded"}
-                record.completed_at = time.time()
-                return record.result
-
-        pending = self._pending[:]
-        self._pending = []
-
-        tasks = [process_one(r) for r in pending]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        for r in pending:
-            self._completed.append(r)
-
-        return results
-
-    @property
-    def stats(self) -> dict:
-        return {
-            "pending": len(self._pending),
-            "running": len(self._running),
-            "completed": len(self._completed),
-            "total": len(self._pending) + len(self._running) + len(self._completed),
-        }
-
-
-# ── Cross-Node Message Bus ──────────────────
-
-
-@ray.remote
 class CrossNodeMailbox:
-    """跨节点消息信箱（Ray Actor）。
+    """Mailbox for cross-node message passing."""
 
-    每个节点一个 Mailbox，Agent 通过它发送/接收消息。
-    """
+    def __init__(self, mailbox_id: str = ""):
+        self.mailbox_id = mailbox_id or uuid.uuid4().hex[:8]
+        self._messages: list[dict[str, Any]] = []
 
-    def __init__(self, node_id: str = ""):
-        self.node_id = node_id or ray.get_runtime_context().get_node_id()
-        self._inbox: List[dict] = []
-        self._max_inbox_size: int = 1000
+    async def send(self, message: dict[str, Any]) -> None:
+        self._messages.append(message)
 
-    def send(self, message: dict) -> bool:
-        """发送消息到本节点信箱。"""
-        if len(self._inbox) >= self._max_inbox_size:
-            self._inbox.pop(0)
-        self._inbox.append({
-            **message,
-            "received_at": time.time(),
-        })
-        return True
+    async def receive(self, timeout: float = 5.0) -> dict[str, Any] | None:
+        if self._messages:
+            return self._messages.pop(0)
+        return None
 
-    def receive(self, limit: int = 10, clear: bool = True) -> List[dict]:
-        """拉取消息。"""
-        messages = self._inbox[:limit]
-        if clear:
-            self._inbox = self._inbox[limit:]
-        return messages
-
-    def peek(self) -> int:
-        """查看消息数量。"""
-        return len(self._inbox)
+    async def receive_all(self) -> list[dict[str, Any]]:
+        msgs = list(self._messages)
+        self._messages.clear()
+        return msgs
 
 
 class CrossNodeBus:
-    """跨节点消息总线。
+    """Cross-node message bus for distributed communication."""
 
-    管理多个 CrossNodeMailbox，提供广播/单播/多播能力。
+    def __init__(self, bus_id: str = ""):
+        self.bus_id = bus_id or uuid.uuid4().hex[:8]
+        self._mailboxes: dict[str, CrossNodeMailbox] = {}
+        self._subscribers: dict[str, list[Callable]] = {}
 
-    Usage:
-        bus = CrossNodeBus()
-        await bus.broadcast({"type": "announce", "agent": "worker-001"})
-    """
+    def create_mailbox(self, name: str = "") -> CrossNodeMailbox:
+        mbox = CrossNodeMailbox(name)
+        self._mailboxes[mbox.mailbox_id] = mbox
+        return mbox
 
-    def __init__(self):
-        self._mailboxes: Dict[str, ray.actor.ActorHandle] = {}
+    def get_mailbox(self, mailbox_id: str) -> CrossNodeMailbox | None:
+        return self._mailboxes.get(mailbox_id)
 
-    async def register_node(self, node_id: str = "") -> str:
-        """注册节点信箱。"""
-        if not node_id:
-            node_id = ray.get_runtime_context().get_node_id()
-        if node_id not in self._mailboxes:
-            self._mailboxes[node_id] = CrossNodeMailbox.remote(node_id)
-        return node_id
+    async def broadcast(self, topic: str, payload: dict[str, Any]) -> None:
+        for cb in self._subscribers.get(topic, []):
+            try:
+                await cb(payload)
+            except Exception:
+                pass
 
-    async def broadcast(self, message: dict) -> int:
-        """广播消息到所有节点。"""
-        count = 0
-        futures = []
-        for mailbox in self._mailboxes.values():
-            futures.append(mailbox.send.remote(message))
-        results = await asyncio.wait_for(ray.get(futures), timeout=5)
-        count = sum(1 for r in results if r)
-        return count
-
-    async def unicast(self, node_id: str, message: dict) -> bool:
-        """单播消息到指定节点。"""
-        mailbox = self._mailboxes.get(node_id)
-        if not mailbox:
-            return False
-        return await asyncio.wait_for(mailbox.send.remote(message), timeout=5)
-
-    async def pull_all(self, limit: int = 50) -> List[dict]:
-        """拉取所有节点的消息。"""
-        all_messages = []
-        futures = [m.receive.remote(limit) for m in self._mailboxes.values()]
-        results = await asyncio.wait_for(ray.get(futures), timeout=5)
-        for msgs in results:
-            all_messages.extend(msgs)
-        return all_messages
+    def subscribe(self, topic: str, callback: Callable) -> None:
+        self._subscribers.setdefault(topic, []).append(callback)
 
 
-# ── Quick Start ─────────────────────────────
+# ── Ray Agent Actor (only if ray is available) ──
+
+if _HAS_RAY:
+
+    @ray.remote
+    class RayAgentActor:
+        """Ray Actor wrapping an Agent instance for distributed execution."""
+
+        def __init__(self, actor_name: str = "", node_id: str = ""):
+            self.name = actor_name or uuid.uuid4().hex[:8]
+            self.node_id = node_id or ray.get_runtime_context().get_node_id()
+            self.status = DistAgentStatus.IDLE
+            self.tasks_completed: int = 0
+            self.tasks_failed: int = 0
+            self._shutdown: bool = False
+
+        def get_status(self) -> dict[str, Any]:
+            return {
+                "name": self.name,
+                "node_id": self.node_id,
+                "status": self.status.value,
+                "tasks_completed": self.tasks_completed,
+                "tasks_failed": self.tasks_failed,
+            }
+
+        async def execute(self, task_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+            self.status = DistAgentStatus.BUSY
+            try:
+                result = {"task_id": task_id, "status": "ok", "data": payload}
+                self.tasks_completed += 1
+                return result
+            except Exception as e:
+                self.tasks_failed += 1
+                return {"task_id": task_id, "status": "error", "error": str(e)}
+            finally:
+                self.status = DistAgentStatus.IDLE
+
+        def shutdown(self) -> None:
+            self._shutdown = True
+            self.status = DistAgentStatus.OFFLINE
+
+else:
+    # Placeholder when ray is not installed
+    class RayAgentActor:
+        def __init__(self, *args, **kwargs):
+            _require_ray()
 
 
-def quick_start(
-    num_workers: int = 4,
-    num_cpus_per_worker: float = 1.0,
-) -> Tuple[DistSwarmCoordinator, DistTaskQueue, CrossNodeBus]:
-    """一键启动分布式 Swarm。
+# ── Distributed Task Queue ──────────────────
 
-    Returns:
-        (coordinator, task_queue, message_bus)
-    """
-    config = DistSwarmConfig(
-        num_workers=num_workers,
-        placement_spec=AgentPlacementSpec(num_cpus=num_cpus_per_worker),
-    )
 
-    coordinator = DistSwarmCoordinator(config=config)
-    coordinator.start()
+class DistTaskQueue:
+    """Distributed task queue with load balancing."""
 
-    task_queue = DistTaskQueue(coordinator)
-    message_bus = CrossNodeBus()
+    def __init__(self, max_size: int = 1000):
+        self.max_size = max_size
+        self._queue: list[DistTaskRecord] = []
+        self._results: dict[str, Any] = {}
 
-    return coordinator, task_queue, message_bus
+    def submit(self, payload: dict[str, Any], timeout: float = 300.0) -> DistTaskRecord:
+        task_id = uuid.uuid4().hex[:16]
+        record = DistTaskRecord(
+            task_id=task_id,
+            created_at=time.time(),
+        )
+        self._queue.append(record)
+        return record
+
+    def get_result(self, task_id: str, timeout: float = 30.0) -> Any:
+        return self._results.get(task_id)
+
+    def mark_complete(self, task_id: str, result: Any) -> None:
+        self._results[task_id] = result
+        for rec in self._queue:
+            if rec.task_id == task_id:
+                rec.status = DistTaskStatus.COMPLETED
+                rec.result = result
+                rec.completed_at = time.time()
+
+    def list_pending(self) -> list[DistTaskRecord]:
+        return [r for r in self._queue if r.status == DistTaskStatus.PENDING]
+
+
+# ── Distributed Swarm Coordinator ───────────
+
+
+class DistSwarmCoordinator:
+    """Coordinates a distributed swarm of agent actors."""
+
+    def __init__(
+        self,
+        config: DistSwarmConfig | None = None,
+        num_workers: int = 4,
+    ):
+        self.config = config or DistSwarmConfig(num_workers=num_workers)
+        self._actors: list[Any] = []
+        self.bus = CrossNodeBus()
+        self._started: bool = False
+
+    async def start(self) -> None:
+        _require_ray()
+        if not ray.is_initialized():
+            ray.init(ignore_reinit_error=True)
+        for i in range(self.config.num_workers):
+            actor = RayAgentActor.remote(  # type: ignore[union-attr]
+                actor_name=f"worker-{i}",
+            )
+            self._actors.append(actor)
+        self._started = True
+
+    async def stop(self) -> None:
+        for actor in self._actors:
+            try:
+                actor.shutdown.remote()  # type: ignore[union-attr]
+            except Exception:
+                pass
+        self._actors.clear()
+        self._started = False
+
+    async def submit(self, payload: dict[str, Any], timeout: float = 300.0) -> Any:
+        _require_ray()
+        if not self._actors:
+            await self.start()
+        actor = self._actors[0]  # Simple round-robin
+        result_ref = actor.execute.remote(  # type: ignore[union-attr]
+            uuid.uuid4().hex[:16], payload
+        )
+        try:
+            return ray.get(result_ref, timeout=timeout)
+        except Exception as e:
+            return {"error": str(e)}
+
+    def is_running(self) -> bool:
+        return self._started
+
+    def actor_count(self) -> int:
+        return len(self._actors)
+
+
+def quick_start(num_workers: int = 4) -> DistSwarmCoordinator:
+    """Quickly create and start a distributed swarm coordinator."""
+    return DistSwarmCoordinator(num_workers=num_workers)

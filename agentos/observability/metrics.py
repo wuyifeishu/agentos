@@ -1,4 +1,4 @@
-"""
+"""  # noqa: E501
 AgentOS v0.70 — 性能指标与可观测性增强。
 基因来源: Prometheus metrics + OpenTelemetry
 
@@ -16,12 +16,12 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass
 class MetricSnapshot:
     """指标快照 — 用于导出/序列化。"""
+
     timestamp: float = field(default_factory=time.time)
     histograms: dict[str, dict] = field(default_factory=dict)
     counters: dict[str, int] = field(default_factory=dict)
@@ -30,30 +30,50 @@ class MetricSnapshot:
 
     def to_json(self) -> str:
         import json
-        return json.dumps({
-            "ts": self.timestamp,
-            "h": self.histograms,
-            "c": self.counters,
-            "g": self.gauges,
-            "d": self.derived_metrics,
-        })
+
+        return json.dumps(
+            {
+                "ts": self.timestamp,
+                "h": self.histograms,
+                "c": self.counters,
+                "g": self.gauges,
+                "d": self.derived_metrics,
+            }
+        )
 
     @classmethod
-    def from_collector(cls, collector: "MetricsCollector") -> "MetricSnapshot":
+    def from_collector(cls, collector: MetricsCollector) -> MetricSnapshot:
         s = collector.snapshot()
         return cls(
-            histograms={"step": s["latency_step_ms"], "model": s["latency_model_ms"], "tool": s["latency_tool_ms"]},
-            counters={"steps": collector.steps_total.value, "model_calls": collector.model_calls_total.value,
-                       "tool_calls": collector.tool_calls_total.value, "errors": collector.errors_total.value,
-                       "cache_hits": collector.cache_hits.value, "cache_misses": collector.cache_misses.value},
-            gauges={"active_agents": collector.active_agents.value, "queue_depth": collector.queue_depth.value},
-            derived_metrics={"rps": s["throughput"]["rps"], "error_rate": s["error_rate"], "cache_hit_rate": s["cache_hit_rate"]},
+            histograms={
+                "step": s["latency_step_ms"],
+                "model": s["latency_model_ms"],
+                "tool": s["latency_tool_ms"],
+            },
+            counters={
+                "steps": collector.steps_total.value,
+                "model_calls": collector.model_calls_total.value,
+                "tool_calls": collector.tool_calls_total.value,
+                "errors": collector.errors_total.value,
+                "cache_hits": collector.cache_hits.value,
+                "cache_misses": collector.cache_misses.value,
+            },
+            gauges={
+                "active_agents": collector.active_agents.value,
+                "queue_depth": collector.queue_depth.value,
+            },
+            derived_metrics={
+                "rps": s["throughput"]["rps"],
+                "error_rate": s["error_rate"],
+                "cache_hit_rate": s["cache_hit_rate"],
+            },
         )
 
 
 @dataclass
 class MetricPoint:
     """指标数据点。"""
+
     timestamp: float
     value: float
     labels: dict[str, str] = field(default_factory=dict)
@@ -62,6 +82,7 @@ class MetricPoint:
 @dataclass
 class Histogram:
     """滑动窗口直方图 — 计算分位数。"""
+
     name: str
     window_seconds: float = 300.0
     max_size: int = 10000
@@ -151,6 +172,7 @@ class Histogram:
 @dataclass
 class Counter:
     """单调递增计数器。"""
+
     name: str
     _value: int = 0
     _labels: dict[str, str] = field(default_factory=dict)
@@ -166,6 +188,7 @@ class Counter:
 @dataclass
 class Gauge:
     """可增可减的仪表值。"""
+
     name: str
     _value: float = 0.0
     _labels: dict[str, str] = field(default_factory=dict)
@@ -291,7 +314,7 @@ class MetricsCollector:
         lines = [
             f"运行时间: {s['uptime_seconds']:.0f}s",
             f"吞吐: {s['throughput']['rps']} rps ({s['throughput']['steps_total']} steps)",
-            f"延迟: p50={s['latency_step_ms']['p50']:.0f}ms p95={s['latency_step_ms']['p95']:.0f}ms p99={s['latency_step_ms']['p99']:.0f}ms",
+            f"延迟: p50={s['latency_step_ms']['p50']:.0f}ms p95={s['latency_step_ms']['p95']:.0f}ms p99={s['latency_step_ms']['p99']:.0f}ms",  # noqa: E501
             f"错误率: {s['error_rate']:.2%} ({s['errors_total']} errors)",
             f"缓存命中率: {s['cache_hit_rate']:.1%} ({s['cache_hits']}/{s['cache_hits'] + s['cache_misses']})",
         ]

@@ -12,6 +12,7 @@ from typing import Any
 @dataclass
 class MemoryEntry:
     """长期记忆条目。"""
+
     id: str
     content: str
     embedding: list[float] | None = None
@@ -57,6 +58,7 @@ class LongTermMemory:
 
     def search_by_vector(self, query_embedding: list[float], top_k: int = 10) -> list[MemoryEntry]:
         """向量相似度检索（余弦相似度）。"""
+
         def cosine(a, b):
             dot = sum(x * y for x, y in zip(a, b))
             norm_a = sum(x * x for x in a) ** 0.5
@@ -92,6 +94,52 @@ class LongTermMemory:
         del self._entries[oldest.id]
         for kw_set in self._keyword_index.values():
             kw_set.discard(oldest.id)
+
+    # ── Persistence (v1.14.9) ────────────────
+
+    def get_state(self) -> dict[str, Any]:
+        """Export LongTermMemory state for persistence."""
+        return {
+            "embedding_dim": self._embedding_dim,
+            "max_entries": self._max_entries,
+            "entries": {
+                eid: {
+                    "id": entry.id,
+                    "content": entry.content,
+                    "embedding": entry.embedding,
+                    "metadata": entry.metadata,
+                    "created_at": entry.created_at,
+                }
+                for eid, entry in self._entries.items()
+            },
+            "entity_graph": {
+                entity: [(r, e) for r, e in relations]
+                for entity, relations in self._entity_graph.items()
+            },
+        }
+
+    def restore_state(self, state: dict[str, Any]) -> None:
+        """Restore LongTermMemory from a persisted snapshot."""
+        self._embedding_dim = state.get("embedding_dim", self._embedding_dim)
+        self._max_entries = state.get("max_entries", self._max_entries)
+        self._entries.clear()
+        self._keyword_index.clear()
+        self._entity_graph.clear()
+
+        for eid, entry_data in state.get("entries", {}).items():
+            entry = MemoryEntry(
+                id=entry_data.get("id", eid),
+                content=entry_data.get("content", ""),
+                embedding=entry_data.get("embedding"),
+                metadata=entry_data.get("metadata", {}),
+                created_at=entry_data.get("created_at", 0.0),
+            )
+            self._entries[eid] = entry
+            self._index_keywords(entry)
+
+        for entity, relations in state.get("entity_graph", {}).items():
+            for rel, target in relations:
+                self._entity_graph.setdefault(entity, set()).add((rel, target))
 
 
 class MemoryStore:
@@ -129,3 +177,17 @@ class MemoryStore:
 
     def clear_short_term(self):
         self.short_term.clear()
+
+    # ── Persistence (v1.14.9) ────────────────
+
+    def get_state(self) -> dict[str, Any]:
+        """Export MemoryStore state for persistence."""
+        return {
+            "working": self.working,
+            "short_term": self.short_term,
+        }
+
+    def restore_state(self, state: dict[str, Any]) -> None:
+        """Restore MemoryStore from a persisted snapshot."""
+        self.working = dict(state.get("working", {}))
+        self.short_term = list(state.get("short_term", []))

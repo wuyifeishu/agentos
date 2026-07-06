@@ -26,26 +26,21 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import re
-import subprocess
-import tempfile
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Optional, Callable, Any
-from urllib.parse import urlparse, quote_plus
+from typing import Any
 
 from agentos.marketplace.importer import (
-    OpenClawImporter, RemoteSkill, OPENCLAW_RAW_BASE, OPENCLAW_API,
+    OpenClawImporter,
 )
-from agentos.marketplace.manifest import SkillManifest
-
 
 # ── Ecosystem Registry ──────────────────────────────────────────────
 
-class EcosystemSource(str, Enum):
+
+class EcosystemSource(StrEnum):
     OPENCLAW = "openclaw"
     HUGGINGFACE = "huggingface"
     GITHUB_TOPICS = "github_topics"
@@ -58,14 +53,15 @@ class EcosystemSource(str, Enum):
 @dataclass
 class EcosystemMeta:
     """Metadata for a skill ecosystem source."""
+
     source: EcosystemSource
-    name: str                     # Human-readable name
-    base_url: str                 # API / catalog URL
-    estimated_skills: int         # Approximate count
-    category: str = "community"   # community / official / experimental
+    name: str  # Human-readable name
+    base_url: str  # API / catalog URL
+    estimated_skills: int  # Approximate count
+    category: str = "community"  # community / official / experimental
     enabled: bool = True
     auth_required: bool = False
-    icon: str = ""                # Icon URL or emoji
+    icon: str = ""  # Icon URL or emoji
     description: str = ""
     api_docs: str = ""
 
@@ -138,9 +134,11 @@ ECOSYSTEMS: dict[EcosystemSource, EcosystemMeta] = {
 
 # ── Ecosystem Bridge ─────────────────────────────────────────────────
 
+
 @dataclass
 class CrossEcosystemSkill:
     """A skill discovered from any ecosystem, normalized to common schema."""
+
     name: str
     ecosystem: EcosystemSource
     ecosystem_name: str
@@ -153,8 +151,8 @@ class CrossEcosystemSkill:
     stars: int = 0
     downloads: int = 0
     license: str = "MIT"
-    language: str = "python"     # python / node / shell / mixed
-    is_imported: bool = False     # Already in local registry?
+    language: str = "python"  # python / node / shell / mixed
+    is_imported: bool = False  # Already in local registry?
 
 
 class EcosystemBridge:
@@ -173,11 +171,13 @@ class EcosystemBridge:
 
     def __init__(self, registry, cache_dir: str = ""):
         self._registry = registry
-        self._cache_dir = Path(cache_dir) if cache_dir else Path.home() / ".agentos" / "ecosystem_bridge"
+        self._cache_dir = (
+            Path(cache_dir) if cache_dir else Path.home() / ".agentos" / "ecosystem_bridge"
+        )
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Sub-importers (lazy init)
-        self._openclaw: Optional[OpenClawImporter] = None
+        self._openclaw: OpenClawImporter | None = None
         self._catalog: list[CrossEcosystemSkill] = []
         self._stats: dict[str, Any] = {}
         self._ecosystems = dict(ECOSYSTEMS)
@@ -213,7 +213,9 @@ class EcosystemBridge:
 
     # ── Catalog Discovery ──
 
-    async def refresh_catalog(self, ecosystems: list[str] | None = None) -> list[CrossEcosystemSkill]:
+    async def refresh_catalog(
+        self, ecosystems: list[str] | None = None
+    ) -> list[CrossEcosystemSkill]:
         """Scan all (or specified) ecosystems and build a unified skill catalog.
 
         Args:
@@ -285,6 +287,7 @@ class EcosystemBridge:
         skills: list[CrossEcosystemSkill] = []
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 url = "https://huggingface.co/api/spaces"
                 params = {"search": "agent-skill", "limit": 50, "full": "false"}
@@ -292,17 +295,19 @@ class EcosystemBridge:
                     if resp.status == 200:
                         data = await resp.json()
                         for item in data:
-                            skills.append(CrossEcosystemSkill(
-                                name=f"hf/{item.get('id', 'unknown')}",
-                                ecosystem=EcosystemSource.HUGGINGFACE,
-                                ecosystem_name=eco.name,
-                                description=item.get("sdk", ""),
-                                author=item.get("author", ""),
-                                tags=item.get("tags", []),
-                                url=f"https://huggingface.co/spaces/{item.get('id', '')}",
-                                stars=item.get("likes", 0),
-                                language="python",
-                            ))
+                            skills.append(
+                                CrossEcosystemSkill(
+                                    name=f"hf/{item.get('id', 'unknown')}",
+                                    ecosystem=EcosystemSource.HUGGINGFACE,
+                                    ecosystem_name=eco.name,
+                                    description=item.get("sdk", ""),
+                                    author=item.get("author", ""),
+                                    tags=item.get("tags", []),
+                                    url=f"https://huggingface.co/spaces/{item.get('id', '')}",
+                                    stars=item.get("likes", 0),
+                                    language="python",
+                                )
+                            )
         except Exception:
             pass
         return skills
@@ -313,6 +318,7 @@ class EcosystemBridge:
         topics = ["agent-skill", "ai-tool", "agent-framework", "skill-marketplace"]
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 for topic in topics[:2]:  # Limit to avoid rate limits
                     url = "https://api.github.com/search/repositories"
@@ -326,22 +332,30 @@ class EcosystemBridge:
                         headers["Authorization"] = f"token {os.environ['GITHUB_TOKEN']}"
 
                     try:
-                        async with session.get(url, params=params, headers=headers, timeout=10) as resp:
+                        async with session.get(
+                            url, params=params, headers=headers, timeout=10
+                        ) as resp:
                             if resp.status == 200:
                                 data = await resp.json()
                                 for item in data.get("items", [])[:15]:
-                                    skills.append(CrossEcosystemSkill(
-                                        name=f"gh/{item['full_name']}",
-                                        ecosystem=EcosystemSource.GITHUB_TOPICS,
-                                        ecosystem_name=eco.name,
-                                        description=(item.get("description") or "")[:200],
-                                        author=item.get("owner", {}).get("login", ""),
-                                        tags=item.get("topics", []),
-                                        url=item.get("html_url", ""),
-                                        stars=item.get("stargazers_count", 0),
-                                        license=item.get("license", {}).get("spdx_id", "MIT") if item.get("license") else "MIT",
-                                        language=item.get("language", "python").lower(),
-                                    ))
+                                    skills.append(
+                                        CrossEcosystemSkill(
+                                            name=f"gh/{item['full_name']}",
+                                            ecosystem=EcosystemSource.GITHUB_TOPICS,
+                                            ecosystem_name=eco.name,
+                                            description=(item.get("description") or "")[:200],
+                                            author=item.get("owner", {}).get("login", ""),
+                                            tags=item.get("topics", []),
+                                            url=item.get("html_url", ""),
+                                            stars=item.get("stargazers_count", 0),
+                                            license=(
+                                                item.get("license", {}).get("spdx_id", "MIT")
+                                                if item.get("license")
+                                                else "MIT"
+                                            ),
+                                            language=item.get("language", "python").lower(),
+                                        )
+                                    )
                     except Exception:
                         continue
         except ImportError:
@@ -353,6 +367,7 @@ class EcosystemBridge:
         skills: list[CrossEcosystemSkill] = []
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 url = "https://registry.npmjs.org/-/v1/search"
                 params = {"text": "agent-skill", "size": 50}
@@ -361,17 +376,19 @@ class EcosystemBridge:
                         data = await resp.json()
                         for obj in data.get("objects", [])[:20]:
                             pkg = obj.get("package", {})
-                            skills.append(CrossEcosystemSkill(
-                                name=f"npm/{pkg.get('name', 'unknown')}",
-                                ecosystem=EcosystemSource.NPM,
-                                ecosystem_name=eco.name,
-                                description=(pkg.get("description", ""))[:150],
-                                author=pkg.get("publisher", {}).get("username", ""),
-                                version=pkg.get("version", "0.1.0"),
-                                tags=pkg.get("keywords", []),
-                                url=pkg.get("links", {}).get("npm", ""),
-                                language="node",
-                            ))
+                            skills.append(
+                                CrossEcosystemSkill(
+                                    name=f"npm/{pkg.get('name', 'unknown')}",
+                                    ecosystem=EcosystemSource.NPM,
+                                    ecosystem_name=eco.name,
+                                    description=(pkg.get("description", ""))[:150],
+                                    author=pkg.get("publisher", {}).get("username", ""),
+                                    version=pkg.get("version", "0.1.0"),
+                                    tags=pkg.get("keywords", []),
+                                    url=pkg.get("links", {}).get("npm", ""),
+                                    language="node",
+                                )
+                            )
         except ImportError:
             pass
         return skills
@@ -381,23 +398,26 @@ class EcosystemBridge:
         skills: list[CrossEcosystemSkill] = []
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 url = "https://pypi.org/simple/"
                 async with session.get(url, timeout=15) as resp:
                     if resp.status == 200:
                         text = await resp.text()
                         # Find agentos-skill-* packages
-                        matches = re.findall(r'agentos-skill-[\w-]+', text)
+                        matches = re.findall(r"agentos-skill-[\w-]+", text)
                         for match in list(set(matches))[:20]:
-                            skills.append(CrossEcosystemSkill(
-                                name=f"pypi/{match}",
-                                ecosystem=EcosystemSource.PYPI,
-                                ecosystem_name=eco.name,
-                                description=f"PyPI agent skill: {match}",
-                                tags=[match.replace("agentos-skill-", "")],
-                                url=f"https://pypi.org/project/{match}/",
-                                language="python",
-                            ))
+                            skills.append(
+                                CrossEcosystemSkill(
+                                    name=f"pypi/{match}",
+                                    ecosystem=EcosystemSource.PYPI,
+                                    ecosystem_name=eco.name,
+                                    description=f"PyPI agent skill: {match}",
+                                    tags=[match.replace("agentos-skill-", "")],
+                                    url=f"https://pypi.org/project/{match}/",
+                                    language="python",
+                                )
+                            )
         except ImportError:
             pass
         return skills
@@ -407,6 +427,7 @@ class EcosystemBridge:
         skills: list[CrossEcosystemSkill] = []
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 url = "https://skills.sh/api/skills"
                 try:
@@ -414,16 +435,18 @@ class EcosystemBridge:
                         if resp.status == 200:
                             data = await resp.json()
                             for item in data[:30]:
-                                skills.append(CrossEcosystemSkill(
-                                    name=f"skillssh/{item.get('slug', item.get('name', 'unknown'))}",
-                                    ecosystem=EcosystemSource.SKILLS_SH,
-                                    ecosystem_name=eco.name,
-                                    description=item.get("description", ""),
-                                    author=item.get("author", ""),
-                                    version=item.get("version", "0.1.0"),
-                                    tags=item.get("tags", []),
-                                    url=item.get("url", ""),
-                                ))
+                                skills.append(
+                                    CrossEcosystemSkill(
+                                        name=f"skillssh/{item.get('slug', item.get('name', 'unknown'))}",
+                                        ecosystem=EcosystemSource.SKILLS_SH,
+                                        ecosystem_name=eco.name,
+                                        description=item.get("description", ""),
+                                        author=item.get("author", ""),
+                                        version=item.get("version", "0.1.0"),
+                                        tags=item.get("tags", []),
+                                        url=item.get("url", ""),
+                                    )
+                                )
                 except Exception:
                     pass
         except ImportError:
@@ -468,7 +491,7 @@ class EcosystemBridge:
             for kw in keywords:
                 if kw in skill.name.lower():
                     score += 10
-                elif kw in ' '.join(skill.tags).lower():
+                elif kw in " ".join(skill.tags).lower():
                     score += 5
                 elif kw in skill.description.lower():
                     score += 2
@@ -485,7 +508,7 @@ class EcosystemBridge:
 
     # ── Import ──
 
-    async def import_skill(self, skill_ref: str) -> Optional[Any]:
+    async def import_skill(self, skill_ref: str) -> Any | None:
         """Import a skill from any ecosystem.
 
         Skill reference formats:
@@ -514,7 +537,7 @@ class EcosystemBridge:
         for prefix, eco in prefix_map.items():
             if skill_ref.startswith(f"{prefix}/"):
                 ecosystem = eco
-                name = skill_ref[len(prefix) + 1:]
+                name = skill_ref[len(prefix) + 1 :]
                 break
 
         if ecosystem == EcosystemSource.OPENCLAW:
@@ -568,7 +591,7 @@ class EcosystemBridge:
         self._compute_stats()
         return imported
 
-    async def _import_from_ecosystem(self, name: str, ecosystem: EcosystemSource) -> Optional[Any]:
+    async def _import_from_ecosystem(self, name: str, ecosystem: EcosystemSource) -> Any | None:
         """Import a skill from a non-OpenClaw ecosystem."""
         # For now, register as an external reference
         # Future: download skill package, convert manifest, register
@@ -595,13 +618,9 @@ class EcosystemBridge:
             "by_ecosystem": eco_counts,
             "by_language": self._count_by("language"),
             "top_tags": sorted(
-                self._count_by_multi("tags").items(),
-                key=lambda x: x[1], reverse=True
+                self._count_by_multi("tags").items(), key=lambda x: x[1], reverse=True
             )[:10],
-            "most_popular": sorted(
-                self._catalog,
-                key=lambda s: s.stars, reverse=True
-            )[:5],
+            "most_popular": sorted(self._catalog, key=lambda s: s.stars, reverse=True)[:5],
         }
 
     def _count_by(self, attr: str) -> dict[str, int]:
@@ -642,6 +661,7 @@ class EcosystemBridge:
 
 
 # ── Convenience Functions ──
+
 
 def discover_ecosystems() -> list[EcosystemMeta]:
     """Quick list of all supported skill ecosystems."""

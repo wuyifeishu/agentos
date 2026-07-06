@@ -31,27 +31,24 @@ Inspired by: GPT-4V multimodal API, Claude Vision, Gemini 1.5 Pro
 from __future__ import annotations
 
 import base64
-import io
 import json
 import mimetypes
 import os
-import struct
 import subprocess
 import tempfile
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import (
-    Any, Dict, List, Optional, Tuple, Union,
+    Any,
 )
-
 
 # ── Types ───────────────────────────────────
 
 
-class MediaType(str, Enum):
+class MediaType(StrEnum):
     IMAGE = "image"
     AUDIO = "audio"
     VIDEO = "video"
@@ -59,7 +56,7 @@ class MediaType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class ImageFormat(str, Enum):
+class ImageFormat(StrEnum):
     PNG = "png"
     JPEG = "jpeg"
     GIF = "gif"
@@ -93,7 +90,7 @@ class MediaMetadata:
     # General
     has_alpha: bool = False
     page_count: int = 0
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -120,14 +117,14 @@ class MediaContext:
     metadata: MediaMetadata = field(default_factory=MediaMetadata)
 
     # Processed representations
-    text_description: str = ""          # 自然语言描述
-    base64_data: str = ""              # Base64 编码（用于视觉 LLM）
-    extracted_text: str = ""           # OCR/转录文本
-    thumbnail_path: str = ""           # 缩略图路径
+    text_description: str = ""  # 自然语言描述
+    base64_data: str = ""  # Base64 编码（用于视觉 LLM）
+    extracted_text: str = ""  # OCR/转录文本
+    thumbnail_path: str = ""  # 缩略图路径
 
     # Structured
-    entities: List[Dict[str, Any]] = field(default_factory=list)
-    captions: List[str] = field(default_factory=list)
+    entities: list[dict[str, Any]] = field(default_factory=list)
+    captions: list[str] = field(default_factory=list)
 
     def to_llm_message(self) -> dict:
         """转换为 LLM API 消息格式。"""
@@ -167,43 +164,65 @@ class MediaDetector:
 
     # Magic bytes signatures
     MAGIC_SIGNATURES = {
-        b'\xFF\xD8\xFF': (MediaType.IMAGE, ImageFormat.JPEG),
-        b'\x89PNG\r\n\x1A\n': (MediaType.IMAGE, ImageFormat.PNG),
-        b'GIF87a': (MediaType.IMAGE, ImageFormat.GIF),
-        b'GIF89a': (MediaType.IMAGE, ImageFormat.GIF),
-        b'RIFF': (MediaType.IMAGE, ImageFormat.WEBP),      # WEBP is RIFF{size}WEBP
-        b'\x42\x4D': (MediaType.IMAGE, ImageFormat.BMP),
-        b'<?xml': (MediaType.IMAGE, ImageFormat.SVG),
-        b'<svg': (MediaType.IMAGE, ImageFormat.SVG),
-        b'II*\x00': (MediaType.IMAGE, ImageFormat.TIFF),
-        b'MM\x00*': (MediaType.IMAGE, ImageFormat.TIFF),
+        b"\xff\xd8\xff": (MediaType.IMAGE, ImageFormat.JPEG),
+        b"\x89PNG\r\n\x1a\n": (MediaType.IMAGE, ImageFormat.PNG),
+        b"GIF87a": (MediaType.IMAGE, ImageFormat.GIF),
+        b"GIF89a": (MediaType.IMAGE, ImageFormat.GIF),
+        b"RIFF": (MediaType.IMAGE, ImageFormat.WEBP),  # WEBP is RIFF{size}WEBP
+        b"\x42\x4d": (MediaType.IMAGE, ImageFormat.BMP),
+        b"<?xml": (MediaType.IMAGE, ImageFormat.SVG),
+        b"<svg": (MediaType.IMAGE, ImageFormat.SVG),
+        b"II*\x00": (MediaType.IMAGE, ImageFormat.TIFF),
+        b"MM\x00*": (MediaType.IMAGE, ImageFormat.TIFF),
         # Audio
-        b'RIFF': (MediaType.AUDIO, None),  # WAV is RIFF
-        b'ID3': (MediaType.AUDIO, None),    # MP3 with ID3
-        b'\xFF\xFB': (MediaType.AUDIO, None),  # MP3
-        b'\xFF\xF3': (MediaType.AUDIO, None),  # MP3
-        b'fLaC': (MediaType.AUDIO, None),  # FLAC
-        b'OggS': (MediaType.AUDIO, None),  # OGG
+        b"ID3": (MediaType.AUDIO, None),  # MP3 with ID3
+        b"\xff\xfb": (MediaType.AUDIO, None),  # MP3
+        b"\xff\xf3": (MediaType.AUDIO, None),  # MP3
+        b"fLaC": (MediaType.AUDIO, None),  # FLAC
+        b"OggS": (MediaType.AUDIO, None),  # OGG
         # Video
-        b'\x00\x00\x00\x18ftyp': (MediaType.VIDEO, None),  # MP4
-        b'\x00\x00\x00\x20ftyp': (MediaType.VIDEO, None),
-        b'\x1A\x45\xDF\xA3': (MediaType.VIDEO, None),  # WebM/MKV
+        b"\x00\x00\x00\x18ftyp": (MediaType.VIDEO, None),  # MP4
+        b"\x00\x00\x00\x20ftyp": (MediaType.VIDEO, None),
+        b"\x1a\x45\xdf\xa3": (MediaType.VIDEO, None),  # WebM/MKV
         # Documents
-        b'%PDF': (MediaType.DOCUMENT, None),
-        b'PK\x03\x04': (MediaType.DOCUMENT, None),  # DOCX/XLSX/PPTX (ZIP)
+        b"%PDF": (MediaType.DOCUMENT, None),
+        b"PK\x03\x04": (MediaType.DOCUMENT, None),  # DOCX/XLSX/PPTX (ZIP)
     }
 
     # Audio extensions
-    AUDIO_EXTENSIONS = {'.mp3', '.wav', '.flac', '.m4a', '.ogg', '.aac', '.wma', '.opus'}
+    AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".opus"}
 
     # Video extensions
-    VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mkv', '.mov', '.wmv', '.webm', '.flv', '.m4v', '.3gp'}
+    VIDEO_EXTENSIONS = {".mp4", ".avi", ".mkv", ".mov", ".wmv", ".webm", ".flv", ".m4v", ".3gp"}
 
     # Image extensions
-    IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.tiff', '.heic', '.ico'}
+    IMAGE_EXTENSIONS = {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".bmp",
+        ".svg",
+        ".tiff",
+        ".heic",
+        ".ico",
+    }
 
     # Document extensions
-    DOCUMENT_EXTENSIONS = {'.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.txt', '.md', '.html', '.epub'}
+    DOCUMENT_EXTENSIONS = {
+        ".pdf",
+        ".docx",
+        ".doc",
+        ".xlsx",
+        ".xls",
+        ".pptx",
+        ".ppt",
+        ".txt",
+        ".md",
+        ".html",
+        ".epub",
+    }
 
     @classmethod
     def detect(cls, file_path: str) -> MediaType:
@@ -221,7 +240,7 @@ class MediaDetector:
 
         # Fallback to magic bytes
         try:
-            with open(file_path, 'rb') as f:
+            with open(file_path, "rb") as f:
                 header = f.read(32)
         except Exception:
             return MediaType.UNKNOWN
@@ -229,27 +248,27 @@ class MediaDetector:
         for magic, (mtype, _) in cls.MAGIC_SIGNATURES.items():
             if header.startswith(magic):
                 # RIFF ambiguity resolution
-                if magic == b'RIFF':
-                    if b'WEBP' in header:
+                if magic == b"RIFF":
+                    if b"WEBP" in header:
                         return MediaType.IMAGE
-                    if b'WAVE' in header:
+                    if b"WAVE" in header:
                         return MediaType.AUDIO
                 return mtype
 
         # MIME type fallback
         mime, _ = mimetypes.guess_type(file_path)
         if mime:
-            if mime.startswith('image/'):
+            if mime.startswith("image/"):
                 return MediaType.IMAGE
-            if mime.startswith('audio/'):
+            if mime.startswith("audio/"):
                 return MediaType.AUDIO
-            if mime.startswith('video/'):
+            if mime.startswith("video/"):
                 return MediaType.VIDEO
 
         return MediaType.UNKNOWN
 
     @classmethod
-    def batch_detect(cls, file_paths: List[str]) -> Dict[str, MediaType]:
+    def batch_detect(cls, file_paths: list[str]) -> dict[str, MediaType]:
         """批量检测。"""
         return {fp: cls.detect(fp) for fp in file_paths}
 
@@ -261,12 +280,10 @@ class MediaProcessor(ABC):
     """媒体处理器基类。"""
 
     @abstractmethod
-    def process(self, file_path: str) -> MediaContext:
-        ...
+    def process(self, file_path: str) -> MediaContext: ...
 
     @abstractmethod
-    def extract_metadata(self, file_path: str) -> MediaMetadata:
-        ...
+    def extract_metadata(self, file_path: str) -> MediaMetadata: ...
 
 
 class ImageProcessor(MediaProcessor):
@@ -309,11 +326,12 @@ class ImageProcessor(MediaProcessor):
         # Try to get dimensions using PIL
         try:
             from PIL import Image
+
             with Image.open(file_path) as img:
                 meta.width = img.width
                 meta.height = img.height
                 meta.color_mode = img.mode
-                meta.has_alpha = img.mode in ('RGBA', 'LA', 'PA')
+                meta.has_alpha = img.mode in ("RGBA", "LA", "PA")
 
                 # EXIF extraction
                 exif = img.getexif()
@@ -330,8 +348,8 @@ class ImageProcessor(MediaProcessor):
     def _encode_base64(self, file_path: str) -> str:
         """将图片编码为 Base64。"""
         try:
-            with open(file_path, 'rb') as f:
-                return base64.b64encode(f.read()).decode('utf-8')
+            with open(file_path, "rb") as f:
+                return base64.b64encode(f.read()).decode("utf-8")
         except Exception:
             return ""
 
@@ -359,13 +377,16 @@ class ImageProcessor(MediaProcessor):
         except Exception:
             return ""
 
-    def resize(self, file_path: str, width: int, height: int, output_path: Optional[str] = None) -> str:
+    def resize(
+        self, file_path: str, width: int, height: int, output_path: str | None = None
+    ) -> str:
         """缩放图片。"""
         try:
             from PIL import Image
 
             out = output_path or str(
-                Path(tempfile.gettempdir()) / f"resized_{uuid.uuid4().hex[:8]}{Path(file_path).suffix}"
+                Path(tempfile.gettempdir())
+                / f"resized_{uuid.uuid4().hex[:8]}{Path(file_path).suffix}"
             )
 
             with Image.open(file_path) as img:
@@ -379,7 +400,7 @@ class ImageProcessor(MediaProcessor):
         self,
         file_path: str,
         quality: int = 70,
-        output_path: Optional[str] = None,
+        output_path: str | None = None,
     ) -> str:
         """压缩图片。"""
         try:
@@ -396,12 +417,14 @@ class ImageProcessor(MediaProcessor):
         except Exception as e:
             raise RuntimeError(f"Image compression failed: {e}")
 
-    def convert_format(self, file_path: str, target_format: str, output_path: Optional[str] = None) -> str:
+    def convert_format(
+        self, file_path: str, target_format: str, output_path: str | None = None
+    ) -> str:
         """转换图片格式。"""
         try:
             from PIL import Image
 
-            fmt = target_format.upper().replace('.', '')
+            fmt = target_format.upper().replace(".", "")
             ext = f".{target_format.lower().lstrip('.')}"
             out = output_path or str(
                 Path(tempfile.gettempdir()) / f"converted_{uuid.uuid4().hex[:8]}{ext}"
@@ -446,8 +469,19 @@ class AudioProcessor(MediaProcessor):
         # Extract with ffprobe if available
         try:
             result = subprocess.run(
-                ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", file_path],
-                capture_output=True, text=True, timeout=10,
+                [
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
+                    "-show_format",
+                    "-show_streams",
+                    file_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode == 0:
                 info = json.loads(result.stdout)
@@ -469,6 +503,7 @@ class AudioProcessor(MediaProcessor):
         """音频转录。"""
         try:
             import whisper
+
             model = whisper.load_model(self._model)
             result = model.transcribe(file_path)
             return result["text"]
@@ -511,8 +546,19 @@ class VideoProcessor(MediaProcessor):
 
         try:
             result = subprocess.run(
-                ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", file_path],
-                capture_output=True, text=True, timeout=10,
+                [
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
+                    "-show_format",
+                    "-show_streams",
+                    file_path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode == 0:
                 info = json.loads(result.stdout)
@@ -530,7 +576,7 @@ class VideoProcessor(MediaProcessor):
 
         return meta
 
-    def _extract_keyframes(self, file_path: str) -> List[str]:
+    def _extract_keyframes(self, file_path: str) -> list[str]:
         """提取视频关键帧。"""
         captions = []
         meta = self.extract_metadata(file_path)
@@ -554,11 +600,18 @@ class VideoProcessor(MediaProcessor):
             try:
                 subprocess.run(
                     [
-                        "ffmpeg", "-y", "-loglevel", "quiet",
-                        "-ss", str(timestamp),
-                        "-i", file_path,
-                        "-vframes", "1",
-                        "-q:v", "2",
+                        "ffmpeg",
+                        "-y",
+                        "-loglevel",
+                        "quiet",
+                        "-ss",
+                        str(timestamp),
+                        "-i",
+                        file_path,
+                        "-vframes",
+                        "1",
+                        "-q:v",
+                        "2",
                         str(frame_path),
                     ],
                     timeout=30,
@@ -617,15 +670,15 @@ class DocumentProcessor(MediaProcessor):
         """提取文档文本。"""
         ext = Path(file_path).suffix.lower()
 
-        if ext == '.pdf':
+        if ext == ".pdf":
             return self._extract_pdf(file_path)
-        elif ext in ('.docx', '.doc'):
+        elif ext in (".docx", ".doc"):
             return self._extract_docx(file_path)
-        elif ext in ('.txt', '.md', '.py', '.json', '.yaml', '.xml', '.html', '.csv'):
+        elif ext in (".txt", ".md", ".py", ".json", ".yaml", ".xml", ".html", ".csv"):
             try:
-                return Path(file_path).read_text(encoding='utf-8')
+                return Path(file_path).read_text(encoding="utf-8")
             except Exception:
-                return Path(file_path).read_text(encoding='latin-1')
+                return Path(file_path).read_text(encoding="latin-1")
         else:
             return f"[Unsupported document format: {ext}]"
 
@@ -633,6 +686,7 @@ class DocumentProcessor(MediaProcessor):
         """从 PDF 中提取文本。"""
         try:
             import fitz  # PyMuPDF
+
             doc = fitz.open(file_path)
             text_parts = []
             for page_num in range(len(doc)):
@@ -646,7 +700,9 @@ class DocumentProcessor(MediaProcessor):
             try:
                 result = subprocess.run(
                     ["pdftotext", file_path, "-"],
-                    capture_output=True, text=True, timeout=30,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
                 )
                 if result.returncode == 0:
                     return result.stdout
@@ -660,6 +716,7 @@ class DocumentProcessor(MediaProcessor):
         """从 DOCX 中提取文本。"""
         try:
             from docx import Document
+
             doc = Document(file_path)
             paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
             return "\n\n".join(paragraphs) if paragraphs else "[No text in document]"
@@ -685,7 +742,7 @@ class MultimodalContextManager:
 
     def __init__(self):
         self._detector = MediaDetector()
-        self._processors: Dict[MediaType, MediaProcessor] = {
+        self._processors: dict[MediaType, MediaProcessor] = {
             MediaType.IMAGE: ImageProcessor(),
             MediaType.AUDIO: AudioProcessor(),
             MediaType.VIDEO: VideoProcessor(),
@@ -705,7 +762,7 @@ class MultimodalContextManager:
 
         return processor.process(file_path)
 
-    def load_batch(self, file_paths: List[str]) -> List[MediaContext]:
+    def load_batch(self, file_paths: list[str]) -> list[MediaContext]:
         """批量加载。"""
         return [self.load(fp) for fp in file_paths]
 
@@ -713,7 +770,7 @@ class MultimodalContextManager:
         """加载并转换为 LLM 消息格式。"""
         return self.load(file_path).to_llm_message()
 
-    def load_batch_as_messages(self, file_paths: List[str]) -> List[dict]:
+    def load_batch_as_messages(self, file_paths: list[str]) -> list[dict]:
         """批量加载为 LLM 消息。"""
         return [self.load_as_message(fp) for fp in file_paths]
 
@@ -721,9 +778,9 @@ class MultimodalContextManager:
         """注册自定义处理器。"""
         self._processors[media_type] = processor
 
-    def analyze_directory(self, directory: str) -> Dict[str, List[str]]:
+    def analyze_directory(self, directory: str) -> dict[str, list[str]]:
         """分析目录中的媒体文件分布。"""
-        result: Dict[str, List[str]] = {
+        result: dict[str, list[str]] = {
             "images": [],
             "audio": [],
             "video": [],
@@ -766,3 +823,9 @@ def create_multimodal_manager() -> MultimodalContextManager:
 def quick_load(file_path: str) -> MediaContext:
     """快速加载单个文件。"""
     return MultimodalContextManager().load(file_path)
+
+
+# ── Compatibility aliases (required by agentos/__init__.py) ──
+
+MultimodalManager = MultimodalContextManager
+Modality = MediaType

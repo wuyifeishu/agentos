@@ -10,23 +10,23 @@
 
 from __future__ import annotations
 
+import mimetypes
 import os
 import shutil
-import mimetypes
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 from agentos.system.permissions import (
-    SystemPermissionManager,
-    PermissionTier,
     PermissionDenied,
+    PermissionTier,
+    SystemPermissionManager,
 )
 
 
 @dataclass
 class FileListing:
     """文件/目录条目。"""
+
     name: str
     path: str
     is_dir: bool
@@ -38,10 +38,11 @@ class FileListing:
 @dataclass
 class FileOpResult:
     """文件操作结果。"""
+
     success: bool
-    action: str           # read/write/delete/move/copy/mkdir/list
+    action: str  # read/write/delete/move/copy/mkdir/list
     path: str
-    content: str = ""     # 读取的内容
+    content: str = ""  # 读取的内容
     listing: list[FileListing] = field(default_factory=list)
     error: str = ""
     bytes_written: int = 0
@@ -67,15 +68,44 @@ class FileOperator:
         try:
             # 自动检测是否为文本文件
             mime, _ = mimetypes.guess_type(path)
-            if mime and mime.startswith("text/") or path.endswith((".py", ".md", ".txt", ".json", ".yaml", ".yml", ".toml", ".cfg", ".ini", ".log", ".csv", ".xml", ".html", ".css", ".js", ".ts", ".sh", ".bash", ".env", ".gitignore")):
-                with open(path, "r", encoding="utf-8", errors="replace") as f:
+            if (
+                mime
+                and mime.startswith("text/")
+                or path.endswith(
+                    (
+                        ".py",
+                        ".md",
+                        ".txt",
+                        ".json",
+                        ".yaml",
+                        ".yml",
+                        ".toml",
+                        ".cfg",
+                        ".ini",
+                        ".log",
+                        ".csv",
+                        ".xml",
+                        ".html",
+                        ".css",
+                        ".js",
+                        ".ts",
+                        ".sh",
+                        ".bash",
+                        ".env",
+                        ".gitignore",
+                    )
+                )
+            ):
+                with open(path, encoding="utf-8", errors="replace") as f:
                     content = f.read()
                 return FileOpResult(success=True, action="read", path=path, content=content)
             else:
                 # 二进制文件返回预览
                 size = os.path.getsize(path)
                 return FileOpResult(
-                    success=True, action="read", path=path,
+                    success=True,
+                    action="read",
+                    path=path,
                     content=f"[Binary file, {self._format_size(size)}]",
                 )
         except Exception as e:
@@ -94,10 +124,14 @@ class FileOperator:
                 data = f.read(max_bytes)
             # Base64 编码返回
             import base64
+
             encoded = base64.b64encode(data).decode("ascii")
             return FileOpResult(
-                success=True, action="read", path=path,
-                content=encoded, bytes_written=len(data),
+                success=True,
+                action="read",
+                path=path,
+                content=encoded,
+                bytes_written=len(data),
             )
         except Exception as e:
             return FileOpResult(success=False, action="read", path=path, error=str(e))
@@ -123,14 +157,19 @@ class FileOperator:
                 full = os.path.join(path, name)
                 stat = os.stat(full)
                 mime, _ = mimetypes.guess_type(full)
-                entries.append(FileListing(
-                    name=name,
-                    path=full,
-                    is_dir=os.path.isdir(full),
-                    size_bytes=stat.st_size,
-                    modified_at=datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                    mime_type=mime or ("inode/directory" if os.path.isdir(full) else "application/octet-stream"),
-                ))
+                entries.append(
+                    FileListing(
+                        name=name,
+                        path=full,
+                        is_dir=os.path.isdir(full),
+                        size_bytes=stat.st_size,
+                        modified_at=datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        mime_type=mime
+                        or (
+                            "inode/directory" if os.path.isdir(full) else "application/octet-stream"
+                        ),
+                    )
+                )
             return FileOpResult(success=True, action="list", path=path, listing=entries)
         except Exception as e:
             return FileOpResult(success=False, action="list", path=path, error=str(e))
@@ -138,6 +177,7 @@ class FileOperator:
     def search(self, root_dir: str, pattern: str, max_depth: int = 5) -> FileOpResult:
         """递归搜索文件（类似 find + glob）。"""
         import fnmatch
+
         path = os.path.abspath(os.path.expanduser(root_dir))
         try:
             self._pm.require(self._sid, PermissionTier.READ, path)
@@ -147,7 +187,7 @@ class FileOperator:
         results: list[FileListing] = []
         try:
             for dirpath, dirnames, filenames in os.walk(path):
-                depth = dirpath[len(path):].count(os.sep)
+                depth = dirpath[len(path) :].count(os.sep)
                 if depth >= max_depth:
                     dirnames.clear()
                     continue
@@ -157,13 +197,15 @@ class FileOperator:
                     if fnmatch.fnmatch(fname, pattern):
                         full = os.path.join(dirpath, fname)
                         stat = os.stat(full)
-                        results.append(FileListing(
-                            name=fname,
-                            path=full,
-                            is_dir=False,
-                            size_bytes=stat.st_size,
-                            modified_at=datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                        ))
+                        results.append(
+                            FileListing(
+                                name=fname,
+                                path=full,
+                                is_dir=False,
+                                size_bytes=stat.st_size,
+                                modified_at=datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                            )
+                        )
             return FileOpResult(success=True, action="list", path=path, listing=results)
         except Exception as e:
             return FileOpResult(success=False, action="list", path=path, error=str(e))
@@ -188,7 +230,9 @@ class FileOperator:
             with open(path, "w", encoding="utf-8") as f:
                 f.write(content)
             return FileOpResult(
-                success=True, action="write", path=path,
+                success=True,
+                action="write",
+                path=path,
                 bytes_written=len(content.encode("utf-8")),
             )
         except Exception as e:
@@ -288,7 +332,9 @@ class FileOperator:
                 f"创建时间: {datetime.fromtimestamp(st.st_ctime).isoformat()}",
                 f"inode: {st.st_ino}",
             ]
-            return FileOpResult(success=True, action="read", path=path, content="\n".join(info_lines))
+            return FileOpResult(
+                success=True, action="read", path=path, content="\n".join(info_lines)
+            )
         except Exception as e:
             return FileOpResult(success=False, action="read", path=path, error=str(e))
 

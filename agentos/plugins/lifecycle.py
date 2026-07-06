@@ -15,15 +15,13 @@ from __future__ import annotations
 
 import asyncio
 import time
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any
 
-from agentos.plugins.registry import PluginRegistry, RegisteredPlugin, PluginStatus
-
+from agentos.plugins.registry import PluginRegistry, PluginStatus, RegisteredPlugin
 
 # ── Abstract Plugin Base ─────────────────────────
+
 
 class LifecyclePlugin(ABC):
     """插件基类 — 实现标准生命周期钩子。"""
@@ -69,6 +67,7 @@ class LifecyclePlugin(ABC):
 @dataclass
 class PluginHealth:
     """插件健康状态摘要。"""
+
     plugin_name: str
     status: str
     uptime_seconds: float
@@ -78,6 +77,7 @@ class PluginHealth:
 
 class HealthStatus:
     """插件健康状态。"""
+
     status: str = "healthy"  # healthy | degraded | unhealthy
     details: dict = field(default_factory=dict)
     uptime_seconds: float = 0.0
@@ -96,7 +96,7 @@ class HealthStatus:
         }
 
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field  # noqa: E402
 
 
 @dataclass
@@ -113,6 +113,7 @@ class LifecycleReport:
 
 
 # ── Lifecycle Manager ────────────────────────────
+
 
 class LifecycleManager:
     """
@@ -168,9 +169,15 @@ class LifecycleManager:
                 await rp.instance.on_start()
             rp.status = PluginStatus.ACTIVE
             rp.error = None
-            report = self._reports.get(name, LifecycleReport(plugin_name=name, status=PluginStatus.ACTIVE))
+            report = self._reports.get(
+                name, LifecycleReport(plugin_name=name, status=PluginStatus.ACTIVE)
+            )
             report.status = PluginStatus.ACTIVE
-            report.uptime_seconds = rp.instance.uptime_seconds if rp.instance and isinstance(rp.instance, LifecyclePlugin) else 0
+            report.uptime_seconds = (
+                rp.instance.uptime_seconds
+                if rp.instance and isinstance(rp.instance, LifecyclePlugin)
+                else 0
+            )
             self._reports[name] = report
             return report
         except Exception as e:
@@ -223,6 +230,7 @@ class LifecycleManager:
 
     def start_health_polling(self, interval_seconds: float = 30.0):
         """启动后台健康检查轮询。"""
+
         async def _poll():
             while True:
                 try:
@@ -245,19 +253,23 @@ class LifecycleManager:
         tracked = {r.plugin_name for r in reports}
         for rp in self.registry.list_all():
             if rp.manifest.name not in tracked:
-                reports.append(LifecycleReport(
-                    plugin_name=rp.manifest.name,
-                    status=rp.status,
-                    load_time_ms=rp.load_time_ms,
-                    error=rp.error,
-                ))
+                reports.append(
+                    LifecycleReport(
+                        plugin_name=rp.manifest.name,
+                        status=rp.status,
+                        load_time_ms=rp.load_time_ms,
+                        error=rp.error,
+                    )
+                )
         return reports
 
     def summary(self) -> str:
         reports = self.report()
         lines = [f"共 {len(reports)} 个插件"]
         for r in reports:
-            lines.append(f"  [{r.status.value}] {r.plugin_name} (load:{r.load_time_ms:.0f}ms, init:{r.init_time_ms:.0f}ms)")
+            lines.append(
+                f"  [{r.status.value}] {r.plugin_name} (load:{r.load_time_ms:.0f}ms, init:{r.init_time_ms:.0f}ms)"
+            )
             if r.error:
                 lines.append(f"    error: {r.error}")
         return "\n".join(lines)

@@ -1,4 +1,4 @@
-"""AgentOS configuration validation — JSON Schema-based config integrity checks.
+"""AgentOS configuration validation — JSON Schema-based config integrity checks.  # noqa: E501
 
 Validates agentos.yaml and environment configurations at startup and reload.
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 # ── Schema definition ─────────────────────────────────────────────────────────
 
@@ -28,7 +28,10 @@ AGENTOS_CONFIG_SCHEMA: dict = {
                 "models": {
                     "type": "object",
                     "properties": {
-                        "default_provider": {"type": "string", "enum": ["openai", "anthropic", "gemini", "deepseek"]},
+                        "default_provider": {
+                            "type": "string",
+                            "enum": ["openai", "anthropic", "gemini", "deepseek"],
+                        },
                         "default_model": {"type": "string"},
                         "temperature": {"type": "number", "minimum": 0.0, "maximum": 2.0},
                         "max_retries": {"type": "integer", "minimum": 0, "maximum": 10},
@@ -39,7 +42,10 @@ AGENTOS_CONFIG_SCHEMA: dict = {
                     "type": "object",
                     "properties": {
                         "short_term_limit": {"type": "integer", "minimum": 1},
-                        "long_term_backend": {"type": "string", "enum": ["chromadb", "faiss", "qdrant", "pinecone"]},
+                        "long_term_backend": {
+                            "type": "string",
+                            "enum": ["chromadb", "faiss", "qdrant", "pinecone"],
+                        },
                         "summarization_threshold": {"type": "integer", "minimum": 100},
                     },
                 },
@@ -82,7 +88,6 @@ AGENTOS_CONFIG_SCHEMA: dict = {
 
 
 class ValidationLevel(Enum):
-
     """校验等级。"""
 
     ERROR = "error"
@@ -93,6 +98,7 @@ class ValidationLevel(Enum):
 @dataclass
 class ValidationIssue:
     """校验问题。"""
+
     level: ValidationLevel
     path: str
     message: str
@@ -101,6 +107,7 @@ class ValidationIssue:
 @dataclass
 class ValidationResult:
     """校验结果。"""
+
     valid: bool = True
     issues: list[ValidationIssue] = field(default_factory=list)
 
@@ -122,7 +129,9 @@ class ValidationResult:
     def __str__(self) -> str:
         if self.valid and not self.issues:
             return "Configuration valid"
-        lines = [f"Configuration {'valid' if self.valid else 'invalid'} ({len(self.errors)} errors, {len(self.warnings)} warnings)"]
+        lines = [
+            f"Configuration {'valid' if self.valid else 'invalid'} ({len(self.errors)} errors, {len(self.warnings)} warnings)"  # noqa: E501
+        ]
         for i in self.issues:
             lines.append(f"  [{i.level.value}] {i.path}: {i.message}")
         return "\n".join(lines)
@@ -131,11 +140,15 @@ class ValidationResult:
 # ── Validator ─────────────────────────────────────────────────────────────────
 
 
-def _validate_type(value: Any, expected: str, schema: dict) -> Optional[str]:
+def _validate_type(value: Any, expected: str, schema: dict) -> str | None:
     """Return error string or None."""
     type_map = {
-        "string": str, "integer": int, "number": (int, float),
-        "boolean": bool, "array": list, "object": dict,
+        "string": str,
+        "integer": int,
+        "number": (int, float),
+        "boolean": bool,
+        "array": list,
+        "object": dict,
     }
     py_type = type_map.get(expected)
     if py_type is None:
@@ -145,7 +158,9 @@ def _validate_type(value: Any, expected: str, schema: dict) -> Optional[str]:
     return None
 
 
-def _walk_schema(config: dict, schema: dict, path: str = "", result: Optional[ValidationResult] = None) -> ValidationResult:
+def _walk_schema(
+    config: dict, schema: dict, path: str = "", result: ValidationResult | None = None
+) -> ValidationResult:
     if result is None:
         result = ValidationResult()
 
@@ -173,6 +188,7 @@ def _walk_schema(config: dict, schema: dict, path: str = "", result: Optional[Va
             result.add_error(path, f"must be one of {schema['enum']}, got {config!r}")
         if "pattern" in schema and isinstance(config, str):
             import re
+
             if not re.match(schema["pattern"], config):
                 result.add_error(path, f"'{config}' does not match pattern {schema['pattern']}")
         if "minimum" in schema and isinstance(config, (int, float)):
@@ -192,7 +208,7 @@ def _walk_schema(config: dict, schema: dict, path: str = "", result: Optional[Va
     return result
 
 
-def validate_config(config: dict, schema: Optional[dict] = None) -> ValidationResult:
+def validate_config(config: dict, schema: dict | None = None) -> ValidationResult:
     """Validate an AgentOS configuration dict against the built-in JSON Schema."""
     schema = schema or AGENTOS_CONFIG_SCHEMA
     return _walk_schema(config, schema)
@@ -201,6 +217,7 @@ def validate_config(config: dict, schema: Optional[dict] = None) -> ValidationRe
 def validate_config_file(file_path: str) -> ValidationResult:
     """Load and validate an AgentOS configuration YAML/JSON file."""
     import os
+
     if not os.path.exists(file_path):
         result = ValidationResult()
         result.add_error("", f"config file not found: {file_path}")
@@ -210,9 +227,11 @@ def validate_config_file(file_path: str) -> ValidationResult:
         if file_path.endswith((".yaml", ".yml")):
             try:
                 import yaml
+
                 config = yaml.safe_load(f)
             except ImportError:
                 import json
+
                 config = json.load(f)  # fallback, may fail
         else:
             config = json.load(f)

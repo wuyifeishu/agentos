@@ -18,35 +18,37 @@ import json
 import time
 import uuid
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import Any, Callable, Optional
-
+from typing import Any
 
 # ── Signal Types ──
 
-class SignalType(str, Enum):
-    TOOL_USAGE = "tool_usage"           # Tool was invoked
+
+class SignalType(StrEnum):
+    TOOL_USAGE = "tool_usage"  # Tool was invoked
     EXPLICIT_FEEDBACK = "explicit_feedback"  # User gave explicit rating
-    CORRECTION = "correction"           # User corrected agent
-    RE_PROMPT = "re_prompt"            # User re-asked the same thing
-    UNDO = "undo"                       # User undid an action
-    SESSION_LENGTH = "session_length"   # Session duration
-    TOPIC_SWITCH = "topic_switch"      # User changed topic abruptly
+    CORRECTION = "correction"  # User corrected agent
+    RE_PROMPT = "re_prompt"  # User re-asked the same thing
+    UNDO = "undo"  # User undid an action
+    SESSION_LENGTH = "session_length"  # Session duration
+    TOPIC_SWITCH = "topic_switch"  # User changed topic abruptly
     FORMAT_PREFERENCE = "format_preference"  # Output format preference
-    RESPONSE_LATENCY = "response_latency"   # How fast agent responded
-    ERROR_RECOVERY = "error_recovery"   # Error occurred and agent recovered
-    PATTERN_MATCH = "pattern_match"     # Recognized repeated pattern
+    RESPONSE_LATENCY = "response_latency"  # How fast agent responded
+    ERROR_RECOVERY = "error_recovery"  # Error occurred and agent recovered
+    PATTERN_MATCH = "pattern_match"  # Recognized repeated pattern
 
 
-class FeedbackPolarity(str, Enum):
+class FeedbackPolarity(StrEnum):
     POSITIVE = "positive"
     NEGATIVE = "negative"
     NEUTRAL = "neutral"
 
 
 # ── Signal Data ──
+
 
 @dataclass
 class BehaviorSignal:
@@ -64,12 +66,12 @@ class BehaviorSignal:
     tool_success: bool = True
     tool_duration_ms: float = 0.0
 
-    feedback_type: str = ""       # "thumbs_up", "thumbs_down", "rating:4"
+    feedback_type: str = ""  # "thumbs_up", "thumbs_down", "rating:4"
     feedback_text: str = ""
     polarity: FeedbackPolarity = FeedbackPolarity.NEUTRAL
 
-    context_before: str = ""      # What happened before this signal
-    context_after: str = ""       # Result after this signal
+    context_before: str = ""  # What happened before this signal
+    context_after: str = ""  # Result after this signal
 
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -102,7 +104,7 @@ class SignalSummary:
     total_signals: int = 0
 
     # Tool usage
-    top_tools: list[tuple[str, int]] = field(default_factory=list)      # [(tool_name, count)]
+    top_tools: list[tuple[str, int]] = field(default_factory=list)  # [(tool_name, count)]
     tool_success_rate: float = 0.0
 
     # Feedback
@@ -133,6 +135,7 @@ class SignalSummary:
 
 # ── Signal Collector ──
 
+
 class SignalCollector:
     """Collects and persists user behavior signals.
 
@@ -161,7 +164,7 @@ class SignalCollector:
     def __init__(
         self,
         buffer_size: int = 2000,
-        persist_path: Optional[str] = None,
+        persist_path: str | None = None,
     ):
         self._buffer: list[BehaviorSignal] = []
         self._buffer_size = buffer_size
@@ -347,7 +350,7 @@ class SignalCollector:
     def _append(self, signal: BehaviorSignal) -> None:
         self._buffer.append(signal)
         if len(self._buffer) > self._buffer_size:
-            self._buffer = self._buffer[-self._buffer_size:]
+            self._buffer = self._buffer[-self._buffer_size :]
 
         for hook in self._hooks:
             try:
@@ -373,7 +376,9 @@ class SignalCollector:
             patterns.append(f"high_undo_rate:{len(undos)}")
 
         # Pattern: repeated tool failures
-        failed_tools = [s for s in signals if s.type_ == SignalType.TOOL_USAGE and not s.tool_success]
+        failed_tools = [
+            s for s in signals if s.type_ == SignalType.TOOL_USAGE and not s.tool_success
+        ]
         if len(failed_tools) >= 3:
             tools = set(s.tool_name for s in failed_tools)
             patterns.append(f"failing_tools:{','.join(tools)}")

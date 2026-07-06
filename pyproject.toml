@@ -4,14 +4,17 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nexus-agentos"
-version = "1.14.6"
-description = "AgentOS — Production-ready multi-agent framework with Tool-Using Agent, LLM abstraction, streaming/retry/checkpoint, swarm coordination, async parallel primitives, virtual memory pager, Docker/K8s deployment, multimodal, Prompt Hub, cost tracker, and enterprise features (RBAC, multi-tenancy, audit)."
+version = "1.25.0"
+description = "AgentOS — Production-grade multi-agent framework: middleware pipeline, swarm coordination, structured logging, Prometheus metrics, graceful shutdown, Docker/K8s deploy, checkpoint/retry, multimodal, prompt hub, cost analytics, enterprise RBAC + multi-tenancy."
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
     {name = "AgentOS Team"},
 ]
-keywords = ["agent", "llm", "ai", "framework", "multi-agent", "function-calling"]
+keywords = [
+    "agent", "llm", "ai", "framework", "multi-agent", "function-calling",
+    "swarm", "rag", "middleware", "production",
+]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -19,6 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Framework :: FastAPI",
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -28,11 +32,16 @@ dependencies = [
     "fastapi>=0.100.0",
     "uvicorn>=0.30.0",
     "pydantic>=2.0",
+    "jsonschema>=4.20.0",
     "aiosqlite>=0.20.0",
-    "pywebview>=5.0",
 ]
 
 [project.optional-dependencies]
+server = [
+    "gunicorn>=22.0",
+    "uvicorn[standard]>=0.30.0",
+    "prometheus-client>=0.20.0",
+]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
@@ -69,9 +78,10 @@ cli = [
     "rich>=13.0",
     "typer>=0.9",
 ]
-docker = [
-    "docker>=7.0",
+all = [
+    "nexus-agentos[server,rag,distributed,evaluation,hitl_ui,cli]",
 ]
+
 [project.urls]
 Homepage = "https://github.com/agentos/agentos"
 Documentation = "https://docs.agentos.dev"
@@ -79,6 +89,25 @@ Repository = "https://github.com/agentos/agentos.git"
 
 [project.scripts]
 agentos = "agentos.cli.main:main"
+agentos-daemon = "agentos.server.daemon:daemon_main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["agentos", "examples"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v --tb=short"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+warn_return_any = true
+warn_unused_configs = true

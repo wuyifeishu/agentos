@@ -2,14 +2,13 @@
 AgentOS v0.30 FastAPI REST服务 — 暴露Agent能力。
 """
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import Optional
-import asyncio
 import uuid
 
-from agentos.core.loop import AgentLoop, AgentResult, LoopState
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from agentos.core.loop import AgentLoop
 
 
 class RunRequest(BaseModel):
@@ -102,11 +101,17 @@ class AgentAPI:
             return {
                 "count": len(self.loop.tool_registry._tools),
                 "tools": [
-                    {"name": t.name, "description": t.description, "is_read": t.is_read, "category": t.category}
+                    {
+                        "name": t.name,
+                        "description": t.description,
+                        "is_read": t.is_read,
+                        "category": t.category,
+                    }
                     for t in self.loop.tool_registry._tools.values()
                 ],
             }
 
     def serve(self, host: str = "0.0.0.0", port: int = 8080):
         import uvicorn
+
         uvicorn.run(self.app, host=host, port=port)

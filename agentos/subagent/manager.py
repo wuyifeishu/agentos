@@ -9,22 +9,22 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Awaitable
+from enum import StrEnum
+from typing import Any
 
 from .parent_child import (
-    ChildStatus,
-    ChildHeartbeat,
-    ChildInfo,
-    SharedState,
     ChildContext,
     ChildHandle,
+    ChildStatus,
+    SharedState,
 )
 
 
-class SubAgentMode(str, Enum):
+class SubAgentMode(StrEnum):
     """子 Agent 模式枚举。"""
+
     FORK = "fork"
     SWARM = "swarm"
     A2A = "a2a"
@@ -33,6 +33,7 @@ class SubAgentMode(str, Enum):
 @dataclass
 class SubAgentSpec:
     """子 Agent 规格。"""
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
     task: str = ""
     mode: SubAgentMode = SubAgentMode.FORK
@@ -45,6 +46,7 @@ class SubAgentSpec:
 @dataclass
 class SubAgentResult:
     """子 Agent 执行结果。"""
+
     agent_id: str
     output: str
     iterations: int
@@ -96,7 +98,8 @@ class SubAgentManager:
     def active_children(self) -> int:
         """当前活跃的子Agent数。"""
         return sum(
-            1 for h in self._agents.values()
+            1
+            for h in self._agents.values()
             if h.status in (ChildStatus.RUNNING, ChildStatus.PAUSED)
         )
 
@@ -205,7 +208,7 @@ class SubAgentManager:
     ) -> list[SubAgentResult]:
         """Swarm模式：最多8个Agent并行处理。"""
         agents = []
-        for i, task in enumerate(tasks[:self.MAX_SWARM_SIZE]):
+        for i, task in enumerate(tasks[: self.MAX_SWARM_SIZE]):
             spec = SubAgentSpec(
                 task=task,
                 mode=SubAgentMode.SWARM,
@@ -300,8 +303,12 @@ class SubAgentManager:
         """清理已完成/失败/取消且超过 max_age_seconds 的句柄。返回清理数。"""
         now = time.time()
         cleaned = 0
-        terminal = (ChildStatus.COMPLETED, ChildStatus.FAILED,
-                    ChildStatus.CANCELLED, ChildStatus.TIMEOUT)
+        terminal = (
+            ChildStatus.COMPLETED,
+            ChildStatus.FAILED,
+            ChildStatus.CANCELLED,
+            ChildStatus.TIMEOUT,
+        )
         for agent_id, handle in list(self._agents.items()):
             if handle.status in terminal:
                 age = now - handle.info.spawned_at

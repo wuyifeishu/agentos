@@ -1,6 +1,5 @@
 """
 AgentOS 配置面板 — Web GUI，一键浏览器配置 API Key。
-
 启动: agentos config-panel
 访问: http://localhost:18480
 """
@@ -13,8 +12,6 @@ import os
 import sys
 import webbrowser
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
-
 
 CONFIG_DIR = Path.home() / ".agentos"
 CONFIG_FILE = CONFIG_DIR / "config.yaml"
@@ -129,8 +126,8 @@ HTML = """<!DOCTYPE html>
     <div class="info-row">
       <div class="info-item">默认模型: <strong>gpt-4o-mini</strong></div>
       <div class="info-item">费用: <strong>低 ~ 中（约 $0.15/百万token）</strong></div>
-      <div class="info-item">注册: <a href="https://platform.openai.com/api-keys" target="_blank" style="color:#667eea">platform.openai.com</a></div>
-    </div>
+      <div class="info-item">注册: <a href="https://platform.openai.com/api-keys"
+                       target="_blank" style="color:#667eea">platform.openai.com</a></div>
     <div class="input-row">
       <input type="password" id="key-openai" placeholder="粘贴你的 OpenAI API Key（以 sk- 开头）">
       <button class="btn btn-primary" onclick="save('openai')">保存并验证</button>
@@ -152,9 +149,7 @@ HTML = """<!DOCTYPE html>
     <div class="info-row">
       <div class="info-item">默认模型: <strong>deepseek-chat</strong></div>
       <div class="info-item">费用: <strong>极低（约 ¥1/百万token）</strong></div>
-      <div class="info-item">注册: <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:#667eea">platform.deepseek.com</a></div>
     </div>
-    <div class="input-row">
       <input type="password" id="key-deepseek" placeholder="粘贴你的 DeepSeek API Key（以 sk- 开头）">
       <button class="btn btn-primary" onclick="save('deepseek')">保存并验证</button>
       <button class="btn btn-outline" onclick="verify('deepseek')">仅验证</button>
@@ -175,10 +170,8 @@ HTML = """<!DOCTYPE html>
     <div class="info-row">
       <div class="info-item">默认模型: <strong>claude-sonnet-4</strong></div>
       <div class="info-item">费用: <strong>中 ~ 高（约 $3/百万token）</strong></div>
-      <div class="info-item">注册: <a href="https://console.anthropic.com/keys" target="_blank" style="color:#667eea">console.anthropic.com</a></div>
     </div>
     <div class="input-row">
-      <input type="password" id="key-anthropic" placeholder="粘贴你的 Anthropic API Key（以 sk-ant- 开头）">
       <button class="btn btn-primary" onclick="save('anthropic')">保存并验证</button>
       <button class="btn btn-outline" onclick="verify('anthropic')">仅验证</button>
     </div>
@@ -325,6 +318,7 @@ def _test_connection(provider: str, api_key: str) -> tuple[bool, str]:
     """测试 API 连接。"""
     try:
         import httpx
+
         if provider == "openai":
             resp = httpx.get(
                 "https://api.openai.com/v1/models",
@@ -410,6 +404,7 @@ def _save_config(provider: str, api_key: str):
     # Update config.yaml
     config = {"version": "1.4.1", "active_provider": provider}
     import yaml
+
     if CONFIG_FILE.exists():
         existing = yaml.safe_load(CONFIG_FILE.read_text())
         if existing and "providers" in existing:
@@ -452,10 +447,12 @@ class PanelHandler(http.server.BaseHTTPRequestHandler):
             if ok:
                 _save_config(provider, key)
                 info = API_TEMPLATE[provider]
-                self._send_json({
-                    "ok": True,
-                    "model": info["default_model"],
-                })
+                self._send_json(
+                    {
+                        "ok": True,
+                        "model": info["default_model"],
+                    }
+                )
             else:
                 self._send_json({"ok": False, "error": err})
         elif self.path == "/api/verify":

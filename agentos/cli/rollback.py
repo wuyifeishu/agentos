@@ -16,23 +16,23 @@ import hashlib
 import json
 import subprocess
 import sys
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
-
 
 # ── Models ──
+
 
 @dataclass
 class VersionEntry:
     """Record of a pushed version."""
+
     version: str
     pushed_at: str
     wheel_path: str
     wheel_size: int
     sha256: str
-    active: bool = True       # False if rolled back from
+    active: bool = True  # False if rolled back from
 
     def to_dict(self) -> dict:
         return {
@@ -45,11 +45,12 @@ class VersionEntry:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "VersionEntry":
+    def from_dict(cls, d: dict) -> VersionEntry:
         return cls(**d)
 
 
 # ── Rollback Manager ──
+
 
 class RollbackManager:
     """Safe version rollback with local wheel archive.
@@ -87,11 +88,12 @@ class RollbackManager:
         # Copy to archive
         dest = self._wheels_dir / filename
         import shutil
+
         shutil.copy2(src, dest)
 
         # Compute hash
         sha = hashlib.sha256(dest.read_bytes()).hexdigest()
-        pushed_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        pushed_at = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         entry = VersionEntry(
             version=version,
@@ -158,13 +160,14 @@ class RollbackManager:
         print(f"  Size: {target.wheel_size / 1024:.0f} KB")
 
         if dry_run:
-            print(f"  [DRY RUN — no changes made]")
+            print("  [DRY RUN — no changes made]")
             return True
 
         # pip install
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "--force-reinstall", "--no-deps", str(wheel)],
-            capture_output=True, text=True,
+            capture_output=True,
+            text=True,
         )
 
         if result.returncode != 0:
@@ -191,20 +194,23 @@ class RollbackManager:
         installed = self._get_installed_version()
         result = []
         for entry in sorted(self._history, key=lambda e: e.pushed_at, reverse=True):
-            result.append({
-                "version": entry.version,
-                "pushed_at": entry.pushed_at,
-                "wheel_size_kb": entry.wheel_size // 1024,
-                "active": entry.active,
-                "current": entry.version == installed,
-                "wheel_exists": Path(entry.wheel_path).exists(),
-            })
+            result.append(
+                {
+                    "version": entry.version,
+                    "pushed_at": entry.pushed_at,
+                    "wheel_size_kb": entry.wheel_size // 1024,
+                    "active": entry.active,
+                    "current": entry.version == installed,
+                    "wheel_exists": Path(entry.wheel_path).exists(),
+                }
+            )
         return result
 
     def list_pypi_versions(self) -> list[str]:
         """List all versions available on PyPI."""
-        import urllib.request
         import json
+        import urllib.request
+
         try:
             url = "https://pypi.org/pypi/nexus-agentos/json"
             req = urllib.request.Request(url, headers={"Accept": "application/json"})
@@ -219,10 +225,7 @@ class RollbackManager:
     def verify(self, version: str = "") -> dict:
         """Verify a specific version's wheel integrity, or all."""
         results = {}
-        entries = (
-            [e for e in self._history if e.version == version]
-            if version else self._history
-        )
+        entries = [e for e in self._history if e.version == version] if version else self._history
 
         pyapi_versions = self.list_pypi_versions()
 
@@ -235,7 +238,7 @@ class RollbackManager:
             else:
                 actual_sha = hashlib.sha256(wheel.read_bytes()).hexdigest()
                 if actual_sha != entry.sha256:
-                    issues.append(f"SHA256 mismatch")
+                    issues.append("SHA256 mismatch")
 
             if entry.version not in pyapi_versions:
                 issues.append("not on PyPI")
@@ -292,12 +295,14 @@ class RollbackManager:
     def _get_installed_version() -> str:
         try:
             import agentos
+
             return agentos.__version__
         except Exception:
             return "unknown"
 
 
 # ── CLI Entry ──
+
 
 def rollback_cli(args: list[str]) -> int:
     """CLI entry for agentos rollback command.

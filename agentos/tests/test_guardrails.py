@@ -2,28 +2,25 @@
 Tests for guardrails module — engine, rules, and policy enforcement.
 """
 
-import pytest
 from agentos.guardrails.engine import (
-    GuardrailEngine,
-    GuardrailRule,
     GuardrailAction,
-    GuardrailCategory,
+    GuardrailEngine,
     GuardrailResult,
     InputGuardrail,
     OutputGuardrail,
-)
-from agentos.guardrails.rules import (
-    PIIRule,
-    KeywordBlockRule,
-    LengthLimitRule,
-    RegexRule,
-    CodeInjectionRule,
-    build_default_rules,
 )
 from agentos.guardrails.policy import (
     GuardrailPolicy,
     PolicyEnforcer,
     PolicyViolation,
+)
+from agentos.guardrails.rules import (
+    CodeInjectionRule,
+    KeywordBlockRule,
+    LengthLimitRule,
+    PIIRule,
+    RegexRule,
+    build_default_rules,
 )
 
 
@@ -159,7 +156,7 @@ class TestCodeInjectionRule:
 
     def test_eval_injection(self):
         rule = CodeInjectionRule()
-        assert rule.check('eval("__import__(\'os\').system(\'rm -rf /\')")')
+        assert rule.check("eval(\"__import__('os').system('rm -rf /')\")")
 
     def test_normal_prompt_passes(self):
         rule = CodeInjectionRule()
@@ -198,10 +195,12 @@ class TestPolicyEnforcer:
         assert pe.is_blocked
 
     def test_category_block(self):
-        pe = PolicyEnforcer(GuardrailPolicy(
-            max_total_violations=100,
-            max_violations_per_category={"injection": 2},
-        ))
+        pe = PolicyEnforcer(
+            GuardrailPolicy(
+                max_total_violations=100,
+                max_violations_per_category={"injection": 2},
+            )
+        )
         r = GuardrailResult(passed=False, action=GuardrailAction.BLOCK)
         violation = pe.evaluate(r, category="injection")
         assert violation is None

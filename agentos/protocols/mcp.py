@@ -16,6 +16,7 @@ from typing import Any
 @dataclass
 class MCPServerConfig:
     """MCP 服务端配置。"""
+
     name: str
     transport: str = "stdio"  # stdio | sse | ws
     command: str | None = None
@@ -27,6 +28,7 @@ class MCPServerConfig:
 @dataclass
 class MCPToolSchema:
     """MCP 工具 Schema。"""
+
     name: str
     description: str
     input_schema: dict
@@ -34,8 +36,8 @@ class MCPToolSchema:
 
 # ── 传输层 ──────────────────────────────────────
 
-class MCPTransport(ABC):
 
+class MCPTransport(ABC):
     """MCP 传输协议。"""
 
     @abstractmethod
@@ -82,10 +84,13 @@ class SSETransport(MCPTransport):
 
     async def connect(self, config: MCPServerConfig):
         import httpx
+
         self._client = httpx.AsyncClient(base_url=config.url, timeout=30)
 
     async def send(self, method: str, params: dict | None = None) -> dict:
-        resp = await self._client.post("/message", json={"jsonrpc": "2.0", "method": method, "params": params or {}, "id": 1})
+        resp = await self._client.post(
+            "/message", json={"jsonrpc": "2.0", "method": method, "params": params or {}, "id": 1}
+        )
         return resp.json()
 
     async def close(self):
@@ -94,6 +99,7 @@ class SSETransport(MCPTransport):
 
 
 # ── MCP 客户端 ──────────────────────────────────
+
 
 class MCPClient:
     """MCP 协议客户端，管理多个 MCP Server 连接。"""
@@ -124,13 +130,15 @@ class MCPClient:
         return await transport.send("tools/list")
 
     async def call_tool(self, full_name: str, arguments: dict) -> Any:
-        server_name = full_name.replace("mcp_", "", 1)
+        full_name.replace("mcp_", "", 1)
         # 找到所属server
         for name in self._servers:
             if full_name.startswith(f"mcp_{name}_"):
-                tool_name = full_name[len(f"mcp_{name}_") + 1:]
+                tool_name = full_name[len(f"mcp_{name}_") + 1 :]
                 transport = self._servers[name]
-                result = await transport.send("tools/call", {"name": tool_name, "arguments": arguments})
+                result = await transport.send(
+                    "tools/call", {"name": tool_name, "arguments": arguments}
+                )
                 return result.get("content", [{}])[0].get("text", "")
         raise ValueError(f"Unknown MCP tool: {full_name}")
 
@@ -138,14 +146,16 @@ class MCPClient:
         """转为 OpenAI function 格式。"""
         schemas = []
         for tool in self._tools.values():
-            schemas.append({
-                "type": "function",
-                "function": {
-                    "name": tool.name,
-                    "description": tool.description,
-                    "parameters": tool.input_schema,
-                },
-            })
+            schemas.append(
+                {
+                    "type": "function",
+                    "function": {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "parameters": tool.input_schema,
+                    },
+                }
+            )
         return schemas
 
     async def close_all(self):

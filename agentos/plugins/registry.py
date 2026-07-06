@@ -10,23 +10,24 @@ AgentOS v0.70 — 插件系统: 注册中心。
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable
+from enum import StrEnum
+from typing import Any
 
 
-class PluginType(str, Enum):
+class PluginType(StrEnum):
     """插件类型枚举。"""
-    PROVIDER = "provider"          # 模型provider (如GeminiAdapter)
-    TOOL = "tool"                  # 工具扩展
-    MIDDLEWARE = "middleware"      # 请求/响应拦截器
-    SINK = "sink"                  # 输出后端 (观测/日志/存储)
-    HOOK = "hook"                  # 生命周期钩子
-    CUSTOM = "custom"              # 自定义
+
+    PROVIDER = "provider"  # 模型provider (如GeminiAdapter)
+    TOOL = "tool"  # 工具扩展
+    MIDDLEWARE = "middleware"  # 请求/响应拦截器
+    SINK = "sink"  # 输出后端 (观测/日志/存储)
+    HOOK = "hook"  # 生命周期钩子
+    CUSTOM = "custom"  # 自定义
 
 
-class PluginStatus(str, Enum):
-
+class PluginStatus(StrEnum):
     """插件状态。"""
 
     LOADED = "loaded"
@@ -46,12 +47,12 @@ class PluginManifest:
     description: str = ""
     author: str = ""
     plugin_type: PluginType = PluginType.CUSTOM
-    entry_point: str = ""          # fully qualified class path
+    entry_point: str = ""  # fully qualified class path
     dependencies: list[str] = field(default_factory=list)
     optional_dependencies: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
     config_schema: dict = field(default_factory=dict)
-    priority: int = 50             # 0=最高, 100=最低
+    priority: int = 50  # 0=最高, 100=最低
     homepage: str = ""
     license: str = "MIT"
 
@@ -183,6 +184,7 @@ class PluginRegistry:
         for cb in self._hooks.get(event, []):
             try:
                 import asyncio
+
                 if asyncio.iscoroutinefunction(cb):
                     results.append(await cb(**kwargs))
                 else:
@@ -212,7 +214,5 @@ class PluginRegistry:
 
 
 class DependencyCycleError(Exception):
-
     """插件依赖循环异常。"""
 
-    pass

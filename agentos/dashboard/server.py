@@ -1,20 +1,17 @@
 """
 Dashboard HTTP 服务器 — 内嵌单页 HTML，无需外部依赖。
 
-启动: agentos dashboard
 访问: http://localhost:18500
 """
 
 from __future__ import annotations
 
-import json
 import http.server
-import os
+import json
 import queue
 import threading
 import webbrowser
-from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 from agentos.dashboard.tracker import Tracker
 
@@ -23,6 +20,7 @@ PORT = 18500
 # SSE 事件队列（线程安全，用于实时推送）
 _sse_queues: list[queue.Queue] = []
 _sse_lock = threading.Lock()
+
 
 def _sse_broadcast(event_type: str, data: dict):
     """广播事件到所有 SSE 连接。"""
@@ -36,6 +34,7 @@ def _sse_broadcast(event_type: str, data: dict):
                 dead.append(q)
         for q in dead:
             _sse_queues.remove(q)
+
 
 # ============================================================
 # 内嵌前端（纯 HTML/CSS/JS，零外部依赖）
@@ -185,8 +184,6 @@ function renderStats(sessions) {
   document.getElementById('stat-cards').innerHTML =
     `<div class="stat-card"><div class="value">${total}</div><div class="label">总运行次数</div></div>
      <div class="stat-card"><div class="value">${completed}</div><div class="label">成功完成</div></div>
-     <div class="stat-card"><div class="value tokens">${(totalTokens/1000).toFixed(1)}K</div><div class="label">Token 消耗</div></div>
-     <div class="stat-card"><div class="value cost">$${totalCost.toFixed(4)}</div><div class="label">总成本</div></div>`;
 }
 
 function renderSessions(sessions) {
@@ -247,14 +244,12 @@ async function showDetail(sid) {
       <div class="stat-row" style="padding:16px 20px 0">
         <div class="stat-card"><div class="value">${dur}</div><div class="label">耗时</div></div>
         <div class="stat-card"><div class="value tokens">${s.total_tokens||0}</div><div class="label">Tokens</div></div>
-        <div class="stat-card"><div class="value cost">$${(s.total_cost_usd||0).toFixed(4)}</div><div class="label">成本</div></div>
         <div class="stat-card"><div class="value">${steps.length}</div><div class="label">步骤数</div></div>
       </div>
       <div class="timeline">${timeline}</div>
     </div>`;
 }
 
-function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 loadSessions();
 
 // SSE 实时推送
@@ -276,6 +271,7 @@ es.onerror = function() { console.log('[dashboard] SSE disconnected, retrying...
 # ============================================================
 # HTTP Handler
 # ============================================================
+
 
 class DashboardHandler(http.server.BaseHTTPRequestHandler):
     """Dashboard HTTP 请求处理器。"""
@@ -318,11 +314,13 @@ class DashboardHandler(http.server.BaseHTTPRequestHandler):
         # API: 健康检查
         if path == "/api/health":
             tracker = Tracker.get()
-            self._json({
-                "status": "ok",
-                "active_sessions": len(tracker._active),
-                "sse_clients": len(_sse_queues),
-            })
+            self._json(
+                {
+                    "status": "ok",
+                    "active_sessions": len(tracker._active),
+                    "sse_clients": len(_sse_queues),
+                }
+            )
             return
 
         self._html(404, "<h1>404</h1>")
@@ -364,7 +362,7 @@ class DashboardHandler(http.server.BaseHTTPRequestHandler):
             while True:
                 try:
                     payload = q.get(timeout=30)  # 30s 心跳
-                    self.wfile.write(f"data: {payload}\n\n".encode("utf-8"))
+                    self.wfile.write(f"data: {payload}\n\n".encode())
                     self.wfile.flush()
                 except queue.Empty:
                     # 心跳保活

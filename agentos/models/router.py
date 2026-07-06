@@ -19,6 +19,7 @@ from agentos.tools.base import ToolCall
 @dataclass
 class ModelResponse:
     """LLM 响应：文本内容 + 函数调用列表。"""
+
     content: str
     tool_calls: list[ToolCall] = field(default_factory=list)
 
@@ -30,6 +31,7 @@ class ModelResponse:
 @dataclass
 class ModelSpec:
     """单个模型的规格定义。"""
+
     provider: str
     model_id: str
     context_window: int = 128_000
@@ -39,16 +41,15 @@ class ModelSpec:
     cost_per_1m_output: float = 0.0
 
 
-class AllModelsFailed(Exception):
-
+class AllModelsFailed(Exception):  # noqa: N818
     """所有模型均失败异常。"""
 
-    pass
 
 
 @dataclass
 class ModelConfig:
     """模型路由配置。"""
+
     default_model: str = "gpt-4o-mini"
     fallback_chain: list[str] = field(default_factory=list)
     models: dict[str, ModelSpec] = field(default_factory=dict)
@@ -62,7 +63,9 @@ RECOMMENDED_CONFIG = ModelConfig(
     models={
         "gpt-4o-mini": ModelSpec(provider="openai", model_id="gpt-4o-mini", context_window=128_000),
         "gpt-4o": ModelSpec(provider="openai", model_id="gpt-4o", context_window=128_000),
-        "claude-3.5-sonnet": ModelSpec(provider="anthropic", model_id="claude-3.5-sonnet", context_window=200_000),
+        "claude-3.5-sonnet": ModelSpec(
+            provider="anthropic", model_id="claude-3.5-sonnet", context_window=200_000
+        ),
     },
 )
 
@@ -72,7 +75,9 @@ class ModelRouter:
     """Minimal LLM router for code generation tasks."""
 
     api_key: str = field(default_factory=lambda: os.environ.get("OPENAI_API_KEY", ""))
-    base_url: str = field(default_factory=lambda: os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"))
+    base_url: str = field(
+        default_factory=lambda: os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    )
 
     async def chat(
         self,

@@ -3,14 +3,15 @@ Guardrail policy enforcement — cumulative violation tracking, rate limiting,
 and session-scoped policy decisions.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 from agentos.guardrails.engine import GuardrailAction, GuardrailCategory, GuardrailResult
 
 
-class PolicyViolation(str, Enum):
+class PolicyViolation(StrEnum):
     """Policy-level violation reasons."""
 
     SESSION_BLOCKED = "session_blocked"
@@ -28,7 +29,7 @@ class GuardrailPolicy:
     window_seconds: int = 300
     auto_block_on: set[GuardrailCategory] = field(default_factory=set)
     on_session_block: str = "reject"  # reject / warn
-    monitoring_callback: Callable[[str, Dict[str, Any]], None] | None = None
+    monitoring_callback: Callable[[str, dict[str, Any]], None] | None = None
 
     def __post_init__(self):
         if not self.max_violations_per_category:
@@ -42,10 +43,10 @@ class GuardrailPolicy:
 class PolicyEnforcer:
     """Tracks violations per session and enforces cumulative policy."""
 
-    def __init__(self, policy: Optional[GuardrailPolicy] = None):
+    def __init__(self, policy: GuardrailPolicy | None = None):
         self.policy = policy or GuardrailPolicy()
         self._violation_count: int = 0
-        self._category_counts: Dict[str, int] = {}
+        self._category_counts: dict[str, int] = {}
         self._session_blocked: bool = False
         self._violation_log: list[tuple[float, str, str]] = []
 
@@ -61,6 +62,7 @@ class PolicyEnforcer:
             return None
 
         import time
+
         now = time.time()
 
         self._violation_count += 1
@@ -82,7 +84,10 @@ class PolicyEnforcer:
         if category and category in self.policy.max_violations_per_category:
             limit = self.policy.max_violations_per_category[category]
             if self._category_counts[category] >= limit:
-                self._emit("category_blocked", {"category": category, "count": self._category_counts[category]})
+                self._emit(
+                    "category_blocked",
+                    {"category": category, "count": self._category_counts[category]},
+                )
                 return PolicyViolation.CATEGORY_BANNED
 
         return None
@@ -102,7 +107,7 @@ class PolicyEnforcer:
     def total_violations(self) -> int:
         return self._violation_count
 
-    def _emit(self, event: str, data: Dict[str, Any]) -> None:
+    def _emit(self, event: str, data: dict[str, Any]) -> None:
         if self.policy.monitoring_callback:
             try:
                 self.policy.monitoring_callback(event, data)

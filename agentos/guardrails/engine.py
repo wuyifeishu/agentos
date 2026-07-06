@@ -2,12 +2,13 @@
 Guardrail engine — rule registry, evaluation, and result aggregation.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from enum import StrEnum
+from typing import Any
 
 
-class GuardrailAction(str, Enum):
+class GuardrailAction(StrEnum):
     """Guardrail disposition for a single rule match."""
 
     BLOCK = "block"
@@ -16,7 +17,7 @@ class GuardrailAction(str, Enum):
     PASS = "pass"
 
 
-class GuardrailCategory(str, Enum):
+class GuardrailCategory(StrEnum):
     """Semantic category of a guardrail rule."""
 
     PII = "pii"
@@ -53,13 +54,13 @@ class GuardrailRule:
     sanitize: Callable[[str], str] | None = None
     description: str = ""
     enabled: bool = True
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class InputGuardrail:
     """Validates user prompts before they reach the LLM."""
 
-    def __init__(self, rules: Optional[list[GuardrailRule]] = None):
+    def __init__(self, rules: list[GuardrailRule] | None = None):
         self._rules: dict[str, GuardrailRule] = {}
         if rules:
             for r in rules:
@@ -98,7 +99,7 @@ class InputGuardrail:
 class OutputGuardrail:
     """Validates LLM outputs before they reach the user."""
 
-    def __init__(self, rules: Optional[list[GuardrailRule]] = None):
+    def __init__(self, rules: list[GuardrailRule] | None = None):
         self._rules: dict[str, GuardrailRule] = {}
         if rules:
             for r in rules:
@@ -139,8 +140,8 @@ class GuardrailEngine:
 
     def __init__(
         self,
-        input_rules: Optional[list[GuardrailRule]] = None,
-        output_rules: Optional[list[GuardrailRule]] = None,
+        input_rules: list[GuardrailRule] | None = None,
+        output_rules: list[GuardrailRule] | None = None,
     ):
         self.input = InputGuardrail(input_rules)
         self.output = OutputGuardrail(output_rules)
@@ -154,11 +155,18 @@ class GuardrailEngine:
     def check(self, prompt: str, response: str = "") -> tuple[GuardrailResult, GuardrailResult]:
         """Evaluate input and output guardrails. Empty response skips output check."""
         inp = self.input.evaluate(prompt)
-        out = self.output.evaluate(response) if response else GuardrailResult(
-            passed=True, action=GuardrailAction.PASS
+        out = (
+            self.output.evaluate(response)
+            if response
+            else GuardrailResult(passed=True, action=GuardrailAction.PASS)
         )
         return inp, out
 
 
 def _action_priority(action: GuardrailAction) -> int:
-    return {GuardrailAction.PASS: 0, GuardrailAction.FLAG: 1, GuardrailAction.SANITIZE: 2, GuardrailAction.BLOCK: 3}[action]
+    return {
+        GuardrailAction.PASS: 0,
+        GuardrailAction.FLAG: 1,
+        GuardrailAction.SANITIZE: 2,
+        GuardrailAction.BLOCK: 3,
+    }[action]

@@ -9,13 +9,13 @@ import asyncio
 import heapq
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional, Callable, Any
+from enum import Enum, StrEnum
+from typing import Any
 
 
-class TaskState(str, Enum):
-
+class TaskState(StrEnum):
     """任务状态枚举。"""
 
     PENDING = "pending"
@@ -28,7 +28,6 @@ class TaskState(str, Enum):
 
 
 class TaskPriority(int, Enum):
-
     """任务优先级枚举。"""
 
     LOW = 0
@@ -40,14 +39,16 @@ class TaskPriority(int, Enum):
 @dataclass(order=True)
 class QueuedTask:
     """带优先级的任务节点（priority取负以实现最大堆）。"""
+
     priority: int  # -priority for max-heap
     created_at: float = field(compare=False)
-    task: "ScheduledTask" = field(compare=False)
+    task: ScheduledTask = field(compare=False)
 
 
 @dataclass
 class ScheduledTask:
     """调度任务。"""
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     name: str = ""
     payload: dict = field(default_factory=dict)
@@ -81,7 +82,10 @@ class MemoryQueue:
             if len(self._pending) >= self.max_size:
                 raise RuntimeError(f"Queue full ({self.max_size})")
             self._pending[task.id] = task
-            heapq.heappush(self._heap, QueuedTask(priority=-task.priority.value, created_at=task.created_at, task=task))
+            heapq.heappush(
+                self._heap,
+                QueuedTask(priority=-task.priority.value, created_at=task.created_at, task=task),
+            )
             return task.id
 
     async def dequeue(self) -> ScheduledTask | None:
@@ -168,7 +172,7 @@ class TaskQueue:
                     result = await asyncio.wait_for(result, timeout=task.timeout)
                 task.result = result
                 task.state = TaskState.SUCCESS
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 task.error = f"Timeout after {task.timeout}s"
                 await self._handle_failure(task)
             except Exception as e:

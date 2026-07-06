@@ -13,37 +13,40 @@ AgentOS v1.14.0 — 结构化 Agent 状态管理系统。
 
 from __future__ import annotations
 
-import uuid
 import time
-from datetime import datetime, timezone
-from enum import Enum
+import uuid
+from collections.abc import Callable
+from datetime import UTC, datetime
+from enum import StrEnum
 from typing import (
-    Any, Callable, Dict, Generic, List, Literal, Optional, Set, TypeVar, Union,
+    Any,
+    TypeVar,
 )
 
 try:
     from pydantic import (
-        BaseModel, Field, field_validator, model_validator,
-        ConfigDict, PrivateAttr,
+        BaseModel,
+        ConfigDict,
+        Field,
+        PrivateAttr,
     )
-    from pydantic.json_schema import GenerateJsonSchema
 except ImportError:
     raise ImportError(
-        "pydantic>=2.0 is required for agentos.state. "
-        "Install with: pip install pydantic>=2.0"
+        "pydantic>=2.0 is required for agentos.state. " "Install with: pip install pydantic>=2.0"
     )
 
 # ── Reducers ────────────────────────────────
 
 
-class ReducerStrategy(str, Enum):
+class ReducerStrategy(StrEnum):
     """状态合并策略。"""
-    REPLACE = "replace"      # 直接替换
-    APPEND = "append"        # 追加（list -> extend）
-    EXTEND = "extend"        # 字典合并
-    MERGE = "merge"          # 深度递归合并
-    KEEP_EXISTING = "keep"   # 保留旧值
-    CUSTOM = "custom"        # 自定义 reducer 函数
+
+    REPLACE = "replace"  # 直接替换
+    APPEND = "append"  # 追加（list -> extend）
+    EXTEND = "extend"  # 字典合并
+    MERGE = "merge"  # 深度递归合并
+    KEEP_EXISTING = "keep"  # 保留旧值
+    CUSTOM = "custom"  # 自定义 reducer 函数
 
 
 # Type variable for generic state
@@ -53,7 +56,7 @@ S = TypeVar("S", bound=BaseModel)
 ReducerFn = Callable[[Any, Any], Any]
 
 # Default reducers
-_DEFAULT_REDUCERS: Dict[str, ReducerStrategy] = {}
+_DEFAULT_REDUCERS: dict[str, ReducerStrategy] = {}
 
 
 def default_reducer(field_name: str, strategy: ReducerStrategy) -> None:
@@ -104,12 +107,13 @@ def _deep_merge(old: Any, new: Any) -> Any:
 
 class StateFieldInfo(BaseModel):
     """状态字段元信息。"""
+
     reducer: ReducerStrategy = ReducerStrategy.REPLACE
-    custom_reducer: Optional[ReducerFn] = None
+    custom_reducer: ReducerFn | None = None
     description: str = ""
     required: bool = False
-    sensitive: bool = False         # 敏感字段，序列化时脱敏
-    checkpointed: bool = True       # 是否持久化到 Checkpoint
+    sensitive: bool = False  # 敏感字段，序列化时脱敏
+    checkpointed: bool = True  # 是否持久化到 Checkpoint
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -138,20 +142,20 @@ class BaseAgentState(BaseModel):
         default_factory=lambda: f"thread-{uuid.uuid4().hex[:8]}",
         description="对话线程唯一标识",
     )
+    messages: list[Any] = Field(default_factory=list, description="对话消息列表")
+    metrics: dict[str, Any] = Field(default_factory=dict, description="运行时指标")
     step: int = Field(default=0, ge=0, description="当前执行步骤")
     created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="创建时间",
     )
     updated_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="最后更新时间",
     )
     tags: list[str] = Field(default_factory=list, description="标签")
     metadata: dict[str, Any] = Field(default_factory=dict, description="自定义元数据")
-    parent_state_id: Optional[str] = Field(
-        default=None, description="父状态 ID（用于分支/回溯）"
-    )
+    parent_state_id: str | None = Field(default=None, description="父状态 ID（用于分支/回溯）")
 
     # 字段级 Reducer 配置
     _field_reducers: dict[str, ReducerStrategy] = PrivateAttr(default_factory=dict)
@@ -175,18 +179,18 @@ class BaseAgentState(BaseModel):
 
     # ── Reducer Registration ──────────────────
 
-    def set_reducer(self, field: str, strategy: ReducerStrategy) -> "BaseAgentState":
+    def set_reducer(self, field: str, strategy: ReducerStrategy) -> BaseAgentState:
         """为字段设置合并策略。"""
         self._field_reducers[field] = strategy
         return self
 
-    def set_custom_reducer(self, field: str, fn: ReducerFn) -> "BaseAgentState":
+    def set_custom_reducer(self, field: str, fn: ReducerFn) -> BaseAgentState:
         """为字段设置自定义合并函数。"""
         self._field_custom_reducers[field] = fn
         self._field_reducers[field] = ReducerStrategy.CUSTOM
         return self
 
-    def mark_sensitive(self, *fields: str) -> "BaseAgentState":
+    def mark_sensitive(self, *fields: str) -> BaseAgentState:
         """标记敏感字段。"""
         self._sensitive_fields.update(fields)
         return self
@@ -197,7 +201,7 @@ class BaseAgentState(BaseModel):
         self,
         field: str,
         value: Any,
-        reducer: Optional[ReducerStrategy] = None,
+        reducer: ReducerStrategy | None = None,
     ) -> None:
         """更新单个字段，自动应用 Reducer。
 
@@ -223,9 +227,9 @@ class BaseAgentState(BaseModel):
             new_val = _apply_reducer(old, value, strategy)
             setattr(self, field, new_val)
 
-        self.updated_at = datetime.now(timezone.utc).isoformat()
+        self.updated_at = datetime.now(UTC).isoformat()
 
-    def merge(self, other: Union["BaseAgentState", dict]) -> "BaseAgentState":
+    def merge(self, other: BaseAgentState | dict) -> BaseAgentState:
         """合并另一个状态到当前状态。
 
         Args:
@@ -250,7 +254,7 @@ class BaseAgentState(BaseModel):
         # Merge metadata
         if other.metadata:
             self.metadata = _deep_merge(self.metadata, other.metadata)
-            self.updated_at = datetime.now(timezone.utc).isoformat()
+            self.updated_at = datetime.now(UTC).isoformat()
 
         # Merge tags
         if other.tags:
@@ -261,7 +265,7 @@ class BaseAgentState(BaseModel):
     def increment_step(self) -> int:
         """递增步骤计数器，返回新 step。"""
         self.step += 1
-        self.updated_at = datetime.now(timezone.utc).isoformat()
+        self.updated_at = datetime.now(UTC).isoformat()
         return self.step
 
     # ── Snapshot & Restore ────────────────────
@@ -288,7 +292,7 @@ class BaseAgentState(BaseModel):
         return data
 
     @classmethod
-    def restore(cls, data: dict[str, Any]) -> "BaseAgentState":
+    def restore(cls, data: dict[str, Any]) -> BaseAgentState:
         """从快照字典恢复状态。
 
         Args:
@@ -297,6 +301,7 @@ class BaseAgentState(BaseModel):
         Returns:
             新的 AgentState 实例
         """
+
         def _clean_private(d: dict) -> dict:
             return {k: v for k, v in d.items() if not k.startswith("_")}
 
@@ -314,7 +319,7 @@ class BaseAgentState(BaseModel):
                         pass
         return instance
 
-    def diff(self, other: "BaseAgentState") -> dict[str, tuple]:
+    def diff(self, other: BaseAgentState) -> dict[str, tuple]:
         """计算两个状态之间的差异。
 
         Returns:
@@ -340,7 +345,7 @@ class BaseAgentState(BaseModel):
         return cls.model_json_schema()
 
     @classmethod
-    def validate_json_input(cls, data: dict) -> "BaseAgentState":
+    def validate_json_input(cls, data: dict) -> BaseAgentState:
         """从 JSON 字典验证并创建实例。"""
         return cls.model_validate(data)
 
@@ -382,13 +387,13 @@ class AgentState(BaseAgentState):
         default="",
         description="上下文摘要（自动分页用）",
     )
-    task_progress: Optional[float] = Field(
+    task_progress: float | None = Field(
         default=None,
         ge=0.0,
         le=1.0,
         description="任务进度 0.0~1.0",
     )
-    abort_reason: Optional[str] = Field(
+    abort_reason: str | None = Field(
         default=None,
         description="中止原因（非空表示需中止）",
     )
@@ -403,7 +408,7 @@ class AgentState(BaseAgentState):
         self._field_reducers["intermediate"] = ReducerStrategy.REPLACE
 
     @property
-    def last_message(self) -> Optional[dict[str, Any]]:
+    def last_message(self) -> dict[str, Any] | None:
         """获取最后一条消息。"""
         return self.messages[-1] if self.messages else None
 
@@ -417,19 +422,19 @@ class AgentState(BaseAgentState):
         """是否需要中止执行？"""
         return self.abort_reason is not None
 
-    def add_message(self, role: str, content: str, **extra) -> "AgentState":
+    def add_message(self, role: str, content: str, **extra) -> AgentState:
         """添加一条消息。"""
         msg = {"role": role, "content": content, **extra}
         self.update_field("messages", [msg])
         return self
 
-    def add_error(self, error_type: str, message: str, **extra) -> "AgentState":
+    def add_error(self, error_type: str, message: str, **extra) -> AgentState:
         """记录一个错误。"""
         err = {
             "type": error_type,
             "message": message,
             "step": self.step,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             **extra,
         }
         self.update_field("errors", [err])
@@ -438,31 +443,31 @@ class AgentState(BaseAgentState):
     def request_human_input(
         self,
         prompt: str,
-        options: Optional[list[str]] = None,
+        options: list[str] | None = None,
         **extra,
-    ) -> "AgentState":
+    ) -> AgentState:
         """发起人工干预请求。"""
         interrupt = {
             "prompt": prompt,
             "options": options,
             "step": self.step,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             **extra,
         }
         self.update_field("human_interrupts", [interrupt])
         return self
 
-    def clear_human_interrupts(self) -> "AgentState":
+    def clear_human_interrupts(self) -> AgentState:
         """清除所有待处理的人工干预请求。"""
         self.human_interrupts = []
         return self
 
-    def abort(self, reason: str) -> "AgentState":
+    def abort(self, reason: str) -> AgentState:
         """标记任务需要中止。"""
         self.abort_reason = reason
         return self
 
-    def reset_abort(self) -> "AgentState":
+    def reset_abort(self) -> AgentState:
         """清除中止标记。"""
         self.abort_reason = None
         return self
@@ -501,9 +506,7 @@ class MultiAgentState(BaseAgentState):
         self._field_reducers["message_queue"] = ReducerStrategy.APPEND
         self._field_reducers["handoff_log"] = ReducerStrategy.APPEND
 
-    def register_agent(
-        self, agent_id: str, role: str = "worker", **meta
-    ) -> "MultiAgentState":
+    def register_agent(self, agent_id: str, role: str = "worker", **meta) -> MultiAgentState:
         """注册一个子 Agent。"""
         self.agents[agent_id] = {
             "role": role,
@@ -515,43 +518,44 @@ class MultiAgentState(BaseAgentState):
         self.roles[agent_id] = role
         return self
 
-    def update_agent_state(
-        self, agent_id: str, updates: dict[str, Any]
-    ) -> "MultiAgentState":
+    def update_agent_state(self, agent_id: str, updates: dict[str, Any]) -> MultiAgentState:
         """更新子 Agent 的状态。"""
         if agent_id in self.agents:
             self.agents[agent_id].update(updates)
             self._touch()
         return self
 
-    def send_message(
-        self, from_agent: str, to_agent: str, content: Any
-    ) -> "MultiAgentState":
+    def send_message(self, from_agent: str, to_agent: str, content: Any) -> MultiAgentState:
         """Agent 间发送消息。"""
         msg = {
             "from": from_agent,
             "to": to_agent,
             "content": content,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         self.update_field("message_queue", [msg])
         return self
 
     def log_handoff(
         self, from_agent: str, to_agent: str, task_id: str, reason: str = ""
-    ) -> "MultiAgentState":
+    ) -> MultiAgentState:
         """记录任务移交。"""
-        self.update_field("handoff_log", [{
-            "from": from_agent,
-            "to": to_agent,
-            "task_id": task_id,
-            "reason": reason,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }])
+        self.update_field(
+            "handoff_log",
+            [
+                {
+                    "from": from_agent,
+                    "to": to_agent,
+                    "task_id": task_id,
+                    "reason": reason,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+            ],
+        )
         return self
 
     def _touch(self) -> None:
-        self.updated_at = datetime.now(timezone.utc).isoformat()
+        self.updated_at = datetime.now(UTC).isoformat()
 
 
 class ToolCallState(BaseAgentState):
@@ -577,7 +581,7 @@ class ToolCallState(BaseAgentState):
         super().__init__(**data)
         self._field_reducers["calls"] = ReducerStrategy.APPEND
 
-    def start_call(self, call_id: str, tool: str, args: dict) -> "ToolCallState":
+    def start_call(self, call_id: str, tool: str, args: dict) -> ToolCallState:
         """记录工具调用开始。"""
         self.pending_calls[call_id] = {
             "tool": tool,
@@ -588,9 +592,7 @@ class ToolCallState(BaseAgentState):
         self._init_stats(tool)
         return self
 
-    def complete_call(
-        self, call_id: str, result: Any, error: Optional[str] = None
-    ) -> "ToolCallState":
+    def complete_call(self, call_id: str, result: Any, error: str | None = None) -> ToolCallState:
         """记录工具调用完成。"""
         if call_id not in self.pending_calls:
             return self  # 幂等
@@ -603,7 +605,7 @@ class ToolCallState(BaseAgentState):
             "result": result,
             "error": error,
             "success": error is None,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         self.update_field("calls", [record])
 
@@ -659,16 +661,16 @@ class StateSchemaRegistry:
         """注册自定义状态类型。"""
         if not issubclass(schema_cls, BaseAgentState):
             raise TypeError(
-                f"State class must inherit from BaseAgentState, "
-                f"got {schema_cls.__name__}"
+                f"State class must inherit from BaseAgentState, " f"got {schema_cls.__name__}"
             )
         self._schemas[name] = schema_cls
 
     def get(self, name: str) -> type[BaseAgentState]:
         """获取已注册的状态类型。"""
         if name not in self._schemas:
-            raise KeyError(f"Unknown state schema: '{name}'. "
-                           f"Available: {list(self._schemas.keys())}")
+            raise KeyError(
+                f"Unknown state schema: '{name}'. " f"Available: {list(self._schemas.keys())}"
+            )
         return self._schemas[name]
 
     def list_schemas(self) -> list[str]:
@@ -700,3 +702,45 @@ class StateSchemaRegistry:
 # ── 全局单例 ─────────────────────────────────
 
 state_registry = StateSchemaRegistry()
+
+
+# ── State Reducers (test compatibility) ──
+class StateReducer:
+    """Base state reducer with merge strategy."""
+
+    @staticmethod
+    def merge(base_state, new_state):
+        data = base_state.model_dump()
+        new_data = new_state.model_dump(exclude_unset=True)
+        data.update(new_data)
+        return type(base_state)(**data)
+
+
+class LastWriteWinsReducer:
+    """Reducer: newer state wins based on version."""
+
+    @staticmethod
+    def merge(base_state, new_state):
+        bv = getattr(base_state, "version", 0)
+        nv = getattr(new_state, "version", 0)
+        if nv >= bv:
+            data = base_state.model_dump()
+            data.update(new_state.model_dump(exclude_unset=True))
+            return type(base_state)(**data)
+        return base_state
+
+
+class AppendOnlyReducer:
+    """Reducer: append-only for list fields."""
+
+    MERGE_FIELDS = ["messages", "logs"]
+
+    @staticmethod
+    def merge(base_state, new_state):
+        data = base_state.model_dump()
+        new_data = new_state.model_dump(exclude_unset=True)
+        for field in AppendOnlyReducer.MERGE_FIELDS:
+            if field in new_data and field in data:
+                data[field] = list(data[field]) + list(new_data[field])
+        data.update({k: v for k, v in new_data.items() if k not in AppendOnlyReducer.MERGE_FIELDS})
+        return type(base_state)(**data)

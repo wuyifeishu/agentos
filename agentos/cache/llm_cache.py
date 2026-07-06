@@ -10,7 +10,7 @@ import json
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Any
 
 
 @dataclass
@@ -27,6 +27,7 @@ class CacheEntry:
         hit_count: Number of cache hits.
         tags: Optional tags for cache invalidation.
     """
+
     key: str
     value: Any
     tokens_saved: int = 0
@@ -48,7 +49,7 @@ class LRUCache:
         self._cache: OrderedDict[str, CacheEntry] = OrderedDict()
         self.max_size = max_size
 
-    def get(self, key: str) -> Optional[CacheEntry]:
+    def get(self, key: str) -> CacheEntry | None:
         entry = self._cache.get(key)
         if entry:
             if entry.expired:
@@ -111,7 +112,7 @@ class SemanticCache:
             return 0.0
         return dot / (norm_a * norm_b)
 
-    def search(self, query: str) -> Optional[CacheEntry]:
+    def search(self, query: str) -> CacheEntry | None:
         query_vec = self._embed(query)
         best_sim = 0.0
         best_entry = None
@@ -131,7 +132,7 @@ class SemanticCache:
         vec = self._embed(query)
         self._entries.append((vec, entry))
         if len(self._entries) > self.max_entries:
-            self._entries = self._entries[-self.max_entries:]
+            self._entries = self._entries[-self.max_entries :]
 
     def clear(self):
         self._entries.clear()
@@ -140,6 +141,7 @@ class SemanticCache:
 @dataclass
 class CacheStats:
     """缓存统计。"""
+
     total_requests: int = 0
     hits: int = 0
     misses: int = 0
@@ -165,9 +167,13 @@ class LLMCache:
     3. 透传 (无缓存命中)
     """
 
-    def __init__(self, lru_size: int = 500, semantic_threshold: float = 0.92, enable_semantic: bool = True):
+    def __init__(
+        self, lru_size: int = 500, semantic_threshold: float = 0.92, enable_semantic: bool = True
+    ):
         self.lru = LRUCache(max_size=lru_size)
-        self.semantic = SemanticCache(similarity_threshold=semantic_threshold) if enable_semantic else None
+        self.semantic = (
+            SemanticCache(similarity_threshold=semantic_threshold) if enable_semantic else None
+        )
         self.stats = CacheStats()
 
     @staticmethod
@@ -175,7 +181,7 @@ class LLMCache:
         payload = prompt + model + json.dumps(kwargs, sort_keys=True)
         return hashlib.sha256(payload.encode()).hexdigest()[:32]
 
-    def get(self, prompt: str, model: str = "", **kwargs) -> Optional[Any]:
+    def get(self, prompt: str, model: str = "", **kwargs) -> Any | None:
         self.stats.total_requests += 1
 
         # 1. 精确匹配
@@ -201,9 +207,20 @@ class LLMCache:
         self.stats.misses += 1
         return None
 
-    def set(self, prompt: str, value: Any, model: str = "", tokens: int = 0, cost: float = 0.0, ttl: float = 3600, **kwargs):
+    def set(
+        self,
+        prompt: str,
+        value: Any,
+        model: str = "",
+        tokens: int = 0,
+        cost: float = 0.0,
+        ttl: float = 3600,
+        **kwargs,
+    ):
         exact_key = self._hash_key(prompt, model, **kwargs)
-        entry = CacheEntry(key=exact_key, value=value, tokens_saved=tokens, cost_saved=cost, ttl=ttl)
+        entry = CacheEntry(
+            key=exact_key, value=value, tokens_saved=tokens, cost_saved=cost, ttl=ttl
+        )
         self.lru.put(exact_key, entry)
 
         if self.semantic:

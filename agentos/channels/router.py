@@ -10,9 +10,8 @@ AgentOS Channels — 消息路由引擎。
 from __future__ import annotations
 
 import time
-from typing import Optional
 
-from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
+from agentos.channels.base import BaseChannelAdapter, ReplyResult
 from agentos.channels.message import ChannelMessage, ChannelType, ConversationContext
 
 
@@ -24,10 +23,10 @@ class ChannelRouter:
     """
 
     def __init__(self):
-        self._adapters: dict[str, BaseChannelAdapter] = {}       # webhook_path → adapter
+        self._adapters: dict[str, BaseChannelAdapter] = {}  # webhook_path → adapter
         self._by_channel: dict[ChannelType, BaseChannelAdapter] = {}
-        self._default: Optional[BaseChannelAdapter] = None
-        self._contexts: dict[str, ConversationContext] = {}      # session_id → context
+        self._default: BaseChannelAdapter | None = None
+        self._contexts: dict[str, ConversationContext] = {}  # session_id → context
 
     # ── 注册 ──
 
@@ -53,7 +52,9 @@ class ChannelRouter:
 
     # ── 查找 ──
 
-    def find(self, webhook_path: str = "", channel: Optional[ChannelType] = None) -> Optional[BaseChannelAdapter]:
+    def find(
+        self, webhook_path: str = "", channel: ChannelType | None = None
+    ) -> BaseChannelAdapter | None:
         """按路径或渠道类型查找适配器。"""
         if webhook_path and webhook_path in self._adapters:
             return self._adapters[webhook_path]
@@ -61,7 +62,7 @@ class ChannelRouter:
             return self._by_channel[channel]
         return self._default
 
-    def get(self, channel: ChannelType) -> Optional[BaseChannelAdapter]:
+    def get(self, channel: ChannelType) -> BaseChannelAdapter | None:
         """按渠道类型获取适配器。"""
         return self._by_channel.get(channel)
 
@@ -91,30 +92,38 @@ class ChannelRouter:
     def update_context(self, session_id: str, reply_text: str) -> None:
         """将 Agent 回复记录到会话上下文。"""
         if session_id in self._contexts:
-            self._contexts[session_id].history.append({
-                "role": "assistant",
-                "content": reply_text,
-                "timestamp": time.time(),
-            })
+            self._contexts[session_id].history.append(
+                {
+                    "role": "assistant",
+                    "content": reply_text,
+                    "timestamp": time.time(),
+                }
+            )
 
     # ── 统一发送 ──
 
-    async def send(self, channel: ChannelType, user_id: str, content: str,
-                   msg_type: str = "text") -> ReplyResult:
+    async def send(
+        self, channel: ChannelType, user_id: str, content: str, msg_type: str = "text"
+    ) -> ReplyResult:
         """统一发送接口 — 自动路由到目标渠道适配器。"""
         adapter = self._by_channel.get(channel)
         if not adapter:
             return ReplyResult(success=False, error=f"No adapter for {channel.value}")
         return await adapter.send_message(user_id, content, msg_type)
 
-    async def broadcast(self, content: str, msg_type: str = "text",
-                        exclude: Optional[ChannelType] = None) -> list[ReplyResult]:
+    async def broadcast(
+        self, content: str, msg_type: str = "text", exclude: ChannelType | None = None
+    ) -> list[ReplyResult]:
         """向所有已注册渠道广播消息。"""
         results = []
         for channel, adapter in self._by_channel.items():
             if channel == exclude:
                 continue
-            results.append(ReplyResult(success=False, error=f"broadcast to {channel.value} requires explicit user_id"))
+            results.append(
+                ReplyResult(
+                    success=False, error=f"broadcast to {channel.value} requires explicit user_id"
+                )
+            )
         return results
 
     # ── 状态 ──

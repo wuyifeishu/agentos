@@ -4,15 +4,16 @@ Supports Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku.
 Uses Anthropic Messages API.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional
-
 import os
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
 class ClaudeConfig:
     """Configuration for Anthropic Claude backend."""
+
     api_key: str = field(default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", ""))
     base_url: str = "https://api.anthropic.com/v1"
     model: str = "claude-sonnet-4-20250514"
@@ -35,11 +36,11 @@ class ClaudeClient:
     - System prompts
     """
 
-    def __init__(self, config: Optional[ClaudeConfig] = None):
+    def __init__(self, config: ClaudeConfig | None = None):
         self.config = config or ClaudeConfig()
 
     @property
-    def _headers(self) -> Dict[str, str]:
+    def _headers(self) -> dict[str, str]:
         return {
             "x-api-key": self.config.api_key,
             "anthropic-version": self.config.anthropic_version,
@@ -52,11 +53,11 @@ class ClaudeClient:
 
     def _build_payload(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
-        payload: Dict[str, Any] = {
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "model": self.config.model,
             "max_tokens": kwargs.get("max_tokens", self.config.max_tokens),
             "messages": messages,
@@ -80,7 +81,7 @@ class ClaudeClient:
 
         return payload
 
-    async def _async_request(self, payload: Dict) -> Dict:
+    async def _async_request(self, payload: dict) -> dict:
         import httpx
 
         timeout = httpx.Timeout(self.config.timeout)
@@ -100,16 +101,17 @@ class ClaudeClient:
                     raise
                 if e.response.status_code >= 500 or e.response.status_code == 429:
                     import asyncio
-                    await asyncio.sleep(2 ** attempt)
+
+                    await asyncio.sleep(2**attempt)
                     continue
                 raise
 
     async def chat(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Send a chat completion request.
 
         Messages format: [{"role": "user", "content": "..."}, ...]
@@ -126,11 +128,13 @@ class ClaudeClient:
             if block.get("type") == "text":
                 text_content += block.get("text", "")
             elif block.get("type") == "tool_use":
-                tool_calls.append({
-                    "id": block.get("id", ""),
-                    "name": block.get("name", ""),
-                    "arguments": block.get("input", {}),
-                })
+                tool_calls.append(
+                    {
+                        "id": block.get("id", ""),
+                        "name": block.get("name", ""),
+                        "arguments": block.get("input", {}),
+                    }
+                )
 
         usage = result.get("usage", {})
         return {
@@ -147,10 +151,10 @@ class ClaudeClient:
 
     async def chat_stream(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> AsyncIterator[Dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, Any]]:
         """Stream chat completion events."""
         payload = self._build_payload(messages, system, **kwargs)
         payload["stream"] = True
@@ -171,6 +175,7 @@ class ClaudeClient:
                     if line.startswith("data: "):
                         data = line[6:].strip()
                         import json
+
                         try:
                             event = json.loads(data)
                             event_type = event.get("type", "")
@@ -191,10 +196,10 @@ class ClaudeClient:
 
     def sync_chat(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Synchronous chat completion."""
         import asyncio
 

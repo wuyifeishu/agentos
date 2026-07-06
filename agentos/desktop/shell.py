@@ -22,13 +22,10 @@ Desktop Shell — AgentOS 原生桌面壳。
 from __future__ import annotations
 
 import argparse
-import sys
-import os
 import json
-import threading
+import os
 import time
 import webbrowser
-
 
 # ── 配置 ───────────────────────────────────────────────────────
 
@@ -53,7 +50,7 @@ def load_config() -> dict:
     }
     if os.path.isfile(CONFIG_FILE):
         try:
-            with open(CONFIG_FILE, "r") as f:
+            with open(CONFIG_FILE) as f:
                 defaults.update(json.load(f))
         except Exception:
             pass
@@ -69,9 +66,15 @@ def save_config(cfg: dict) -> None:
 # ── 原生桌面壳 ─────────────────────────────────────────────────
 
 
-def create_native_shell(url: str, width: int = 1200, height: int = 800,
-                        title: str = APP_NAME, fullscreen: bool = False,
-                        on_top: bool = False, minimize_to_tray: bool = True) -> None:
+def create_native_shell(
+    url: str,
+    width: int = 1200,
+    height: int = 800,
+    title: str = APP_NAME,
+    fullscreen: bool = False,
+    on_top: bool = False,
+    minimize_to_tray: bool = True,
+) -> None:
     """使用 pywebview 创建原生桌面窗口。"""
     try:
         import webview
@@ -86,7 +89,7 @@ def create_native_shell(url: str, width: int = 1200, height: int = 800,
             pass
         return
 
-    window = webview.create_window(
+    webview.create_window(
         title=title,
         url=url,
         width=width,

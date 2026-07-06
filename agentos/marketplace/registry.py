@@ -1,4 +1,4 @@
-"""
+"""  # noqa: E501
 AgentOS Skill Marketplace — Registry。
 
 核心能力:
@@ -23,13 +23,11 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
-from agentos.marketplace.manifest import SkillManifest, SkillFormat, ToolDef
+from agentos.marketplace.manifest import SkillFormat, SkillManifest
 
 MARKET_DIR = Path.home() / ".agentos" / "marketplace"
 INSTALLED_JSON = MARKET_DIR / "installed.json"
@@ -44,10 +42,11 @@ class System:
 @dataclass
 class SearchResult:
     """搜索结果。"""
+
     name: str
     version: str
     description: str
-    source: str               # pypi | github | local
+    source: str  # pypi | github | local
     installable: bool = True
     pypi_package: str = ""
     skill_count: int = 0
@@ -56,11 +55,12 @@ class SearchResult:
 @dataclass
 class InstallResult:
     """安装结果。"""
+
     success: bool
-    manifest: Optional[SkillManifest] = None
+    manifest: SkillManifest | None = None
     error: str = ""
     pypi_package: str = ""
-    install_type: str = ""    # pypi_install | local_copy | git_clone
+    install_type: str = ""  # pypi_install | local_copy | git_clone
     dep_installed: list[str] = field(default_factory=list)
 
 
@@ -90,9 +90,14 @@ class SkillRegistry:
         # 1. 搜索 PyPI（agentos-skill-*）
         try:
             r = subprocess.run(
-                [sys.executable, "-m", "pip", "search", f"{PYPI_SKILL_PREFIX}{query}"] if query else
-                [sys.executable, "-m", "pip", "search", PYPI_SKILL_PREFIX],
-                capture_output=True, text=True, timeout=15,
+                (
+                    [sys.executable, "-m", "pip", "search", f"{PYPI_SKILL_PREFIX}{query}"]
+                    if query
+                    else [sys.executable, "-m", "pip", "search", PYPI_SKILL_PREFIX]
+                ),
+                capture_output=True,
+                text=True,
+                timeout=15,
                 env={**os.environ, "PIP_DISABLE_PIP_VERSION_CHECK": "1"},
             )
             for line in r.stdout.split("\n"):
@@ -105,13 +110,15 @@ class SkillRegistry:
                     skill_name = pkg_name.replace(PYPI_SKILL_PREFIX, "").replace("-", "_")
                     # 去重
                     if not any(r.name == skill_name for r in results):
-                        results.append(SearchResult(
-                            name=skill_name,
-                            version=version,
-                            description=desc,
-                            source="pypi",
-                            pypi_package=pkg_name,
-                        ))
+                        results.append(
+                            SearchResult(
+                                name=skill_name,
+                                version=version,
+                                description=desc,
+                                source="pypi",
+                                pypi_package=pkg_name,
+                            )
+                        )
         except Exception:
             pass
 
@@ -119,19 +126,22 @@ class SkillRegistry:
         if not results and query:
             try:
                 import urllib.request
+
                 url = f"https://pypi.org/pypi/{PYPI_SKILL_PREFIX}{query}/json"
                 req = urllib.request.Request(url, headers={"User-Agent": "AgentOS-Marketplace/1.0"})
                 with urllib.request.urlopen(req, timeout=8) as resp:
                     data = json.loads(resp.read())
                     info = data.get("info", {})
                     skill_name = query.replace("-", "_")
-                    results.append(SearchResult(
-                        name=skill_name,
-                        version=info.get("version", "?"),
-                        description=info.get("summary", ""),
-                        source="pypi",
-                        pypi_package=f"{PYPI_SKILL_PREFIX}{query}",
-                    ))
+                    results.append(
+                        SearchResult(
+                            name=skill_name,
+                            version=info.get("version", "?"),
+                            description=info.get("summary", ""),
+                            source="pypi",
+                            pypi_package=f"{PYPI_SKILL_PREFIX}{query}",
+                        )
+                    )
             except Exception:
                 pass
 
@@ -148,7 +158,7 @@ class SkillRegistry:
                 manifests.append(m)
         return sorted(manifests, key=lambda m: m.name)
 
-    def get_installed(self, name: str) -> Optional[SkillManifest]:
+    def get_installed(self, name: str) -> SkillManifest | None:
         """获取已安装 skill 的 manifest。"""
         for m in self.list_installed():
             if m.name == name:
@@ -179,7 +189,9 @@ class SkillRegistry:
                 manifest_file = local_path / "manifest.json"
             if manifest_file.exists():
                 return self._install_local(local_path, manifest_file)
-            return InstallResult(success=False, error=f"No manifest (skill.yaml/json) found in {local_path}")
+            return InstallResult(
+                success=False, error=f"No manifest (skill.yaml/json) found in {local_path}"
+            )
 
         # ─ 源 2: GitHub URL ─
         if "github.com" in name_or_path:
@@ -220,9 +232,29 @@ class SkillRegistry:
         elif old_source == "github":
             return self._install_github(existing.repository or f"https://github.com/{name}")
         elif old_source == "local":
-            return self._install_local(Path(existing.install_path), Path(existing.install_path) / "skill.yaml")
+            return self._install_local(
+                Path(existing.install_path), Path(existing.install_path) / "skill.yaml"
+            )
 
         return InstallResult(success=False, error=f"Unknown source: {old_source}")
+
+    def register(self, manifest: SkillManifest, force: bool = False) -> InstallResult | None:
+        """公开注册接口: 直接将 SkillManifest 写入 registry (不复制文件)。
+
+        用于 importer.import_skill() / import_all() 等场景。
+        与 install() 的区别: install 会复制/下载源文件，register 只写索引。
+        """
+        existing = self.get_installed(manifest.name)
+        if existing and not force:
+            return InstallResult(
+                success=False,
+                error=f"Skill '{manifest.name}' already installed. Use force=True to overwrite.",
+            )
+        if existing and force:
+            self.uninstall(manifest.name)
+
+        self._register_manifest(manifest)
+        return InstallResult(success=True, manifest=manifest)
 
     def stats(self) -> dict:
         """市场统计。"""
@@ -237,13 +269,13 @@ class SkillRegistry:
             "market_dir": str(MARKET_DIR),
         }
 
-    def _check_duplicate(self, name: str) -> Optional[InstallResult]:
+    def _check_duplicate(self, name: str) -> InstallResult | None:
         """如果 skill 已安装，返回失败结果；否则返回 None。"""
         existing = self.get_installed(name)
         if existing:
             return InstallResult(
                 success=False,
-                error=f"Skill '{name}' already installed (v{existing.version}). Use 'marketplace update {name}' to upgrade.",
+                error=f"Skill '{name}' already installed (v{existing.version}). Use 'marketplace update {name}' to upgrade.",  # noqa: E501
             )
         return None
 
@@ -252,8 +284,18 @@ class SkillRegistry:
         pkg = f"{PYPI_SKILL_PREFIX}{name}"
         try:
             r = subprocess.run(
-                [sys.executable, "-m", "pip", "install", pkg, "--quiet", "--disable-pip-version-check"],
-                capture_output=True, text=True, timeout=120,
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "install",
+                    pkg,
+                    "--quiet",
+                    "--disable-pip-version-check",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
             )
             if r.returncode != 0:
                 return InstallResult(success=False, error=f"pip install failed: {r.stderr[:200]}")
@@ -290,6 +332,7 @@ class SkillRegistry:
         raw = manifest_file.read_text(encoding="utf-8")
         if manifest_file.suffix in (".yaml", ".yml"):
             import yaml
+
             data = yaml.safe_load(raw) or {}
         else:
             data = json.loads(raw)
@@ -332,7 +375,9 @@ class SkillRegistry:
         try:
             r = subprocess.run(
                 ["git", "clone", "--depth=1", url, str(dest)],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True,
+                text=True,
+                timeout=60,
             )
             if r.returncode != 0:
                 return InstallResult(success=False, error=f"git clone failed: {r.stderr[:200]}")
@@ -353,6 +398,7 @@ class SkillRegistry:
             raw = manifest_file.read_text(encoding="utf-8")
             if manifest_file.suffix in (".yaml", ".yml"):
                 import yaml
+
                 data = yaml.safe_load(raw)
             else:
                 data = json.loads(raw)
@@ -389,20 +435,31 @@ class SkillRegistry:
         for dep in manifest.dependencies:
             try:
                 subprocess.run(
-                    [sys.executable, "-m", "pip", "install", dep, "--quiet", "--disable-pip-version-check"],
-                    capture_output=True, timeout=60,
+                    [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "install",
+                        dep,
+                        "--quiet",
+                        "--disable-pip-version-check",
+                    ],
+                    capture_output=True,
+                    timeout=60,
                 )
                 installed.append(dep)
             except Exception:
                 pass
         return installed
 
-    def _find_package_manifest(self, pkg_name: str) -> Optional[SkillManifest]:
+    def _find_package_manifest(self, pkg_name: str) -> SkillManifest | None:
         """从已安装的 PyPI 包中查找 manifest。"""
         try:
             r = subprocess.run(
                 [sys.executable, "-m", "pip", "show", "-f", pkg_name],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if r.returncode != 0:
                 return None
@@ -430,6 +487,7 @@ class SkillRegistry:
                     raw = p.read_text(encoding="utf-8")
                     if p.suffix in (".yaml", ".yml"):
                         import yaml
+
                         data = yaml.safe_load(raw)
                     else:
                         data = json.loads(raw)
@@ -444,8 +502,11 @@ class SkillRegistry:
         dest.mkdir(parents=True, exist_ok=True)
         manifest_path = dest / "manifest.yaml"
         import yaml
+
         manifest_path.write_text(
-            yaml.dump(manifest.to_dict(), allow_unicode=True, default_flow_style=False, sort_keys=False),
+            yaml.dump(
+                manifest.to_dict(), allow_unicode=True, default_flow_style=False, sort_keys=False
+            ),
             encoding="utf-8",
         )
 

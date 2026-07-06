@@ -18,28 +18,30 @@ import asyncio
 import json
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import (
-    Any, Callable, Dict, List, Optional, Set, Tuple, Union,
+    Any,
 )
-
 
 # ── Memory Data Models ──────────────────────
 
 
-class MemoryType(str, Enum):
+class MemoryType(StrEnum):
     """记忆类型。"""
-    FACT = "fact"               # 事实性信息
-    PREFERENCE = "preference"   # 用户偏好
-    PATTERN = "pattern"         # 行为模式
-    DECISION = "decision"       # 决策记录
-    LESSON = "lesson"           # 经验教训
-    CONTEXT = "context"         # 上下文摘要
+
+    FACT = "fact"  # 事实性信息
+    PREFERENCE = "preference"  # 用户偏好
+    PATTERN = "pattern"  # 行为模式
+    DECISION = "decision"  # 决策记录
+    LESSON = "lesson"  # 经验教训
+    CONTEXT = "context"  # 上下文摘要
 
 
-class MemoryImportance(str, Enum):
+class MemoryImportance(StrEnum):
     """记忆重要性。"""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -54,14 +56,14 @@ class MemoryFragment:
     memory_type: MemoryType = MemoryType.FACT
     content: str = ""
     importance: MemoryImportance = MemoryImportance.MEDIUM
-    source_messages: List[int] = field(default_factory=list)  # 源自哪些消息
-    tags: List[str] = field(default_factory=list)
-    confidence: float = 1.0         # 0.0~1.0 置信度
+    source_messages: list[int] = field(default_factory=list)  # 源自哪些消息
+    tags: list[str] = field(default_factory=list)
+    confidence: float = 1.0  # 0.0~1.0 置信度
     created_at: float = field(default_factory=time.time)
     last_accessed: float = field(default_factory=time.time)
     access_count: int = 0
-    embedding: Optional[List[float]] = None   # 向量嵌入（惰性计算）
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    embedding: list[float] | None = None  # 向量嵌入（惰性计算）
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -79,7 +81,7 @@ class MemoryFragment:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "MemoryFragment":
+    def from_dict(cls, d: dict) -> MemoryFragment:
         return cls(
             memory_id=d.get("memory_id", ""),
             memory_type=MemoryType(d.get("memory_type", "fact")),
@@ -104,11 +106,11 @@ class MemoryFragment:
 class ReflectionResult:
     """一次 Reflection 的输出。"""
 
-    fragments: List[MemoryFragment] = field(default_factory=list)
-    summary: str = ""                       # 会话级摘要
-    contradictions: List[Tuple[str, str]] = field(default_factory=list)  # 新旧矛盾
-    deprecated_ids: List[str] = field(default_factory=list)  # 需淘汰的旧记忆
-    user_profile_update: Dict[str, Any] = field(default_factory=dict)
+    fragments: list[MemoryFragment] = field(default_factory=list)
+    summary: str = ""  # 会话级摘要
+    contradictions: list[tuple[str, str]] = field(default_factory=list)  # 新旧矛盾
+    deprecated_ids: list[str] = field(default_factory=list)  # 需淘汰的旧记忆
+    user_profile_update: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
 
     @property
@@ -131,23 +133,23 @@ class VectorStoreBackend:
 
     async def add(
         self,
-        fragments: List[MemoryFragment],
-        embeddings: List[List[float]],
-    ) -> List[str]:
+        fragments: list[MemoryFragment],
+        embeddings: list[list[float]],
+    ) -> list[str]:
         """批量添加记忆片段（含嵌入向量）。返回 memory_ids。"""
         raise NotImplementedError
 
     async def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
-        filter_types: Optional[List[MemoryType]] = None,
+        filter_types: list[MemoryType] | None = None,
         min_importance: MemoryImportance = MemoryImportance.LOW,
-    ) -> List[Tuple[MemoryFragment, float]]:
+    ) -> list[tuple[MemoryFragment, float]]:
         """向量相似度搜索。返回 (fragment, score)。"""
         raise NotImplementedError
 
-    async def delete(self, memory_ids: List[str]) -> int:
+    async def delete(self, memory_ids: list[str]) -> int:
         """删除指定记忆。返回删除数量。"""
         raise NotImplementedError
 
@@ -160,14 +162,14 @@ class InMemoryVectorStore(VectorStoreBackend):
     """内存向量存储（开发/测试用）。"""
 
     def __init__(self):
-        self._fragments: Dict[str, MemoryFragment] = {}
-        self._embeddings: Dict[str, List[float]] = {}
+        self._fragments: dict[str, MemoryFragment] = {}
+        self._embeddings: dict[str, list[float]] = {}
 
     async def add(
         self,
-        fragments: List[MemoryFragment],
-        embeddings: List[List[float]],
-    ) -> List[str]:
+        fragments: list[MemoryFragment],
+        embeddings: list[list[float]],
+    ) -> list[str]:
         ids = []
         for frag, emb in zip(fragments, embeddings):
             self._fragments[frag.memory_id] = frag
@@ -177,11 +179,11 @@ class InMemoryVectorStore(VectorStoreBackend):
 
     async def search(
         self,
-        query_embedding: List[float],
+        query_embedding: list[float],
         top_k: int = 10,
-        filter_types: Optional[List[MemoryType]] = None,
+        filter_types: list[MemoryType] | None = None,
         min_importance: MemoryImportance = MemoryImportance.LOW,
-    ) -> List[Tuple[MemoryFragment, float]]:
+    ) -> list[tuple[MemoryFragment, float]]:
         results = []
         importance_rank = {
             MemoryImportance.LOW: 0,
@@ -206,7 +208,7 @@ class InMemoryVectorStore(VectorStoreBackend):
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:top_k]
 
-    async def delete(self, memory_ids: List[str]) -> int:
+    async def delete(self, memory_ids: list[str]) -> int:
         count = 0
         for mid in memory_ids:
             if mid in self._fragments:
@@ -219,7 +221,7 @@ class InMemoryVectorStore(VectorStoreBackend):
         return len(self._fragments)
 
     @staticmethod
-    def _cosine_similarity(a: List[float], b: List[float]) -> float:
+    def _cosine_similarity(a: list[float], b: list[float]) -> float:
         dot = sum(x * y for x, y in zip(a, b))
         norm_a = sum(x * x for x in a) ** 0.5
         norm_b = sum(x * x for x in b) ** 0.5
@@ -234,11 +236,11 @@ class InMemoryVectorStore(VectorStoreBackend):
 class EmbeddingProvider:
     """嵌入向量生成器抽象。"""
 
-    async def embed(self, texts: List[str]) -> List[List[float]]:
+    async def embed(self, texts: list[str]) -> list[list[float]]:
         """批量生成嵌入向量。"""
         raise NotImplementedError
 
-    async def embed_single(self, text: str) -> List[float]:
+    async def embed_single(self, text: str) -> list[float]:
         """单条文本嵌入。"""
         results = await self.embed([text])
         return results[0]
@@ -254,13 +256,13 @@ class SimpleHashEmbedding(EmbeddingProvider):
     def __init__(self, dim: int = 128):
         self.dim = dim
 
-    async def embed(self, texts: List[str]) -> List[List[float]]:
+    async def embed(self, texts: list[str]) -> list[list[float]]:
         results = []
         for text in texts:
             vec = [0.0] * self.dim
             # Character 3-gram hashing
             for i in range(len(text) - 2):
-                gram = text[i:i+3]
+                gram = text[i : i + 3]
                 h = hash(gram) % self.dim
                 vec[h] += 1.0
             # L2 normalize
@@ -309,10 +311,10 @@ class ReflectionEngine:
 
     def __init__(
         self,
-        llm_reflect_fn: Callable[[List[dict], str], Any],
-        vector_store: VectorStoreBackend,
-        embedding_provider: EmbeddingProvider,
-        config: Optional[ReflectionConfig] = None,
+        llm_reflect_fn: Callable[[list[dict], str], Any] | None = None,
+        vector_store: Any | None = None,
+        embedding_provider: Any | None = None,
+        config: ReflectionConfig | None = None,
     ):
         """
         Args:
@@ -335,20 +337,14 @@ class ReflectionEngine:
             return False
         if self._reflection_count == 0 and current_message_count >= 5:
             return True  # 首次在 5 条消息后触发
-        msg_check = (
-            self._message_count_since_reflection
-            >= self.config.min_messages_since_last
-        )
-        time_check = (
-            time.time() - self._last_reflection_time
-            >= self.config.min_seconds_since_last
-        )
+        msg_check = self._message_count_since_reflection >= self.config.min_messages_since_last
+        time_check = time.time() - self._last_reflection_time >= self.config.min_seconds_since_last
         return msg_check or time_check
 
     async def reflect(
         self,
-        messages: List[dict],
-        existing_fragments: Optional[List[MemoryFragment]] = None,
+        messages: list[dict],
+        existing_fragments: list[MemoryFragment] | None = None,
     ) -> ReflectionResult:
         """执行一次 Reflection。
 
@@ -399,8 +395,8 @@ class ReflectionEngine:
         self,
         query: str,
         top_k: int = 5,
-        filter_types: Optional[List[MemoryType]] = None,
-    ) -> List[MemoryFragment]:
+        filter_types: list[MemoryType] | None = None,
+    ) -> list[MemoryFragment]:
         """检索与查询相关的记忆。
 
         Args:
@@ -425,19 +421,16 @@ class ReflectionEngine:
 
     def _build_reflection_prompt(
         self,
-        messages: List[dict],
-        existing_fragments: Optional[List[MemoryFragment]] = None,
+        messages: list[dict],
+        existing_fragments: list[MemoryFragment] | None = None,
     ) -> str:
         """构建 Reflection prompt。"""
         existing_str = ""
         if existing_fragments:
             existing_items = [
-                f"- [{f.memory_type.value}] {f.content}"
-                for f in existing_fragments[:20]
+                f"- [{f.memory_type.value}] {f.content}" for f in existing_fragments[:20]
             ]
-            existing_str = (
-                "\n\nExisting memories:\n" + "\n".join(existing_items)
-            )
+            existing_str = "\n\nExisting memories:\n" + "\n".join(existing_items)
 
         return f"""You are a memory consolidation system. Analyze the conversation and extract:
 
@@ -471,15 +464,13 @@ If nothing significant to extract, output empty array: []"""
             start = text.find("[")
             end = text.rfind("]")
             if start >= 0 and end > start:
-                json_str = text[start:end + 1]
+                json_str = text[start : end + 1]
                 items = json.loads(json_str)
                 for item in items:
                     frag = MemoryFragment(
                         memory_type=MemoryType(item.get("type", "fact")),
                         content=item.get("content", ""),
-                        importance=MemoryImportance(
-                            item.get("importance", "medium")
-                        ),
+                        importance=MemoryImportance(item.get("importance", "medium")),
                         confidence=float(item.get("confidence", 1.0)),
                         tags=item.get("tags", []),
                         source_messages=list(
@@ -497,12 +488,49 @@ If nothing significant to extract, output empty array: []"""
         return result
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "reflection_count": self._reflection_count,
             "last_reflection_time": self._last_reflection_time,
             "messages_since_last": self._message_count_since_reflection,
         }
+
+    # ── Persistence (v1.14.9) ────────────────
+
+    def get_state(self) -> dict[str, Any]:
+        """Export ReflectionEngine state for persistence."""
+        return {
+            "reflection_count": self._reflection_count,
+            "last_reflection_time": self._last_reflection_time,
+            "message_count_since_reflection": self._message_count_since_reflection,
+            "vector_store_fragments": (
+                {mid: frag.to_dict() for mid, frag in self._vector_store._fragments.items()}
+                if hasattr(self._vector_store, "_fragments") and self._vector_store
+                else {}
+            ),
+            "vector_store_embeddings": {
+                mid: list(emb) if emb else []
+                for mid, emb in (
+                    self._vector_store._embeddings.items()
+                    if hasattr(self._vector_store, "_embeddings") and self._vector_store
+                    else {}.items()
+                )
+            },
+        }
+
+    def restore_state(self, state: dict[str, Any]) -> None:
+        """Restore ReflectionEngine from a persisted snapshot."""
+        self._reflection_count = state.get("reflection_count", 0)
+        self._last_reflection_time = state.get("last_reflection_time", 0.0)
+        self._message_count_since_reflection = state.get("message_count_since_reflection", 0)
+
+        if self._vector_store and hasattr(self._vector_store, "_fragments"):
+            self._vector_store._fragments.clear()
+            self._vector_store._embeddings.clear()
+            for mid, frag_data in state.get("vector_store_fragments", {}).items():
+                self._vector_store._fragments[mid] = MemoryFragment.from_dict(frag_data)
+            for mid, emb in state.get("vector_store_embeddings", {}).items():
+                self._vector_store._embeddings[mid] = emb
 
 
 # ── Memory Context Injector ─────────────────
@@ -533,7 +561,7 @@ class MemoryContextInjector:
     async def build_context(
         self,
         query: str,
-        include_types: Optional[List[MemoryType]] = None,
+        include_types: list[MemoryType] | None = None,
     ) -> str:
         """构建上下文注入文本。"""
         fragments = await self._engine.retrieve_relevant(
@@ -554,7 +582,7 @@ class MemoryContextInjector:
 
         context = "\n".join(lines)
         if len(context) > self.max_context_length:
-            context = context[:self.max_context_length] + "..."
+            context = context[: self.max_context_length] + "..."
 
         return context
 
@@ -569,7 +597,8 @@ class MemoryContextInjector:
         )
         # Filter: only HIGH/CRITICAL
         important = [
-            f for f in fragments
+            f
+            for f in fragments
             if f.importance in (MemoryImportance.HIGH, MemoryImportance.CRITICAL)
         ]
         if not important:
@@ -603,9 +632,9 @@ class MemoryConsolidationPipeline:
     def __init__(
         self,
         llm_reflect_fn: Callable,
-        vector_store: Optional[VectorStoreBackend] = None,
-        embedding_provider: Optional[EmbeddingProvider] = None,
-        config: Optional[ReflectionConfig] = None,
+        vector_store: VectorStoreBackend | None = None,
+        embedding_provider: EmbeddingProvider | None = None,
+        config: ReflectionConfig | None = None,
     ):
         self._vector_store = vector_store or InMemoryVectorStore()
         self._embedding_provider = embedding_provider or SimpleHashEmbedding(128)
@@ -625,7 +654,7 @@ class MemoryConsolidationPipeline:
             self._reflection_engine._message_count_since_reflection
         )
 
-    async def reflect(self, messages: List[dict]) -> ReflectionResult:
+    async def reflect(self, messages: list[dict]) -> ReflectionResult:
         return await self._reflection_engine.reflect(messages)
 
     async def get_context(self, query: str) -> str:
@@ -635,10 +664,22 @@ class MemoryConsolidationPipeline:
         return await self._injector.build_condensed_context(query)
 
     @property
-    def stats(self) -> Dict[str, Any]:
+    def stats(self) -> dict[str, Any]:
         return {
             "reflection": self._reflection_engine.stats,
-            "total_memories": asyncio.get_event_loop().run_until_complete(
-                self._vector_store.count()
-            ) if asyncio.get_event_loop().is_running() else 0,
+            "total_memories": (
+                asyncio.get_event_loop().run_until_complete(self._vector_store.count())
+                if asyncio.get_event_loop().is_running()
+                else 0
+            ),
         }
+
+    # ── Persistence (v1.14.9) ────────────────
+
+    def get_state(self) -> dict[str, Any]:
+        """Export consolidation pipeline state for persistence. Delegates to ReflectionEngine."""
+        return self._reflection_engine.get_state()
+
+    def restore_state(self, state: dict[str, Any]) -> None:
+        """Restore consolidation pipeline from a persisted snapshot."""
+        self._reflection_engine.restore_state(state)

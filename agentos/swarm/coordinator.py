@@ -1,4 +1,4 @@
-"""
+"""  # noqa: E501
 v1.9.8: Smart Swarm Coordinator with tool registry + intelligent routing.
 
 Full intelligence stack:
@@ -18,63 +18,80 @@ Full intelligence stack:
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 import uuid
+from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Optional
+from enum import StrEnum
+from typing import Any
 
-from agentos.core.di import Agent, RunContext
-from agentos.swarm.task_decomposer import TaskDecomposer, Decomposition, SubTask
-from agentos.swarm.result_fusion import ResultFusion, FusedResult
-from agentos.swarm.eval_feedback_loop import EvalFeedbackLoop, LoopResult, RetryConfig
-from agentos.swarm.code_sandbox import CodeSandbox, SandboxResult, TestCase, CodeFeedbackExtractor
-from agentos.swarm.human_loop import (
-    HITLManager, HITLConfig, Breakpoint, BreakpointType, HumanDecision,
-)
-from agentos.swarm.agent_monitor import (
-    AgentMonitor, QualityGate, MonitorReport, GateResult, GateStatus, GateAction,
-    output_not_empty, output_length_range, no_error_output, contains_keywords,
-    latency_max, confidence_min,
-)
-from agentos.swarm.execution_trace import (
-    ExecutionTrace, TraceSpan, TraceEvent, TraceCollector,
+from agentos.core.di import Agent
+from agentos.security.guard import (
+    GuardPipeline,
+    create_strict_guard,
 )
 from agentos.swarm.agent_memory import (
-    AgentMemory, WorkingMemory, ShortTermMemory, LongTermMemory,
-    ContextWindowManager, ContextBudget, MemoryEntry,
+    AgentMemory,
 )
+from agentos.swarm.agent_monitor import (
+    AgentMonitor,
+    MonitorReport,
+    QualityGate,
+    no_error_output,
+    output_not_empty,
+)
+from agentos.swarm.code_sandbox import CodeFeedbackExtractor, CodeSandbox, SandboxResult, TestCase
+from agentos.swarm.eval_feedback_loop import EvalFeedbackLoop, LoopResult, RetryConfig
+from agentos.swarm.execution_trace import (
+    ExecutionTrace,
+    TraceCollector,
+    TraceEvent,
+)
+from agentos.swarm.human_loop import (
+    BreakpointType,
+    HITLManager,
+    HumanDecision,
+)
+from agentos.swarm.result_fusion import FusedResult, ResultFusion
+from agentos.swarm.task_decomposer import Decomposition, TaskDecomposer
 from agentos.swarm.tool_registry import (
-    ToolRegistry, ToolRouter, ToolExecutor, ToolSchema, ToolParam,
-    ToolCategory, RoutingDecision, RoutingContext, ToolExecutionError,
+    RoutingContext,
+    RoutingDecision,
+    ToolCategory,
+    ToolExecutor,
+    ToolParam,
+    ToolRegistry,
+    ToolRouter,
+    ToolSchema,
     create_tool,
 )
-from agentos.security.guard import (
-    GuardPipeline, InputGuard, OutputGuard,
-    PIIDetector, ContentSafetyFilter,
-    create_strict_guard, create_permissive_guard,
-    GuardChainResult,
-)
 
 
-class SwarmTopology(str, Enum):
+class SwarmTopology(StrEnum):
     """Swarm topology types."""
-    STAR = "star"     # Central coordinator
-    RING = "ring"     # Circular message passing
-    MESH = "mesh"     # All-to-all communication
-    TREE = "tree"     # Hierarchical structure
+
+    STAR = "star"  # Central coordinator
+    RING = "ring"  # Circular message passing
+    MESH = "mesh"  # All-to-all communication
+    TREE = "tree"  # Hierarchical structure
+    DAG = "dag"  # Workflow-based dependencies
+    HYBRID = "hybrid"  # Dynamic topology switching
 
 
-class ExecutionMode(str, Enum):
+class ExecutionMode(StrEnum):
     """Execution strategy for the coordinator."""
-    RAW = "raw"             # Original topology-only execution
-    SMART = "smart"         # Decompose → Execute DAG → Fuse
-    FEEDBACK = "feedback"   # Smart + eval feedback loop
+
+    RAW = "raw"  # Original topology-only execution
+    SMART = "smart"  # Decompose → Execute DAG → Fuse
+    FEEDBACK = "feedback"  # Smart + eval feedback loop
 
 
 @dataclass
 class AgentRole:
     """Agent 角色定义。"""
+
     name: str
     goal: str
     backstory: str = ""
@@ -125,9 +142,10 @@ class SwarmMessage:
         metadata: Additional metadata
         timestamp: Message timestamp
     """
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     sender: str = ""
-    receiver: Optional[str] = None
+    receiver: str | None = None
     content: Any = None
     metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
@@ -161,6 +179,7 @@ class SwarmResult:
         decomposition: Task decomposition used (smart mode only)
         feedback_loop: Feedback loop result (feedback mode only)
     """
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     topology: SwarmTopology = SwarmTopology.STAR
     mode: ExecutionMode = ExecutionMode.RAW
@@ -168,9 +187,9 @@ class SwarmResult:
     messages: list[SwarmMessage] = field(default_factory=list)
     duration: float = 0.0
     success: bool = True
-    fused: Optional[FusedResult] = None
-    decomposition: Optional[Decomposition] = None
-    feedback_loop: Optional[LoopResult] = None
+    fused: FusedResult | None = None
+    decomposition: Decomposition | None = None
+    feedback_loop: LoopResult | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict."""
@@ -202,6 +221,294 @@ class SwarmResult:
                 "duration": f"{self.feedback_loop.duration:.2f}s",
             }
         return d
+
+
+# ── Swarm Agent Role Enum (v1.16.2, migrated from orchestration/swarm_coordinator.py) ─
+
+
+class SwarmAgentRole(StrEnum):
+    """Role of an agent within a swarm (enum-based, distinct from AgentRole dataclass)."""
+
+    COORDINATOR = "coordinator"
+    WORKER = "worker"
+    REVIEWER = "reviewer"
+    OBSERVER = "observer"
+    SPECIALIST = "specialist"
+
+
+class TaskPriority(StrEnum):
+    """Priority level for swarm tasks."""
+
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+class TaskStatus(StrEnum):
+    """Execution status of a swarm task."""
+
+    PENDING = "pending"
+    ASSIGNED = "assigned"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELED = "canceled"
+
+
+@dataclass
+class SwarmAgentInfo:
+    """Metadata about a swarm agent (v1.16.2, migrated from orchestration)."""
+
+    agent_id: str
+    role: SwarmAgentRole
+    capabilities: list[str] = field(default_factory=list)
+    model: str = ""
+    max_concurrency: int = 3
+    current_load: int = 0
+    is_alive: bool = True
+    last_heartbeat: float = 0.0
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_available(self) -> bool:
+        return self.is_alive and self.current_load < self.max_concurrency
+
+
+@dataclass
+class SwarmTask:
+    """A task to be executed by the swarm (v1.16.2, migrated from orchestration)."""
+
+    task_id: str
+    description: str
+    priority: TaskPriority = TaskPriority.MEDIUM
+    status: TaskStatus = TaskStatus.PENDING
+    assigned_to: str = ""
+    required_capabilities: list[str] = field(default_factory=list)
+    parent_task_id: str = ""
+    dependencies: list[str] = field(default_factory=list)
+    result: Any = None
+    error: str = ""
+    started_at: float = 0.0
+    completed_at: float = 0.0
+    retry_count: int = 0
+    max_retries: int = 3
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def is_ready(self) -> bool:
+        return self.status == TaskStatus.PENDING and not self.dependencies
+
+    @property
+    def duration_ms(self) -> float:
+        if self.completed_at and self.started_at:
+            return (self.completed_at - self.started_at) * 1000
+        return 0.0
+
+
+# ── Dynamic Task Allocator ──────────────────────────────────────
+
+
+class TaskAllocator:
+    """Workload-aware dynamic task allocation (v1.16.2, migrated from orchestration).
+
+    Considers: capabilities, load, priority, affinity.
+    """
+
+    def __init__(self):
+        self._assignments: dict[str, str] = {}
+
+    def allocate(
+        self,
+        task: SwarmTask,
+        agents: list[SwarmAgentInfo],
+    ) -> str | None:
+        available = [a for a in agents if a.is_available]
+        if not available:
+            return None
+
+        scored: list[tuple[SwarmAgentInfo, float]] = []
+        for agent in available:
+            score = 0.0
+
+            if task.required_capabilities:
+                match = len(set(task.required_capabilities) & set(agent.capabilities))
+                total = len(task.required_capabilities)
+                score += (match / total) * 50 if total > 0 else 25
+
+            score -= agent.current_load * 10
+
+            if agent.role == SwarmAgentRole.SPECIALIST:
+                if any(cap in agent.capabilities for cap in task.required_capabilities):
+                    score += 20
+
+            if task.parent_task_id and self._assignments.get(task.parent_task_id) == agent.agent_id:
+                score += 15
+
+            scored.append((agent, score))
+
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        if scored and scored[0][1] > 0:
+            best = scored[0][0]
+            self._assignments[task.task_id] = best.agent_id
+            return best.agent_id
+
+        return available[0].agent_id if available else None
+
+
+# ── Conflict Resolver ───────────────────────────────────────────
+
+
+class ConflictType(StrEnum):
+    """Type of conflict between agent outputs."""
+
+    FACTUAL = "factual"
+    METHODOLOGICAL = "methodological"
+    OUTPUT = "output"
+    RESOURCE = "resource"
+
+
+class ConflictResolver:
+    """Detect and resolve conflicts between agents (v1.16.2, migrated from orchestration).
+
+    Strategies: majority vote, weighted vote, ranked choice, escalation.
+    """
+
+    def __init__(self):
+        self._conflict_log: list[dict] = []
+
+    def detect_conflict(
+        self,
+        agent_outputs: dict[str, Any],
+        expected_type: str = "text",
+    ) -> list[dict]:
+        conflicts = []
+        agents = list(agent_outputs.keys())
+        if len(agents) < 2:
+            return conflicts
+
+        outputs = list(agent_outputs.values())
+
+        if all(isinstance(o, str) for o in outputs):
+            for i in range(len(outputs)):
+                for j in range(i + 1, len(outputs)):
+                    similarity = self._text_similarity(outputs[i], outputs[j])
+                    if similarity < 0.3:
+                        conflicts.append(
+                            {
+                                "type": ConflictType.OUTPUT.value,
+                                "agents": [agents[i], agents[j]],
+                                "similarity": similarity,
+                                "outputs": {
+                                    agents[i]: outputs[i][:200],
+                                    agents[j]: outputs[j][:200],
+                                },
+                            }
+                        )
+
+        elif all(isinstance(o, (int, float)) for o in outputs):
+            values = outputs
+            mean_val = sum(values) / len(values)
+            for i, val in enumerate(values):
+                if abs(val - mean_val) / max(abs(mean_val), 1) > 0.5:
+                    conflicts.append(
+                        {
+                            "type": ConflictType.FACTUAL.value,
+                            "agents": [agents[i]],
+                            "value": val,
+                            "mean": mean_val,
+                            "deviation": abs(val - mean_val) / max(abs(mean_val), 1),
+                        }
+                    )
+
+        return conflicts
+
+    def resolve(
+        self,
+        agent_outputs: dict[str, Any],
+        weights: dict[str, float] | None = None,
+        strategy: str = "majority",
+        expected_type: str = "text",
+    ) -> dict[str, Any]:
+        if len(agent_outputs) == 1:
+            agent_id = list(agent_outputs.keys())[0]
+            return {"output": agent_outputs[agent_id], "method": "single_agent", "conflict": False}
+
+        outputs = list(agent_outputs.values())
+
+        if all(isinstance(o, str) for o in outputs):
+            return self._resolve_text(agent_outputs, weights, strategy)
+        elif all(isinstance(o, (int, float)) for o in outputs):
+            return self._resolve_numeric(agent_outputs, weights, strategy)
+        else:
+            return {"output": outputs[0], "method": "first", "conflict": True}
+
+    def _resolve_text(
+        self, outputs: dict[str, str], weights: dict[str, float] | None, strategy: str
+    ) -> dict:
+        if strategy == "majority":
+            votes: dict[str, list[str]] = defaultdict(list)
+            agent_ids = list(outputs.keys())
+            for i, a1 in enumerate(agent_ids):
+                best_match = a1
+                best_sim = 0
+                for j, a2 in enumerate(agent_ids):
+                    if i == j:
+                        continue
+                    sim = self._text_similarity(outputs[a1], outputs[a2])
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_match = a2
+                key = outputs[best_match][:50]
+                votes[key].append(a1)
+
+            winning_key = max(votes, key=lambda k: len(votes[k]))
+            winning_agent = votes[winning_key][0]
+            return {
+                "output": outputs[winning_agent],
+                "method": "majority",
+                "votes": {k: len(v) for k, v in votes.items()},
+                "conflict": len(votes) > 1,
+            }
+
+        elif strategy == "weighted":
+            if not weights:
+                return self._resolve_text(outputs, weights, "majority")
+            best_agent = max(weights, key=weights.get)
+            return {
+                "output": outputs.get(best_agent, list(outputs.values())[0]),
+                "method": "weighted",
+                "conflict": False,
+            }
+
+        else:
+            return {"output": list(outputs.values())[0], "method": "first", "conflict": False}
+
+    def _resolve_numeric(
+        self, outputs: dict[str, float], weights: dict[str, float] | None, strategy: str
+    ) -> dict:
+        values = list(outputs.values())
+        agents = list(outputs.keys())
+
+        if strategy == "weighted" and weights:
+            total_weight = sum(weights.get(a, 1.0) for a in agents)
+            weighted = sum(weights.get(a, 1.0) * outputs[a] for a in agents) / total_weight
+            return {"output": weighted, "method": "weighted_average", "conflict": False}
+        else:
+            avg = sum(values) / len(values)
+            return {"output": avg, "method": "average", "conflict": False}
+
+    def _text_similarity(self, a: str, b: str) -> float:
+        if a == b:
+            return 1.0
+        tokens_a = set(a.lower().split())
+        tokens_b = set(b.lower().split())
+        if not tokens_a or not tokens_b:
+            return 0.0
+        intersection = tokens_a & tokens_b
+        union = tokens_a | tokens_b
+        return len(intersection) / len(union) if union else 0.0
 
 
 class SmartSwarmCoordinator:
@@ -303,7 +610,7 @@ class SmartSwarmCoordinator:
             return True
         return False
 
-    def get_agent(self, agent_name: str) -> Optional[Agent[Any, Any]]:
+    def get_agent(self, agent_name: str) -> Agent[Any, Any] | None:
         return self._agents.get(agent_name)
 
     def list_agents(self) -> list[str]:
@@ -350,7 +657,7 @@ class SmartSwarmCoordinator:
             result = SwarmResult(
                 topology=self.topology,
                 mode=ExecutionMode.SMART,
-                output=f"[BLOCKED] Input rejected by guard: {guard_result.blocked_by}. Reason: {', '.join(guard_result.warnings)}",
+                output=f"[BLOCKED] Input rejected by guard: {guard_result.blocked_by}. Reason: {', '.join(guard_result.warnings)}",  # noqa: E501
                 completed=False,
             )
             return result
@@ -364,7 +671,9 @@ class SmartSwarmCoordinator:
             self.tracer.add(trace)
 
         if trace:
-            root = trace.start_span(TraceEvent.TASK_START, name="smart_execute", data={"task": task_str})
+            root = trace.start_span(
+                TraceEvent.TASK_START, name="smart_execute", data={"task": task_str}
+            )
 
         result = SwarmResult(
             topology=self.topology,
@@ -391,9 +700,9 @@ class SmartSwarmCoordinator:
 
         for _round in range(self.max_rounds):
             ready = [
-                st for st in decomp.sub_tasks
-                if st.status == "pending"
-                and all(dep in completed for dep in st.depends_on)
+                st
+                for st in decomp.sub_tasks
+                if st.status == "pending" and all(dep in completed for dep in st.depends_on)
             ]
             if not ready:
                 break
@@ -402,7 +711,9 @@ class SmartSwarmCoordinator:
                 st.status = "running"
 
                 if trace:
-                    stspan = trace.start_span(TraceEvent.SUBTASK_START, name=st.description[:60], data={"id": st.id})
+                    stspan = trace.start_span(
+                        TraceEvent.SUBTASK_START, name=st.description[:60], data={"id": st.id}
+                    )
 
                 # Build context from dependencies
                 context = task_str
@@ -434,18 +745,22 @@ class SmartSwarmCoordinator:
 
                 if trace and stspan:
                     st_status = "done" if st.status == "done" else "failed"
-                    trace.end_span(stspan.id, status=st_status, data={"output_keys": list(topo_result.outputs.keys())})
+                    trace.end_span(
+                        stspan.id,
+                        status=st_status,
+                        data={"output_keys": list(topo_result.outputs.keys())},
+                    )
 
         # Step 3: Fuse results from final sub-tasks
         if trace:
             fspan = trace.start_span(TraceEvent.FUSE, name="fuse_results")
 
         final_subtasks = [
-            st for st in decomp.sub_tasks
-            if st.status == "done" and st.id not in {
-                s.id for s in decomp.sub_tasks
-                if any(d == st.id for d in s.depends_on)
-            }
+            st
+            for st in decomp.sub_tasks
+            if st.status == "done"
+            and st.id
+            not in {s.id for s in decomp.sub_tasks if any(d == st.id for d in s.depends_on)}
         ]
         if final_subtasks:
             all_final: dict[str, Any] = {}
@@ -469,7 +784,11 @@ class SmartSwarmCoordinator:
                 result.success = fused.confidence >= 0.3
 
         if trace and fspan:
-            trace.end_span(fspan.id, status="done", data={"confidence": result.fused.confidence if result.fused else 0})
+            trace.end_span(
+                fspan.id,
+                status="done",
+                data={"confidence": result.fused.confidence if result.fused else 0},
+            )
 
         result.duration = time.time() - start_time
 
@@ -540,6 +859,7 @@ class SmartSwarmCoordinator:
         scorer = None
         try:
             from agentos.evaluation.scorers import CompositeScorerV2
+
             scorer = CompositeScorerV2()
         except Exception:
             pass
@@ -557,7 +877,9 @@ class SmartSwarmCoordinator:
         )
 
         result.feedback_loop = loop_result
-        result.outputs = {"final": str(loop_result.final_output) if loop_result.final_output else ""}
+        result.outputs = {
+            "final": str(loop_result.final_output) if loop_result.final_output else ""
+        }
         result.success = loop_result.converged
         result.duration = time.time() - start_time
         return result
@@ -723,7 +1045,7 @@ class SmartSwarmCoordinator:
     def send_message(
         self,
         sender: str,
-        receiver: Optional[str],
+        receiver: str | None,
         content: Any,
         **metadata,
     ) -> SwarmMessage:
@@ -738,13 +1060,10 @@ class SmartSwarmCoordinator:
 
     def get_messages(
         self,
-        receiver: Optional[str] = None,
+        receiver: str | None = None,
     ) -> list[SwarmMessage]:
         if receiver:
-            return [
-                m for m in self._message_queue
-                if m.receiver == receiver or m.receiver is None
-            ]
+            return [m for m in self._message_queue if m.receiver == receiver or m.receiver is None]
         return self._message_queue.copy()
 
     def clear_messages(self) -> None:
@@ -864,9 +1183,9 @@ class SmartSwarmCoordinator:
                 break
 
             ready = [
-                st for st in decomp.sub_tasks
-                if st.status == "pending"
-                and all(dep in completed for dep in st.depends_on)
+                st
+                for st in decomp.sub_tasks
+                if st.status == "pending" and all(dep in completed for dep in st.depends_on)
             ]
             if not ready:
                 break
@@ -930,11 +1249,11 @@ class SmartSwarmCoordinator:
 
         # Step 3: Fuse results
         final_subtasks = [
-            st for st in decomp.sub_tasks
-            if st.status == "done" and st.id not in {
-                s.id for s in decomp.sub_tasks
-                if any(d == st.id for d in s.depends_on)
-            }
+            st
+            for st in decomp.sub_tasks
+            if st.status == "done"
+            and st.id
+            not in {s.id for s in decomp.sub_tasks if any(d == st.id for d in s.depends_on)}
         ]
         if final_subtasks:
             all_final: dict[str, Any] = {}
@@ -1011,10 +1330,12 @@ class SmartSwarmCoordinator:
         elif not self.monitor._gates:
             # Default gates if none configured
             monitor = AgentMonitor()
-            monitor.add_gates([
-                output_not_empty(),
-                no_error_output(),
-            ])
+            monitor.add_gates(
+                [
+                    output_not_empty(),
+                    no_error_output(),
+                ]
+            )
 
         # Track latency for latency gates
         start = time.time()
@@ -1057,10 +1378,16 @@ class SmartSwarmCoordinator:
     ) -> ToolSchema:
         """Register a tool in the coordinator's tool registry."""
         tool = create_tool(
-            name=name, description=description, handler=handler,
-            category=category, params=params or [],
-            capabilities=capabilities or [], tags=tags or [],
-            is_destructive=is_destructive, rate_limit=rate_limit, **kwargs,
+            name=name,
+            description=description,
+            handler=handler,
+            category=category,
+            params=params or [],
+            capabilities=capabilities or [],
+            tags=tags or [],
+            is_destructive=is_destructive,
+            rate_limit=rate_limit,
+            **kwargs,
         )
         return self.tool_registry.register(tool)
 
@@ -1073,7 +1400,9 @@ class SmartSwarmCoordinator:
         context = RoutingContext(task=task, **ctx_kwargs)
         return self.tool_router.route(context)
 
-    def execute_tool(self, tool_name: str, params: dict[str, Any] | None = None, force: bool = False) -> Any:
+    def execute_tool(
+        self, tool_name: str, params: dict[str, Any] | None = None, force: bool = False
+    ) -> Any:
         """Execute a registered tool safely."""
         return self.tool_executor.execute(tool_name, params, force=force)
 

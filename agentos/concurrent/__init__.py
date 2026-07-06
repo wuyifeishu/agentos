@@ -7,16 +7,16 @@
 """
 
 from agentos.concurrent.parallel import (
-    ParallelExecutor,
-    FanOutExecutor,
     FanOutConfig,
-    TaskThrottler,
+    FanOutExecutor,
+    GatherResult,
+    ParallelExecutor,
     TaskResult,
     TaskStatus,
-    GatherResult,
+    TaskThrottler,
+    create_parallel_agent_gather,
     parallel_gather,
     parallel_map,
-    create_parallel_agent_gather,
 )
 
 __all__ = [

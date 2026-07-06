@@ -9,24 +9,25 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class GateStatus(str, Enum):
+class GateStatus(StrEnum):
     PASS = "pass"
     FAIL = "fail"
     WARN = "warn"
     SKIP = "skip"
 
 
-class GateAction(str, Enum):
-    ACCEPT = "accept"      # Accept result as-is
-    RETRY = "retry"        # Retry the task
+class GateAction(StrEnum):
+    ACCEPT = "accept"  # Accept result as-is
+    RETRY = "retry"  # Retry the task
     FALLBACK = "fallback"  # Use fallback result
-    ABORT = "abort"        # Abort the task
-    WARN = "warn"          # Accept but flag warning
+    ABORT = "abort"  # Abort the task
+    WARN = "warn"  # Accept but flag warning
 
 
 @dataclass
@@ -235,13 +236,15 @@ class AgentMonitor:
                 else:
                     output = result
             except Exception as e:
-                report.gates.append(GateResult(
-                    name="execution_error",
-                    status=GateStatus.FAIL,
-                    action=GateAction.RETRY,
-                    score=0.0,
-                    detail=str(e),
-                ))
+                report.gates.append(
+                    GateResult(
+                        name="execution_error",
+                        status=GateStatus.FAIL,
+                        action=GateAction.RETRY,
+                        score=0.0,
+                        detail=str(e),
+                    )
+                )
                 retries += 1
                 if retries > self.max_retries:
                     report.overall_status = GateStatus.FAIL
@@ -344,11 +347,13 @@ class AgentMonitor:
 
 # ── Built-in Quality Gates ────────────────────────────────────────
 
+
 def output_not_empty(
     min_length: int = 1,
     threshold: float = 0.9,
 ) -> QualityGate:
     """Gate: output must not be empty."""
+
     def check(output: Any, ctx: dict) -> tuple[bool, str, float]:
         s = str(output).strip() if output else ""
         score = min(1.0, len(s) / max(min_length, 1))
@@ -357,6 +362,7 @@ def output_not_empty(
         if len(s) < min_length:
             return False, f"Output too short ({len(s)} < {min_length})", score
         return True, f"Output length {len(s)} OK", 1.0
+
     return QualityGate("output_not_empty", check, threshold, on_fail=GateAction.RETRY)
 
 
@@ -366,6 +372,7 @@ def output_length_range(
     threshold: float = 0.8,
 ) -> QualityGate:
     """Gate: output length must be in range."""
+
     def check(output: Any, ctx: dict) -> tuple[bool, str, float]:
         s = str(output).strip() if output else ""
         length = len(s)
@@ -374,12 +381,13 @@ def output_length_range(
         if length > max_len:
             return False, f"Output too long: {length} > {max_len}", max_len / length
         return True, f"Output length {length} OK", 1.0
+
     return QualityGate("output_length", check, threshold, on_fail=GateAction.WARN)
 
 
 def no_error_output(threshold: float = 0.95) -> QualityGate:
     """Gate: output must not contain error/exception patterns."""
-    ERROR_PATTERNS = [
+    ERROR_PATTERNS = [  # noqa: N806
         "Traceback (most recent call last)",
         "Error:",
         "Exception:",
@@ -396,6 +404,7 @@ def no_error_output(threshold: float = 0.95) -> QualityGate:
             score = 1.0 - (len(hits) / len(ERROR_PATTERNS))
             return False, f"Error patterns found: {hits[:3]}", max(0, score)
         return True, "No error patterns", 1.0
+
     return QualityGate("no_error", check, threshold, on_fail=GateAction.RETRY)
 
 
@@ -405,6 +414,7 @@ def contains_keywords(
     threshold: float = 0.7,
 ) -> QualityGate:
     """Gate: output must contain at least N keywords."""
+
     def check(output: Any, ctx: dict) -> tuple[bool, str, float]:
         s = str(output).lower()
         hits = [kw for kw in keywords if kw.lower() in s]
@@ -413,26 +423,31 @@ def contains_keywords(
             missing = [kw for kw in keywords if kw.lower() not in s]
             return False, f"Missing keywords: {missing[:5]}", score
         return True, f"Found {len(hits)}/{len(keywords)} keywords", 1.0
+
     return QualityGate("keywords", check, threshold, on_fail=GateAction.WARN)
 
 
 def latency_max(max_ms: float, threshold: float = 0.9) -> QualityGate:
     """Gate: execution must complete within time limit (ms)."""
+
     def check(output: Any, ctx: dict) -> tuple[bool, str, float]:
         elapsed = ctx.get("_latency_ms", 0)
         score = max(0, 1.0 - (elapsed / max_ms))
         if elapsed > max_ms:
             return False, f"Latency {elapsed:.0f}ms > {max_ms}ms", score
         return True, f"Latency {elapsed:.0f}ms OK", 1.0
+
     return QualityGate("latency", check, threshold, on_fail=GateAction.WARN)
 
 
 def confidence_min(min_confidence: float = 0.5, threshold: float = 0.8) -> QualityGate:
     """Gate: fused confidence must meet minimum."""
+
     def check(output: Any, ctx: dict) -> tuple[bool, str, float]:
         confidence = ctx.get("_confidence", 0.0)
         score = min(1.0, confidence / max(min_confidence, 0.01))
         if confidence < min_confidence:
             return False, f"Confidence {confidence:.2f} < {min_confidence}", score
         return True, f"Confidence {confidence:.2f} OK", 1.0
+
     return QualityGate("confidence", check, threshold, on_fail=GateAction.RETRY)

@@ -12,18 +12,17 @@ MCP Sampling 允许 MCP Server 向 Client 发起 LLM 请求。
 
 from __future__ import annotations
 
-import asyncio
-import json
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Union
-
+from enum import StrEnum
+from typing import Any
 
 # ── Sampling Data Models ────────────────────
 
 
-class SamplingRole(str, Enum):
+class SamplingRole(StrEnum):
     """Sampling 消息角色。"""
+
     USER = "user"
     ASSISTANT = "assistant"
 
@@ -37,7 +36,7 @@ class SamplingContentBlock:
 
     type: str = "text"  # text | image
     text: str = ""
-    data: str = ""       # base64 image data
+    data: str = ""  # base64 image data
     mime_type: str = ""
 
     def to_dict(self) -> dict:
@@ -50,7 +49,7 @@ class SamplingContentBlock:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> "SamplingContentBlock":
+    def from_dict(cls, d: dict) -> SamplingContentBlock:
         return cls(
             type=d.get("type", "text"),
             text=d.get("text", ""),
@@ -59,19 +58,20 @@ class SamplingContentBlock:
         )
 
     @classmethod
-    def text_block(cls, text: str) -> "SamplingContentBlock":
+    def text_block(cls, text: str) -> SamplingContentBlock:
         return cls(type="text", text=text)
 
     @classmethod
-    def image_block(cls, base64_data: str, mime_type: str = "image/png") -> "SamplingContentBlock":
+    def image_block(cls, base64_data: str, mime_type: str = "image/png") -> SamplingContentBlock:
         return cls(type="image", data=base64_data, mime_type=mime_type)
 
 
 @dataclass
 class SamplingMessage:
     """Sampling 消息。"""
+
     role: SamplingRole
-    content: Union[str, List[SamplingContentBlock]]
+    content: str | list[SamplingContentBlock]
 
     def to_dict(self) -> dict:
         if isinstance(self.content, str):
@@ -85,7 +85,7 @@ class SamplingMessage:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "SamplingMessage":
+    def from_dict(cls, d: dict) -> SamplingMessage:
         role = SamplingRole(d["role"])
         content_raw = d["content"]
         if isinstance(content_raw, str):
@@ -106,14 +106,14 @@ class SamplingRequest:
     符合 MCP sampling/createMessage 规范。
     """
 
-    messages: List[SamplingMessage]
-    model_preferences: Optional[Dict[str, Any]] = None
+    messages: list[SamplingMessage]
+    model_preferences: dict[str, Any] | None = None
     system_prompt: str = ""
     include_context: str = "none"  # none | thisServer | allServers
     temperature: float = 0.7
     max_tokens: int = 4096
-    stop_sequences: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    stop_sequences: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         d: dict = {
@@ -135,7 +135,7 @@ class SamplingRequest:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> "SamplingRequest":
+    def from_dict(cls, d: dict) -> SamplingRequest:
         return cls(
             messages=[SamplingMessage.from_dict(m) for m in d.get("messages", [])],
             model_preferences=d.get("modelPreferences"),
@@ -157,9 +157,9 @@ class SamplingResponse:
 
     model: str = ""
     role: SamplingRole = SamplingRole.ASSISTANT
-    content: Union[str, List[SamplingContentBlock]] = ""
+    content: str | list[SamplingContentBlock] = ""
     stop_reason: str = ""  # endTurn | stopSequence | maxTokens
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         content_block: dict
@@ -178,7 +178,7 @@ class SamplingResponse:
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> "SamplingResponse":
+    def from_dict(cls, d: dict) -> SamplingResponse:
         content_raw = d.get("content", "")
         if isinstance(content_raw, str):
             content = content_raw
@@ -201,6 +201,7 @@ class SamplingResponse:
 
 class SamplingError(Exception):
     """Sampling 错误。"""
+
     def __init__(self, code: int, message: str):
         self.code = code
         self.message = message
@@ -263,9 +264,7 @@ class MCPClientSampling:
         if not self.allow_image_input:
             for msg in request.messages:
                 if isinstance(msg.content, list):
-                    has_image = any(
-                        c.type == "image" for c in msg.content
-                    )
+                    has_image = any(c.type == "image" for c in msg.content)
                     if has_image:
                         raise SamplingError(
                             -32000,
@@ -323,7 +322,7 @@ class MCPResourceTemplate:
     name: str = ""
     description: str = ""
     mime_type: str = ""
-    annotations: Dict[str, Any] = field(default_factory=dict)
+    annotations: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         d: dict = {
@@ -339,7 +338,7 @@ class MCPResourceTemplate:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> "MCPResourceTemplate":
+    def from_dict(cls, d: dict) -> MCPResourceTemplate:
         return cls(
             uri_template=d.get("uriTemplate", ""),
             name=d.get("name", ""),
@@ -352,8 +351,9 @@ class MCPResourceTemplate:
 # ── MCP Logging ────────────────────────────
 
 
-class MCPLogLevel(str, Enum):
+class MCPLogLevel(StrEnum):
     """MCP 日志级别。"""
+
     DEBUG = "debug"
     INFO = "info"
     NOTICE = "notice"
@@ -373,7 +373,7 @@ class MCPLoggingHandler:
 
     def __init__(self, max_level: MCPLogLevel = MCPLogLevel.INFO):
         self._max_level = max_level
-        self._log_callback: Optional[Callable[[MCPLogLevel, str, str], None]] = None
+        self._log_callback: Callable[[MCPLogLevel, str, str], None] | None = None
 
     def set_log_callback(
         self,
@@ -419,6 +419,7 @@ class MCPLoggingHandler:
 @dataclass
 class MCPRoot:
     """MCP Root — Client 暴露给 Server 的可访问文件系统根。"""
+
     uri: str
     name: str = ""
 
@@ -429,5 +430,5 @@ class MCPRoot:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict) -> "MCPRoot":
+    def from_dict(cls, d: dict) -> MCPRoot:
         return cls(uri=d.get("uri", ""), name=d.get("name", ""))

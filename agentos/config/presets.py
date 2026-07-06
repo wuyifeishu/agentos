@@ -1,5 +1,5 @@
 """
-Config Presets — Ready-to-use configuration profiles for common AgentOS scenarios.
+Config Presets — Ready-to-use configuration profiles for common AgentOS scenarios.  # noqa: E501
 
 Each preset provides sensible defaults for specific use cases:
 development, production, testing, and budget-constrained environments.
@@ -7,8 +7,7 @@ development, production, testing, and budget-constrained environments.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 
 @dataclass
@@ -48,7 +47,7 @@ PRESETS: dict[str, AgentOSPreset] = {
     ),
     "production": AgentOSPreset(
         name="production",
-        description="Production deployment with guardrails, rate limiting, and cost tracking. Uses GPT-4o for reliability.",
+        description="Production deployment with guardrails, rate limiting, and cost tracking. Uses GPT-4o for reliability.",  # noqa: E501
         model="gpt-4o",
         max_iterations=20,
         temperature=0.3,
@@ -108,7 +107,7 @@ PRESETS: dict[str, AgentOSPreset] = {
     ),
     "deep_research": AgentOSPreset(
         name="deep_research",
-        description="Deep research: Claude 3 Opus, many iterations, large memory window, guardrails off for exploration.",
+        description="Deep research: Claude 3 Opus, many iterations, large memory window, guardrails off for exploration.",  # noqa: E501
         model="claude-3-opus",
         max_iterations=30,
         temperature=0.4,
@@ -154,7 +153,7 @@ PRESETS: dict[str, AgentOSPreset] = {
 }
 
 
-def get_preset(name: str) -> Optional[AgentOSPreset]:
+def get_preset(name: str) -> AgentOSPreset | None:
     """Get a preset by name. Returns None if not found."""
     return PRESETS.get(name.lower())
 
@@ -184,9 +183,7 @@ def apply_preset(preset_name: str, config: dict) -> dict:
     """
     preset = get_preset(preset_name)
     if not preset:
-        raise ValueError(
-            f"Unknown preset: '{preset_name}'. Available: {list(PRESETS.keys())}"
-        )
+        raise ValueError(f"Unknown preset: '{preset_name}'. Available: {list(PRESETS.keys())}")
 
     mapping = {
         "model": "model",

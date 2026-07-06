@@ -1,12 +1,13 @@
 """AgentOS OpenTelemetry - OTLP/Jaeger/Zipkin trace/metric export (v1.14.6)."""
 
-import os
 import logging
+import os
+from collections.abc import Callable
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from agentos.observability.metrics import MetricsCollector
@@ -16,8 +17,10 @@ logger = logging.getLogger("agentos.otel")
 
 # ---- Enums ----
 
-class OTelExporter(str, Enum):
+
+class OTelExporter(StrEnum):
     """OpenTelemetry exporter backend."""
+
     OTLP_HTTP = "otlp_http"
     OTLP_GRPC = "otlp_grpc"
     CONSOLE = "console"
@@ -25,14 +28,16 @@ class OTelExporter(str, Enum):
     NONE = "none"
 
 
-class OtelStatus(str, Enum):
+class OtelStatus(StrEnum):
     """Span status codes."""
+
     OK = "OK"
     ERROR = "ERROR"
 
 
-class SpanKind(str, Enum):
+class SpanKind(StrEnum):
     """Span kind for semantic conventions."""
+
     INTERNAL = "internal"
     CLIENT = "client"
     SERVER = "server"
@@ -41,6 +46,7 @@ class SpanKind(str, Enum):
 
 
 # ---- OtelConfig ----
+
 
 @dataclass
 class OtelConfig:
@@ -51,7 +57,7 @@ class OtelConfig:
     exporter: OTelExporter = OTelExporter.CONSOLE
     endpoint: str = "http://localhost:4318/v1/traces"
     metrics_endpoint: str = "http://localhost:4318/v1/metrics"
-    resource_attrs: Dict[str, str] = field(default_factory=dict)
+    resource_attrs: dict[str, str] = field(default_factory=dict)
     sample_rate: float = 1.0
     batch_timeout_ms: int = 5000
     max_span_attributes: int = 128
@@ -73,6 +79,7 @@ class OtelConfig:
 
 # ---- SpanHandle ----
 
+
 def _normalize_value(v: Any) -> Any:
     if isinstance(v, (str, int, float, bool)):
         return v
@@ -90,25 +97,27 @@ class SpanHandle:
     def set_attribute(self, key: str, value: Any) -> None:
         self._span.set_attribute(key, _normalize_value(value))
 
-    def set_attributes(self, attrs: Dict[str, Any]) -> None:
+    def set_attributes(self, attrs: dict[str, Any]) -> None:
         for k, v in attrs.items():
             self.set_attribute(k, v)
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None) -> None:
-        self._span.add_event(name, attributes={
-            k: _normalize_value(v) for k, v in (attributes or {}).items()
-        })
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None) -> None:
+        self._span.add_event(
+            name, attributes={k: _normalize_value(v) for k, v in (attributes or {}).items()}
+        )
 
     def record_exception(self, exception: Exception) -> None:
         self._span.record_exception(exception)
 
     def set_status(self, status: OtelStatus, description: str = "") -> None:
         from opentelemetry import trace as otel_trace
+
         code = otel_trace.StatusCode.OK if status == OtelStatus.OK else otel_trace.StatusCode.ERROR
         self._span.set_status(otel_trace.Status(code, description))
 
 
 # ---- OtelTracer ----
+
 
 class OtelTracer:
     """OpenTelemetry tracer with span management and W3C context propagation.
@@ -124,12 +133,12 @@ class OtelTracer:
         async def process(input): ...
     """
 
-    _config: Optional[OtelConfig] = None
+    _config: OtelConfig | None = None
     _tracer_provider: Any = None
     _initialized: bool = False
 
     @classmethod
-    def init(cls, config: Optional[OtelConfig] = None) -> None:
+    def init(cls, config: OtelConfig | None = None) -> None:
         if config is None:
             config = OtelConfig().with_env_overrides()
         else:
@@ -145,7 +154,8 @@ class OtelTracer:
             cls._initialized = True
             logger.info(
                 "OtelTracer initialized: service=%s exporter=%s",
-                config.service_name, config.exporter.value,
+                config.service_name,
+                config.exporter.value,
             )
         except ImportError:
             logger.warning("opentelemetry packages not installed - noop tracer")
@@ -156,17 +166,18 @@ class OtelTracer:
 
     @classmethod
     def _init_sdk(cls, config: OtelConfig):
-        from opentelemetry import trace as otel_trace
+        from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
-        from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
         from opentelemetry.trace import set_tracer_provider
 
-        resource = Resource.create({
-            SERVICE_NAME: config.service_name,
-            SERVICE_VERSION: config.service_version,
-            **config.resource_attrs,
-        })
+        resource = Resource.create(
+            {
+                SERVICE_NAME: config.service_name,
+                SERVICE_VERSION: config.service_version,
+                **config.resource_attrs,
+            }
+        )
 
         provider = TracerProvider(resource=resource)
         exporter = cls._build_exporter(config)
@@ -187,17 +198,21 @@ class OtelTracer:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
                 OTLPSpanExporter,
             )
+
             return OTLPSpanExporter(endpoint=config.endpoint)
         elif config.exporter == OTelExporter.OTLP_GRPC:
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
                 OTLPSpanExporter,
             )
+
             return OTLPSpanExporter(endpoint=config.endpoint, insecure=True)
         elif config.exporter == OTelExporter.CONSOLE:
             from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+
             return ConsoleSpanExporter()
         elif config.exporter == OTelExporter.ZIPKIN:
             from opentelemetry.exporter.zipkin.proto.http import ZipkinExporter
+
             return ZipkinExporter(endpoint=config.zipkin_endpoint)
         return None
 
@@ -206,6 +221,7 @@ class OtelTracer:
         if not cls._initialized:
             cls.init()
         from opentelemetry import trace as otel_trace
+
         return otel_trace.get_tracer(name)
 
     @classmethod
@@ -214,7 +230,7 @@ class OtelTracer:
         cls,
         name: str,
         kind: SpanKind = SpanKind.INTERNAL,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: dict[str, Any] | None = None,
         parent: Any = None,
     ):
         if not cls._initialized:
@@ -231,12 +247,11 @@ class OtelTracer:
         sk = kind_map.get(kind, 0)
 
         from opentelemetry import trace as otel_trace
+
         span = tracer.start_span(
             name,
             kind=otel_trace.SpanKind(sk),
-            attributes={
-                k: _normalize_value(v) for k, v in (attributes or {}).items()
-            },
+            attributes={k: _normalize_value(v) for k, v in (attributes or {}).items()},
         )
 
         try:
@@ -252,13 +267,14 @@ class OtelTracer:
         cls,
         name: str = "",
         kind: SpanKind = SpanKind.INTERNAL,
-        extract_attrs: Optional[Callable] = None,
+        extract_attrs: Callable | None = None,
     ):
         span_name = name
 
         def decorator(func):
             nonlocal span_name
             import asyncio
+
             if not span_name:
                 span_name = func.__name__
             is_async = asyncio.iscoroutinefunction(func)
@@ -312,26 +328,27 @@ class OtelTracer:
 
 # ---- OtelMeter ----
 
+
 class OtelMeter:
     """Bridge MetricsCollector to OpenTelemetry metrics."""
 
     _meter: Any = None
-    _instruments: Dict[str, Any] = {}
+    _instruments: dict[str, Any] = {}
 
     @classmethod
-    def init(cls, config: Optional[OtelConfig] = None):
+    def init(cls, config: OtelConfig | None = None):
         if config is None:
             config = OtelConfig().with_env_overrides()
         if config.disabled:
             return
         try:
             from opentelemetry import metrics
-            from opentelemetry.sdk.metrics import MeterProvider
-            from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-            from opentelemetry.sdk.resources import Resource, SERVICE_NAME
             from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
                 OTLPMetricExporter,
             )
+            from opentelemetry.sdk.metrics import MeterProvider
+            from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+            from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 
             resource = Resource.create({SERVICE_NAME: config.service_name})
             exporter = OTLPMetricExporter(endpoint=config.metrics_endpoint)
@@ -346,9 +363,7 @@ class OtelMeter:
             logger.error("OtelMeter init failed: %s", e)
 
     @classmethod
-    def record_counter(
-        cls, name: str, value: float, attrs: Optional[Dict[str, str]] = None
-    ):
+    def record_counter(cls, name: str, value: float, attrs: dict[str, str] | None = None):
         if cls._meter is None:
             return
         if name not in cls._instruments:
@@ -356,9 +371,7 @@ class OtelMeter:
         cls._instruments[name].add(value, attributes=attrs or {})
 
     @classmethod
-    def record_histogram(
-        cls, name: str, value: float, attrs: Optional[Dict[str, str]] = None
-    ):
+    def record_histogram(cls, name: str, value: float, attrs: dict[str, str] | None = None):
         if cls._meter is None:
             return
         key = f"hist_{name}"
@@ -367,16 +380,12 @@ class OtelMeter:
         cls._instruments[key].record(value, attributes=attrs or {})
 
     @classmethod
-    def record_gauge(
-        cls, name: str, value: float, attrs: Optional[Dict[str, str]] = None
-    ):
+    def record_gauge(cls, name: str, value: float, attrs: dict[str, str] | None = None):
         if cls._meter is None:
             return
         key = f"gauge_{name}"
         if key not in cls._instruments:
-            cls._instruments[key] = cls._meter.create_up_down_counter(
-                name, description=""
-            )
+            cls._instruments[key] = cls._meter.create_up_down_counter(name, description="")
         cls._instruments[key].add(value, attributes=attrs or {})
 
     @classmethod
@@ -401,26 +410,29 @@ class OtelMeter:
 
 # ---- OtelMiddleware ----
 
+
 class OtelMiddleware:
     """W3C TraceContext propagation for multi-agent pipelines."""
 
     @staticmethod
-    def inject_context(headers: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+    def inject_context(headers: dict[str, str] | None = None) -> dict[str, str]:
         if headers is None:
             headers = {}
         try:
             from opentelemetry import propagate
+
             propagate.inject(headers)
         except Exception:
             pass
         return headers
 
     @staticmethod
-    def extract_context(headers: Optional[Dict[str, str]] = None) -> None:
+    def extract_context(headers: dict[str, str] | None = None) -> None:
         if headers is None:
             return
         try:
-            from opentelemetry import propagate, context
+            from opentelemetry import context, propagate
+
             ctx = propagate.extract(headers)
             context.attach(ctx)
         except Exception:
@@ -430,6 +442,7 @@ class OtelMiddleware:
     def get_trace_id() -> str:
         try:
             from opentelemetry import trace as otel_trace
+
             span = otel_trace.get_current_span()
             ctx = span.get_span_context()
             if ctx.is_valid:
@@ -442,6 +455,7 @@ class OtelMiddleware:
     def get_span_id() -> str:
         try:
             from opentelemetry import trace as otel_trace
+
             span = otel_trace.get_current_span()
             ctx = span.get_span_context()
             if ctx.is_valid:

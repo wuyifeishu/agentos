@@ -6,19 +6,19 @@
 - FewShotSelector: 智能 few-shot 示例选择与格式化。
 """
 
-from agentos.prompts.manager import PromptTemplate, PromptRegistry
-from agentos.prompts.optimizer import (
-    PromptOptimizer,
-    OptimizerConfig,
-    OptimizationStrategy,
-    OptimizationResult,
-    PromptCandidate,
-)
 from agentos.prompts.few_shot import (
-    FewShotSelector,
     Example,
+    FewShotSelector,
     SelectionStrategy,
     build_examples,
+)
+from agentos.prompts.manager import PromptRegistry, PromptTemplate
+from agentos.prompts.optimizer import (
+    OptimizationResult,
+    OptimizationStrategy,
+    OptimizerConfig,
+    PromptCandidate,
+    PromptOptimizer,
 )
 
 __all__ = [

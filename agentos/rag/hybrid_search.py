@@ -14,25 +14,23 @@ Compatible with existing ChromaStore + RAGPipeline.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import math
 import re
-import time
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Optional, Callable
-
+from typing import Any
 
 # ── Types ───────────────────────────────────────────────────────────
+
 
 @dataclass
 class SearchResult:
     """A single search result with metadata."""
+
     doc_id: str
     content: str
-    source: str = ""           # File path, URL, or source identifier
+    source: str = ""  # File path, URL, or source identifier
     title: str = ""
     score: float = 0.0
     dense_score: float = 0.0
@@ -46,6 +44,7 @@ class SearchResult:
 @dataclass
 class Citation:
     """A citation from source material."""
+
     text: str
     source: str
     doc_id: str = ""
@@ -56,6 +55,7 @@ class Citation:
 
 
 # ── BM25 Sparse Retriever ───────────────────────────────────────────
+
 
 class BM25Retriever:
     """Pure Python BM25 implementation for keyword search.
@@ -134,16 +134,18 @@ class BM25Retriever:
                 score=score / max(max_score, 1e-9),
                 metadata={"method": "bm25"},
             )
-            for doc_id, score in ranked[:top_k] if score > 0
+            for doc_id, score in ranked[:top_k]
+            if score > 0
         ]
 
     def _tokenize(self, text: str) -> list[str]:
         """Simple tokenization: lowercase, split on non-alphanumeric, filter short tokens."""
-        tokens = re.findall(r'[\w\u4e00-\u9fff]+', text.lower())
+        tokens = re.findall(r"[\w\u4e00-\u9fff]+", text.lower())
         return [t for t in tokens if len(t) > 1]
 
 
 # ── Dense Retriever ─────────────────────────────────────────────────
+
 
 class DenseRetriever:
     """Semantic search via embeddings.
@@ -155,7 +157,7 @@ class DenseRetriever:
     def __init__(
         self,
         vector_store=None,
-        embed_fn: Optional[Callable[[str], list[float]]] = None,
+        embed_fn: Callable[[str], list[float]] | None = None,
     ):
         self._store = vector_store
         self._embed = embed_fn
@@ -185,6 +187,7 @@ class DenseRetriever:
 
 
 # ── Cross-Encoder Re-Ranker ─────────────────────────────────────────
+
 
 class CrossEncoderReranker:
     """Re-rank search results with a cross-encoder model.
@@ -243,6 +246,7 @@ class CrossEncoderReranker:
         """Re-rank using HuggingFace cross-encoder."""
         try:
             from sentence_transformers import CrossEncoder
+
             if self._model is None:
                 self._model = CrossEncoder(self._model_name)
 
@@ -253,9 +257,7 @@ class CrossEncoderReranker:
                 candidate.rerank_score = float(score)
                 # Weighted fusion
                 candidate.score = (
-                    candidate.dense_score * 0.3 +
-                    candidate.sparse_score * 0.2 +
-                    float(score) * 0.5
+                    candidate.dense_score * 0.3 + candidate.sparse_score * 0.2 + float(score) * 0.5
                 )
 
             candidates.sort(key=lambda x: x.rerank_score, reverse=True)
@@ -284,7 +286,7 @@ class CrossEncoderReranker:
             # Parse scores
             scores: dict[int, float] = {}
             for line in response.split("\n"):
-                match = re.match(r'\[(\d+)\]\s*(\d+(?:\.\d+)?)', line.strip())
+                match = re.match(r"\[(\d+)\]\s*(\d+(?:\.\d+)?)", line.strip())
                 if match:
                     idx = int(match.group(1))
                     score = float(match.group(2)) / 10.0
@@ -294,9 +296,9 @@ class CrossEncoderReranker:
             for i, candidate in enumerate(candidates):
                 candidate.rerank_score = scores.get(i, 0.5)
                 candidate.score = (
-                    candidate.dense_score * 0.25 +
-                    candidate.sparse_score * 0.15 +
-                    candidate.rerank_score * 0.6
+                    candidate.dense_score * 0.25
+                    + candidate.sparse_score * 0.15
+                    + candidate.rerank_score * 0.6
                 )
 
             candidates.sort(key=lambda x: x.rerank_score, reverse=True)
@@ -307,6 +309,7 @@ class CrossEncoderReranker:
 
 
 # ── Fusion Algorithms ───────────────────────────────────────────────
+
 
 class FusionMethod:
     """Collection of rank fusion algorithms."""
@@ -396,6 +399,7 @@ class FusionMethod:
 
 # ── Citation Tracker ────────────────────────────────────────────────
 
+
 class CitationTracker:
     """Track and verify citations from source documents.
 
@@ -432,10 +436,10 @@ class CitationTracker:
         for source in sources:
             # Find substrings of generated text that appear in source
             source_content = source.content.lower()
-            text_lower = text.lower()
+            text.lower()
 
             # Extract sentences from generated text
-            sentences = re.split(r'[.!?]+', text)
+            sentences = re.split(r"[.!?]+", text)
             for sent in sentences:
                 sent = sent.strip()
                 if len(sent) < 15:
@@ -443,13 +447,15 @@ class CitationTracker:
 
                 # Check if this sentence appears in source (with fuzzy matching)
                 if self._is_from_source(sent.lower(), source_content):
-                    citations.append(Citation(
-                        text=sent,
-                        source=source.source or source.doc_id,
-                        doc_id=source.doc_id,
-                        chunk_index=source.chunk_index,
-                        confidence=0.9,
-                    ))
+                    citations.append(
+                        Citation(
+                            text=sent,
+                            source=source.source or source.doc_id,
+                            doc_id=source.doc_id,
+                            chunk_index=source.chunk_index,
+                            confidence=0.9,
+                        )
+                    )
 
         # Deduplicate
         seen: set[str] = set()
@@ -471,11 +477,10 @@ class CitationTracker:
         """
         citations = self.extract_citations(text, sources)
 
-        sentences = re.split(r'[.!?]+', text)
+        sentences = re.split(r"[.!?]+", text)
         total_sentences = len(sentences)
         cited_sentences = sum(
-            1 for s in sentences
-            if any(c.text[:30].lower() in s.strip().lower() for c in citations)
+            1 for s in sentences if any(c.text[:30].lower() in s.strip().lower() for c in citations)
         )
 
         uncited = total_sentences - cited_sentences
@@ -490,7 +495,11 @@ class CitationTracker:
                 {"text": c.text[:100], "source": c.source, "confidence": c.confidence}
                 for c in citations[:10]
             ],
-            "status": "clean" if hallucination_risk < 0.3 else "medium_risk" if hallucination_risk < 0.6 else "high_risk",
+            "status": (
+                "clean"
+                if hallucination_risk < 0.3
+                else "medium_risk" if hallucination_risk < 0.6 else "high_risk"
+            ),
         }
 
     def _is_from_source(self, text: str, source: str, threshold: float = 0.6) -> bool:
@@ -513,13 +522,15 @@ class CitationTracker:
             "by_source": Counter(c.source for c in self._citations),
             "avg_confidence": (
                 sum(c.confidence for c in self._citations) / len(self._citations)
-                if self._citations else 0
+                if self._citations
+                else 0
             ),
             "sources_indexed": len(self._source_index),
         }
 
 
 # ── Hybrid Search Engine ────────────────────────────────────────────
+
 
 class HybridSearchEngine:
     """Unified hybrid search engine.
@@ -543,10 +554,10 @@ class HybridSearchEngine:
 
     def __init__(
         self,
-        dense_retriever: Optional[DenseRetriever] = None,
-        sparse_retriever: Optional[BM25Retriever] = None,
-        reranker: Optional[CrossEncoderReranker] = None,
-        citation_tracker: Optional[CitationTracker] = None,
+        dense_retriever: DenseRetriever | None = None,
+        sparse_retriever: BM25Retriever | None = None,
+        reranker: CrossEncoderReranker | None = None,
+        citation_tracker: CitationTracker | None = None,
         fusion_method: str = "rrf",
         dense_weight: float = 0.6,
     ):
@@ -597,7 +608,8 @@ class HybridSearchEngine:
             fused = FusionMethod.cascade(dense_results, sparse_results)
         else:  # weighted_sum
             fused = FusionMethod.weighted_sum(
-                dense_results, sparse_results,
+                dense_results,
+                sparse_results,
                 dense_weight=self.dense_weight,
                 sparse_weight=1.0 - self.dense_weight,
             )
@@ -612,9 +624,7 @@ class HybridSearchEngine:
         if return_citations and fused:
             for result in fused:
                 result.citations = [
-                    c.text for c in self.citations.extract_citations(
-                        result.content, [result]
-                    )
+                    c.text for c in self.citations.extract_citations(result.content, [result])
                 ]
 
         return fused

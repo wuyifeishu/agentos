@@ -8,8 +8,9 @@ tool_choice dispatch, argument validation, execution, and result formatting.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 import jsonschema
 
@@ -73,7 +74,7 @@ class ToolResult:
     name: str
     success: bool
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     latency_ms: float = 0.0
 
 
@@ -114,7 +115,7 @@ class ToolRegistry:
         self._tools.pop(name, None)
         self._handlers.pop(name, None)
 
-    def get_schema(self, name: str) -> Optional[ToolSchema]:
+    def get_schema(self, name: str) -> ToolSchema | None:
         return self._tools.get(name)
 
     def list_schemas(self) -> list[ToolSchema]:
@@ -137,9 +138,9 @@ class ToolRegistry:
         errors: list[str] = []
 
         # Check required args
-        for field in schema.required:
-            if field not in arguments:
-                errors.append(f"Missing required argument: {field}")
+        for f in schema.required:
+            if f not in arguments:
+                errors.append(f"Missing required argument: {f}")
 
         # JSON Schema validation
         try:
@@ -160,6 +161,7 @@ class ToolRegistry:
             ToolResult with success/failure and output.
         """
         import time
+
         t0 = time.perf_counter()
 
         errors = self.validate_arguments(call.name, call.arguments)
@@ -204,9 +206,7 @@ class ToolRegistry:
         """Execute multiple tool calls. Independent calls run sequentially."""
         return [self.execute(c) for c in calls]
 
-    def parse_tool_calls(
-        self, raw_tool_calls: list[dict[str, Any]]
-    ) -> list[ToolCall]:
+    def parse_tool_calls(self, raw_tool_calls: list[dict[str, Any]]) -> list[ToolCall]:
         """Parse raw LLM tool_call dicts into ToolCall objects."""
         parsed: list[ToolCall] = []
         for tc in raw_tool_calls:
@@ -219,11 +219,13 @@ class ToolRegistry:
                     args = {}
             else:
                 args = args_raw
-            parsed.append(ToolCall(
-                id=tc.get("id", ""),
-                name=fn.get("name", ""),
-                arguments=args,
-            ))
+            parsed.append(
+                ToolCall(
+                    id=tc.get("id", ""),
+                    name=fn.get("name", ""),
+                    arguments=args,
+                )
+            )
         return parsed
 
     @property

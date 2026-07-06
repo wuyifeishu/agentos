@@ -9,8 +9,9 @@ automatic dependency resolution.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Generic, TypeVar, get_type_hints, get_origin, get_args
+from typing import Any, Generic, TypeVar, get_args, get_origin, get_type_hints
 
 # Type variables for Agent generic
 Deps = TypeVar("Deps")
@@ -28,6 +29,7 @@ class RunContext(Generic[Deps]):
     - run_id: Unique ID for this run
     - metadata: Additional metadata
     """
+
     deps: Deps
     agent_name: str = ""
     run_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
@@ -54,6 +56,7 @@ class Depends:
             async def run(self, ctx):
                 db = ctx.deps  # Database instance
     """
+
     def __init__(self, callable: Callable[..., Any]):
         self.callable = callable
 
@@ -71,11 +74,13 @@ def inject_tool(tool: Callable[..., Any]) -> Callable[..., Any]:
         class MyAgent(Agent):
             ...
     """
+
     def decorator(cls):
-        if not hasattr(cls, '_tools'):
+        if not hasattr(cls, "_tools"):
             cls._tools = []
         cls._tools.append(tool)
         return cls
+
     return decorator
 
 
@@ -88,11 +93,13 @@ def requires_context(*fields: str) -> Callable[..., Any]:
         class MyAgent(Agent):
             ...
     """
+
     def decorator(cls):
-        if not hasattr(cls, '_required_context'):
+        if not hasattr(cls, "_required_context"):
             cls._required_context = []
         cls._required_context.extend(fields)
         return cls
+
     return decorator
 
 
@@ -115,8 +122,8 @@ class Agent(Generic[Deps, Out]):
 
     def __init__(self, name: str = ""):
         self.name = name or self.__class__.__name__
-        self._tools: list[Callable[..., Any]] = getattr(self.__class__, '_tools', [])
-        self._required_context: list[str] = getattr(self.__class__, '_required_context', [])
+        self._tools: list[Callable[..., Any]] = getattr(self.__class__, "_tools", [])
+        self._required_context: list[str] = getattr(self.__class__, "_required_context", [])
 
     async def run(self, ctx: RunContext[Deps]) -> Out:
         """
@@ -153,9 +160,9 @@ class Agent(Generic[Deps, Out]):
         )
 
         # Validate required context
-        for field in self._required_context:
-            if field not in ctx.metadata:
-                raise ValueError(f"Required context field missing: {field}")
+        for f in self._required_context:
+            if f not in ctx.metadata:
+                raise ValueError(f"Required context field missing: {f}")
 
         # Run agent
         result = await self.run(ctx)
@@ -174,7 +181,7 @@ class Agent(Generic[Deps, Out]):
         """
         # Get type hints
         hints = get_type_hints(self.__class__)
-        out_type = hints.get('Out')
+        out_type = hints.get("Out")
 
         if out_type is None:
             # Try to get from generic base
@@ -192,6 +199,7 @@ class Agent(Generic[Deps, Out]):
         # Check if it's a Pydantic model
         try:
             from pydantic import BaseModel
+
             if isinstance(out_type, type) and issubclass(out_type, BaseModel):
                 if not isinstance(result, out_type):
                     # Try to validate/convert

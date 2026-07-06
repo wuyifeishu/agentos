@@ -11,15 +11,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 class TaskStatus(Enum):
-
     """任务状态枚举。"""
 
     PENDING = "pending"
@@ -46,10 +46,10 @@ class TaskSpec:
     task_id: str
     coro_or_func: Callable[..., Awaitable[Any]]
     args: tuple = ()
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: dict[str, Any] = field(default_factory=dict)
     timeout: float = 60.0
     max_retries: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -59,7 +59,7 @@ class TaskResult:
     task_id: str
     status: TaskStatus
     result: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     duration_ms: float = 0.0
     retries: int = 0
     started_at: float = 0.0
@@ -87,7 +87,7 @@ class BatchConfig:
 class BatchResult:
     """Aggregated result of a batch execution."""
 
-    results: List[TaskResult] = field(default_factory=list)
+    results: list[TaskResult] = field(default_factory=list)
     total: int = 0
     succeeded: int = 0
     failed: int = 0
@@ -106,22 +106,21 @@ class BatchResult:
     def all_success(self) -> bool:
         return self.succeeded == self.total
 
-    def get_failed_ids(self) -> List[str]:
+    def get_failed_ids(self) -> list[str]:
         return [
-            r.task_id for r in self.results
-            if r.status in (TaskStatus.FAILED, TaskStatus.TIMEOUT)
+            r.task_id for r in self.results if r.status in (TaskStatus.FAILED, TaskStatus.TIMEOUT)
         ]
 
 
 class AsyncBatchExecutor:
     """Concurrently dispatches multiple AgentOS tasks and aggregates results."""
 
-    def __init__(self, config: Optional[BatchConfig] = None):
+    def __init__(self, config: BatchConfig | None = None):
         self.config = config or BatchConfig()
-        self._semaphore: Optional[asyncio.Semaphore] = None
-        self._cancel_event: Optional[asyncio.Event] = None
+        self._semaphore: asyncio.Semaphore | None = None
+        self._cancel_event: asyncio.Event | None = None
 
-    async def execute(self, tasks: List[TaskSpec]) -> BatchResult:
+    async def execute(self, tasks: list[TaskSpec]) -> BatchResult:
         """Execute a list of tasks and return aggregated results."""
         if not tasks:
             return BatchResult(total=0)
@@ -129,7 +128,7 @@ class AsyncBatchExecutor:
         start = time.perf_counter()
         self._semaphore = asyncio.Semaphore(self.config.max_concurrency)
         self._cancel_event = asyncio.Event()
-        results: List[TaskResult] = []
+        results: list[TaskResult] = []
 
         if self.config.strategy == BatchStrategy.SEQUENTIAL:
             for task in tasks:
@@ -181,7 +180,7 @@ class AsyncBatchExecutor:
                         started_at=started,
                         finished_at=time.perf_counter(),
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     if retries < max_retries:
                         retries += 1
                         logger.warning(

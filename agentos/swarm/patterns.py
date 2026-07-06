@@ -9,9 +9,10 @@ from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 from agentos.swarm.coordinator import SwarmCoordinator
 
@@ -60,7 +61,7 @@ class MemberResult:
     member_id: str
     success: bool
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     latency_ms: float = 0.0
 
 
@@ -86,7 +87,7 @@ class SwarmPatterns:
     def __init__(
         self,
         coordinator: SwarmCoordinator,
-        config: Optional[CollaborationConfig] = None,
+        config: CollaborationConfig | None = None,
     ):
         self._coordinator = coordinator
         self._config = config or CollaborationConfig()
@@ -96,7 +97,7 @@ class SwarmPatterns:
     def collaborate(
         self,
         task: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> CollaborationResult:
         """
         Execute collaboration using configured topology.
@@ -128,9 +129,7 @@ class SwarmPatterns:
         result.topology = topology
         return result
 
-    def _broadcast(
-        self, task: str, context: Optional[dict] = None
-    ) -> CollaborationResult:
+    def _broadcast(self, task: str, context: dict | None = None) -> CollaborationResult:
         """Broadcast task to all members, collect all responses."""
         members = self._coordinator.list_members()
         results: list[MemberResult] = []
@@ -151,18 +150,14 @@ class SwarmPatterns:
             failure_count=failure,
         )
 
-    def _pipeline(
-        self, task: str, context: Optional[dict] = None
-    ) -> CollaborationResult:
+    def _pipeline(self, task: str, context: dict | None = None) -> CollaborationResult:
         """Sequential pipeline: each member processes previous output."""
         members = self._coordinator.list_members()
         results: list[MemberResult] = []
         current_input = task
 
         for member in members:
-            m_result = self._invoke_member(
-                member, current_input, context
-            )
+            m_result = self._invoke_member(member, current_input, context)
             results.append(m_result)
             if m_result.success:
                 current_input = str(m_result.output) if m_result.output else current_input
@@ -180,9 +175,7 @@ class SwarmPatterns:
             failure_count=failure,
         )
 
-    def _hierarchical(
-        self, task: str, context: Optional[dict] = None
-    ) -> CollaborationResult:
+    def _hierarchical(self, task: str, context: dict | None = None) -> CollaborationResult:
         """Two-level hierarchy: leader delegates to sub-groups."""
         members = self._coordinator.list_members()
         n = len(members)
@@ -220,9 +213,7 @@ class SwarmPatterns:
             failure_count=failure,
         )
 
-    def _consensus(
-        self, task: str, context: Optional[dict] = None
-    ) -> CollaborationResult:
+    def _consensus(self, task: str, context: dict | None = None) -> CollaborationResult:
         """Voting: all members vote, majority output wins."""
         members = self._coordinator.list_members()
         results: list[MemberResult] = []
@@ -253,9 +244,7 @@ class SwarmPatterns:
             failure_count=failure,
         )
 
-    def _round_robin(
-        self, task: str, context: Optional[dict] = None
-    ) -> CollaborationResult:
+    def _round_robin(self, task: str, context: dict | None = None) -> CollaborationResult:
         """Load-balancing: pick next available member."""
         members = self._coordinator.list_members()
         if not members:
@@ -281,7 +270,7 @@ class SwarmPatterns:
         )
 
     def _invoke_member(
-        self, member_id: str, task: str, context: Optional[dict] = None
+        self, member_id: str, task: str, context: dict | None = None
     ) -> MemberResult:
         """Invoke a single swarm member with timeout."""
         t0 = time.perf_counter()
@@ -312,7 +301,7 @@ class SwarmPatterns:
     async def collaborate_async(
         self,
         task: str,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> CollaborationResult:
         """Async version using asyncio for broadcast/consensus topologies."""
         t0 = time.perf_counter()
@@ -323,19 +312,13 @@ class SwarmPatterns:
 
             async def run_one(member_id: str) -> MemberResult:
                 async with semaphore:
-                    return await asyncio.to_thread(
-                        self._invoke_member, member_id, task, context
-                    )
+                    return await asyncio.to_thread(self._invoke_member, member_id, task, context)
 
-            results = await asyncio.gather(
-                *[run_one(m) for m in members]
-            )
+            results = await asyncio.gather(*[run_one(m) for m in members])
             member_results = list(results)
         else:
             # Other topologies: run sequentially in thread
-            member_results = await asyncio.to_thread(
-                self.collaborate, task, context
-            )
+            member_results = await asyncio.to_thread(self.collaborate, task, context)
             if isinstance(member_results, CollaborationResult):
                 member_results = member_results.member_results
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Optional
 
 import httpx
 
@@ -38,7 +37,9 @@ class QQAdapter(BaseChannelAdapter):
         """QQ Bot 暂不强验证签名。"""
         return True
 
-    def parse_webhook(self, raw_body: bytes, headers: dict) -> ChannelMessage | list[ChannelMessage]:
+    def parse_webhook(
+        self, raw_body: bytes, headers: dict
+    ) -> ChannelMessage | list[ChannelMessage]:
         data = json.loads(raw_body.decode("utf-8"))
         op = data.get("op", 0)
         t = data.get("t", "")
@@ -83,7 +84,7 @@ class QQAdapter(BaseChannelAdapter):
         if content.startswith("<@"):
             end = content.find(">")
             if end > 0:
-                content = content[end + 1:].strip()
+                content = content[end + 1 :].strip()
 
         return ChannelMessage(
             msg_id=event_data.get("id", ""),
@@ -105,12 +106,14 @@ class QQAdapter(BaseChannelAdapter):
         )
 
     def build_reply(self, msg: ChannelMessage, reply_text: str) -> str:
-        return json.dumps({
-            "msg_type": 0,
-            "content": reply_text,
-            "msg_id": msg.msg_id,
-            "message_reference": {"message_id": msg.msg_id},
-        })
+        return json.dumps(
+            {
+                "msg_type": 0,
+                "content": reply_text,
+                "msg_id": msg.msg_id,
+                "message_reference": {"message_id": msg.msg_id},
+            }
+        )
 
     # ── 主动推送 ──
 

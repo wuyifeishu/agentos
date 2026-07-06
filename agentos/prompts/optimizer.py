@@ -4,16 +4,17 @@ iterative refinement, few-shot bootstrapping, and multi-strategy optimization.
 """
 
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class OptimizationStrategy(str, Enum):
+class OptimizationStrategy(StrEnum):
     """Available optimization approaches."""
 
     BOOTSTRAP_FEWSHOT = "bootstrap_fewshot"
-    MIPRO = "mipro"          # Multi-prompt instruction proposal
+    MIPRO = "mipro"  # Multi-prompt instruction proposal
     GRADIENT_FREE = "gradient_free"
     ENSEMBLE = "ensemble"
     CHAIN_OF_THOUGHT = "chain_of_thought"
@@ -92,7 +93,7 @@ class PromptOptimizer:
         ],
     }
 
-    def __init__(self, config: Optional[OptimizerConfig] = None):
+    def __init__(self, config: OptimizerConfig | None = None):
         self.config = config or OptimizerConfig()
         random.seed(self.config.seed)
 
@@ -113,9 +114,7 @@ class PromptOptimizer:
         no_improve = 0
 
         for iteration in range(1, self.config.max_iterations + 1):
-            candidates = self._generate_candidates(
-                best.text, iteration, few_shot_examples
-            )
+            candidates = self._generate_candidates(best.text, iteration, few_shot_examples)
             for c in candidates:
                 c.score = score_fn(c.text)
                 history.append(c)
@@ -130,7 +129,7 @@ class PromptOptimizer:
 
             # Keep top-K across all generations
             history.sort(key=lambda c: c.score, reverse=True)
-            history = history[:self.config.keep_top_k * 2]
+            history = history[: self.config.keep_top_k * 2]
 
             if best.score >= self.config.target_threshold:
                 break
@@ -143,7 +142,7 @@ class PromptOptimizer:
             iterations=iteration,
             candidates_evaluated=len(history),
             strategy=self.config.strategy,
-            history=history[:self.config.keep_top_k],
+            history=history[: self.config.keep_top_k],
         )
 
     def _generate_candidates(
@@ -168,12 +167,14 @@ class PromptOptimizer:
             if random.random() < 0.3 and generation > 1:
                 text = self._perturb(text)
 
-            candidates.append(PromptCandidate(
-                id=f"gen{generation}_{i}",
-                text=text,
-                generation=generation,
-                parent_id="base" if generation == 1 else f"gen{generation-1}_0",
-            ))
+            candidates.append(
+                PromptCandidate(
+                    id=f"gen{generation}_{i}",
+                    text=text,
+                    generation=generation,
+                    parent_id="base" if generation == 1 else f"gen{generation-1}_0",
+                )
+            )
 
         return candidates
 

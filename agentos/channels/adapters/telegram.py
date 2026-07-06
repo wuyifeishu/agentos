@@ -7,7 +7,6 @@ BotFather token → long-polling / webhook → ChannelMessage.
 from __future__ import annotations
 
 import json
-from typing import Optional, Any
 
 from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
 from agentos.channels.message import ChannelMessage, ChannelType, MessageType
@@ -41,7 +40,7 @@ class TelegramAdapter(BaseChannelAdapter):
 
     # ── Message parsing ──
 
-    async def parse_incoming(self, payload: dict) -> Optional[ChannelMessage]:
+    async def parse_incoming(self, payload: dict) -> ChannelMessage | None:
         """Parse Telegram Update into ChannelMessage."""
         if "message" in payload:
             return self._parse_message(payload["message"])
@@ -51,7 +50,7 @@ class TelegramAdapter(BaseChannelAdapter):
             return self._parse_inline(payload["inline_query"])
         return None
 
-    def _parse_message(self, msg: dict) -> Optional[ChannelMessage]:
+    def _parse_message(self, msg: dict) -> ChannelMessage | None:
         """Parse a Telegram Message object."""
         chat = msg.get("chat", {})
         user = msg.get("from", {})
@@ -104,7 +103,7 @@ class TelegramAdapter(BaseChannelAdapter):
             metadata=metadata,
         )
 
-    def _parse_callback(self, cb: dict) -> Optional[ChannelMessage]:
+    def _parse_callback(self, cb: dict) -> ChannelMessage | None:
         """Parse callback query (inline button press)."""
         user = cb.get("from", {})
         msg = cb.get("message", {})
@@ -118,7 +117,7 @@ class TelegramAdapter(BaseChannelAdapter):
             reply_token=cb.get("id", ""),
         )
 
-    def _parse_inline(self, inline: dict) -> Optional[ChannelMessage]:
+    def _parse_inline(self, inline: dict) -> ChannelMessage | None:
         """Parse inline query."""
         user = inline.get("from", {})
         return ChannelMessage(
@@ -135,44 +134,59 @@ class TelegramAdapter(BaseChannelAdapter):
 
     async def reply(self, channel_id: str, content: str, **kwargs) -> ReplyResult:
         """Send message via sendMessage."""
-        return await self._api_call("sendMessage", {
-            "chat_id": channel_id,
-            "text": content,
-            "parse_mode": self._parse_mode,
-            "reply_to_message_id": kwargs.get("reply_token"),
-        })
+        return await self._api_call(
+            "sendMessage",
+            {
+                "chat_id": channel_id,
+                "text": content,
+                "parse_mode": self._parse_mode,
+                "reply_to_message_id": kwargs.get("reply_token"),
+            },
+        )
 
     async def reply_inline_keyboard(
-        self, channel_id: str, text: str,
-        buttons: list[list[dict]], **kwargs,
+        self,
+        channel_id: str,
+        text: str,
+        buttons: list[list[dict]],
+        **kwargs,
     ) -> ReplyResult:
         """Send message with inline keyboard buttons.
 
         buttons = [[{"text": "Yes", "callback_data": "yes"}], ...]
         """
-        return await self._api_call("sendMessage", {
-            "chat_id": channel_id,
-            "text": text,
-            "parse_mode": self._parse_mode,
-            "reply_markup": json.dumps({"inline_keyboard": buttons}),
-        })
+        return await self._api_call(
+            "sendMessage",
+            {
+                "chat_id": channel_id,
+                "text": text,
+                "parse_mode": self._parse_mode,
+                "reply_markup": json.dumps({"inline_keyboard": buttons}),
+            },
+        )
 
     async def reply_photo(
         self, channel_id: str, photo_url: str, caption: str = "", **kwargs
     ) -> ReplyResult:
         """Send a photo."""
-        return await self._api_call("sendPhoto", {
-            "chat_id": channel_id,
-            "photo": photo_url,
-            "caption": caption,
-        })
+        return await self._api_call(
+            "sendPhoto",
+            {
+                "chat_id": channel_id,
+                "photo": photo_url,
+                "caption": caption,
+            },
+        )
 
     async def answer_callback(self, callback_query_id: str, text: str = "") -> ReplyResult:
         """Answer a callback query (dismiss loading spinner)."""
-        return await self._api_call("answerCallbackQuery", {
-            "callback_query_id": callback_query_id,
-            "text": text,
-        })
+        return await self._api_call(
+            "answerCallbackQuery",
+            {
+                "callback_query_id": callback_query_id,
+                "text": text,
+            },
+        )
 
     # ── Internal ──
 
@@ -182,6 +196,7 @@ class TelegramAdapter(BaseChannelAdapter):
 
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=params) as resp:
                     data = await resp.json()
@@ -196,8 +211,10 @@ class TelegramAdapter(BaseChannelAdapter):
                     )
         except ImportError:
             import urllib.request
+
             req = urllib.request.Request(
-                url, data=json.dumps(params).encode(),
+                url,
+                data=json.dumps(params).encode(),
                 headers={"Content-Type": "application/json"},
             )
             with urllib.request.urlopen(req) as resp:

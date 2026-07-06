@@ -4,12 +4,11 @@ toxicity heuristics, and code injection detection.
 """
 
 import re
-from typing import Dict, List
 
-from agentos.guardrails.engine import GuardrailRule, GuardrailAction, GuardrailCategory
+from agentos.guardrails.engine import GuardrailAction, GuardrailCategory, GuardrailRule
 
 
-def PIIRule(
+def PIIRule(  # noqa: N802
     name: str = "pii_detector",
     action: GuardrailAction = GuardrailAction.SANITIZE,
     enabled: bool = True,
@@ -45,7 +44,7 @@ def PIIRule(
     )
 
 
-def KeywordBlockRule(
+def KeywordBlockRule(  # noqa: N802
     keywords: list[str],
     name: str = "keyword_block",
     case_sensitive: bool = False,
@@ -69,7 +68,7 @@ def KeywordBlockRule(
     )
 
 
-def LengthLimitRule(
+def LengthLimitRule(  # noqa: N802
     max_input: int = 32_000,
     max_output: int = 16_000,
     name: str = "length_limit",
@@ -90,7 +89,7 @@ def LengthLimitRule(
     )
 
 
-def RegexRule(
+def RegexRule(  # noqa: N802
     pattern: str,
     name: str = "regex_rule",
     action: GuardrailAction = GuardrailAction.FLAG,
@@ -113,7 +112,7 @@ def RegexRule(
     )
 
 
-def ToxicityRule(
+def ToxicityRule(  # noqa: N802
     name: str = "toxicity_check",
     action: GuardrailAction = GuardrailAction.FLAG,
     enabled: bool = True,
@@ -121,10 +120,20 @@ def ToxicityRule(
     """Heuristic toxicity detection via keyword lists (offline, no API call)."""
 
     _toxic = [
-        "kill yourself", "kys", "die in a fire", "i hope you die",
-        "nigger", "faggot", "retard", "cunt",
-        "terrorist", "bomb making", "how to make a bomb",
-        "child porn", "cp ", "lolicon",
+        "kill yourself",
+        "kys",
+        "die in a fire",
+        "i hope you die",
+        "nigger",
+        "faggot",
+        "retard",
+        "cunt",
+        "terrorist",
+        "bomb making",
+        "how to make a bomb",
+        "child porn",
+        "cp ",
+        "lolicon",
     ]
 
     def _check(text: str) -> bool:
@@ -141,7 +150,7 @@ def ToxicityRule(
     )
 
 
-def CodeInjectionRule(
+def CodeInjectionRule(  # noqa: N802
     name: str = "code_injection_detector",
     action: GuardrailAction = GuardrailAction.BLOCK,
     enabled: bool = True,

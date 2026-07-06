@@ -15,13 +15,9 @@
 
 from __future__ import annotations
 
-import json
 import os
-import re
 import sys
 from pathlib import Path
-from typing import Optional
-
 
 CONFIG_DIR = Path.home() / ".agentos"
 CONFIG_FILE = CONFIG_DIR / "config.yaml"
@@ -85,7 +81,9 @@ def _detect_current_config() -> dict:
 
     # Determine active provider
     for name in ["openai", "deepseek", "anthropic"]:
-        if config["providers"][name]["env_set"] or config["providers"].get(name, {}).get("in_config"):
+        if config["providers"][name]["env_set"] or config["providers"].get(name, {}).get(
+            "in_config"
+        ):
             config["active"] = name
             break
 
@@ -95,10 +93,11 @@ def _detect_current_config() -> dict:
 def _print_banner():
     """打印欢迎横幅。"""
     from agentos import __version__
-    print(f"\n  ╔══════════════════════════════════════════════╗")
+
+    print("\n  ╔══════════════════════════════════════════════╗")
     print(f"  ║        Nexus AgentOS v{__version__:8s}        ║")
-    print(f"  ║        交互式配置向导                        ║")
-    print(f"  ╚══════════════════════════════════════════════╝")
+    print("  ║        交互式配置向导                        ║")
+    print("  ╚══════════════════════════════════════════════╝")
     print()
 
 
@@ -138,21 +137,23 @@ def _select_provider() -> str:
         print("  输入无效，请输入数字 1-3。")
 
 
-def _input_api_key(provider_name: str) -> Optional[str]:
+def _input_api_key(provider_name: str) -> str | None:
     """交互输入 API Key。"""
     p = PROVIDERS[provider_name]
     print()
     print(f"  ── 配置 {p['label']} API Key ──")
     print()
     print(f"  ① 打开 {p['website']}")
-    print(f"  ② 创建或复制一个 API Key")
-    print(f"  ③ 粘贴到下方（输入后按回车）")
+    print("  ② 创建或复制一个 API Key")
+    print("  ③ 粘贴到下方（输入后按回车）")
     print()
 
     existing = os.environ.get(p["env_var"], "")
     if existing:
         preview = existing[:8] + "..." + existing[-4:] if len(existing) > 20 else existing
-        use_existing = input(f"  检测到环境变量已设置 ({preview})，直接使用？(Y/n): ").strip().lower()
+        use_existing = (
+            input(f"  检测到环境变量已设置 ({preview})，直接使用？(Y/n): ").strip().lower()
+        )
         if use_existing in ("", "y", "yes"):
             return existing
 
@@ -166,8 +167,11 @@ def _input_api_key(provider_name: str) -> Optional[str]:
         # Basic validation
         prefix = p["key_prefix"]
         if prefix and not key.startswith(prefix):
-            warn = input(f"  警告：{p['label']} 的 Key 通常以 '{prefix}' 开头，"
-                         f"确认继续？(y/N): ").strip().lower()
+            warn = (
+                input(f"  警告：{p['label']} 的 Key 通常以 '{prefix}' 开头，" f"确认继续？(y/N): ")
+                .strip()
+                .lower()
+            )
             if warn not in ("y", "yes"):
                 continue
         return key
@@ -181,6 +185,7 @@ def _test_connection(provider_name: str, api_key: str) -> bool:
     try:
         if provider_name == "openai":
             import httpx
+
             resp = httpx.get(
                 "https://api.openai.com/v1/models",
                 headers={"Authorization": f"Bearer {api_key}"},
@@ -197,14 +202,18 @@ def _test_connection(provider_name: str, api_key: str) -> bool:
                 return True
         elif provider_name == "deepseek":
             import httpx
+
             resp = httpx.post(
                 "https://api.deepseek.com/chat/completions",
                 headers={
                     "Authorization": f"Bearer {api_key}",
                     "Content-Type": "application/json",
                 },
-                json={"model": "deepseek-chat", "messages": [{"role": "user",
-                      "content": "hi"}], "max_tokens": 1},
+                json={
+                    "model": "deepseek-chat",
+                    "messages": [{"role": "user", "content": "hi"}],
+                    "max_tokens": 1,
+                },
                 timeout=10,
             )
             if resp.status_code == 200:
@@ -218,6 +227,7 @@ def _test_connection(provider_name: str, api_key: str) -> bool:
                 return True
         elif provider_name == "anthropic":
             import httpx
+
             resp = httpx.post(
                 "https://api.anthropic.com/v1/messages",
                 headers={
@@ -225,8 +235,11 @@ def _test_connection(provider_name: str, api_key: str) -> bool:
                     "anthropic-version": "2023-06-01",
                     "Content-Type": "application/json",
                 },
-                json={"model": "claude-sonnet-4-20250514", "max_tokens": 1,
-                      "messages": [{"role": "user", "content": "hi"}]},
+                json={
+                    "model": "claude-sonnet-4-20250514",
+                    "max_tokens": 1,
+                    "messages": [{"role": "user", "content": "hi"}],
+                },
                 timeout=10,
             )
             if resp.status_code == 200:
@@ -269,17 +282,17 @@ def _save_config(provider_name: str, api_key: str):
         },
     }
     import yaml
+
     with open(CONFIG_FILE, "w") as f:
         yaml.dump(config, f, default_flow_style=False)
 
-    print(f"\n  ✅ 配置已保存")
+    print("\n  ✅ 配置已保存")
     print(f"     {CONFIG_FILE}")
     print(f"     {ENV_FILE}")
 
 
 def _show_completion_message(provider_name: str):
     """显示配置完成后引导。"""
-    from agentos import __version__
     p = PROVIDERS[provider_name]
 
     print()
@@ -291,25 +304,25 @@ def _show_completion_message(provider_name: str):
     print()
     print("  ── 快速开始 ──")
     print()
-    print(f"  # 运行任务")
-    print(f"  agentos \"列出当前目录的文件\"")
+    print("  # 运行任务")
+    print('  agentos "列出当前目录的文件"')
     print()
-    print(f"  # 运行端到端示例")
-    print(f"  python -m examples.multi_agent_research --topic \"量子计算\"")
+    print("  # 运行端到端示例")
+    print('  python -m examples.multi_agent_research --topic "量子计算"')
     print()
     if provider_name != "openai":
         print(f"  # 指定使用 {p['label']}")
-        print(f"  agentos --provider {provider_name} \"写一个 Python 爬虫\"")
+        print(f'  agentos --provider {provider_name} "写一个 Python 爬虫"')
     print()
     print("  ── 多 Provider 配置（可选） ──")
     print()
     print(f"  编辑 {ENV_FILE}，添加其他 API Key 即可实现自动回退:")
-    print(f"    OPENAI_API_KEY=sk-xxx         # 默认使用")
-    print(f"    DEEPSEEK_API_KEY=sk-xxx       # 回退 1")
-    print(f"    ANTHROPIC_API_KEY=sk-ant-xxx  # 回退 2")
+    print("    OPENAI_API_KEY=sk-xxx         # 默认使用")
+    print("    DEEPSEEK_API_KEY=sk-xxx       # 回退 1")
+    print("    ANTHROPIC_API_KEY=sk-ant-xxx  # 回退 2")
     print()
-    print(f"  重新运行 agentos init 修改配置。")
-    print(f"  或 agentos config-panel 打开浏览器版配置面板。")
+    print("  重新运行 agentos init 修改配置。")
+    print("  或 agentos config-panel 打开浏览器版配置面板。")
 
 
 # ── 配置加载接口 ────────────────────────────────────────────
@@ -333,6 +346,7 @@ def load_config() -> dict:
     if CONFIG_FILE.exists():
         try:
             import yaml
+
             raw = yaml.safe_load(CONFIG_FILE.read_text())
             if raw and "providers" in raw:
                 for name, pcfg in raw["providers"].items():
@@ -406,7 +420,7 @@ ANTHROPIC_API_KEY=sk-ant-xxx
     _print_status(current)
 
     if current["configured_providers"]:
-        print(f"  检测到已有 API Key 配置。")
+        print("  检测到已有 API Key 配置。")
         reconfig = input("  是否重新配置？(y/N): ").strip().lower()
         if reconfig not in ("y", "yes"):
             _show_completion_message(current["active"] or current["configured_providers"][0])

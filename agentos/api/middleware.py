@@ -8,9 +8,8 @@ from __future__ import annotations
 
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Optional
-
 
 # ── Request ID ────────────────────────────────────────────────────────────────
 
@@ -18,6 +17,7 @@ from typing import Callable, Optional
 @dataclass
 class RequestContext:
     """请求上下文。"""
+
     request_id: str = ""
     start_time: float = 0.0
     method: str = ""
@@ -49,9 +49,14 @@ class RequestIDMiddleware:
 @dataclass
 class CORSConfig:
     """CORS 配置。"""
+
     allow_origins: list[str] = field(default_factory=lambda: ["*"])
-    allow_methods: list[str] = field(default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"])
-    allow_headers: list[str] = field(default_factory=lambda: ["Content-Type", "Authorization", "X-Request-ID"])
+    allow_methods: list[str] = field(
+        default_factory=lambda: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
+    )
+    allow_headers: list[str] = field(
+        default_factory=lambda: ["Content-Type", "Authorization", "X-Request-ID"]
+    )
     expose_headers: list[str] = field(default_factory=list)
     max_age: int = 86400
     allow_credentials: bool = False
@@ -60,7 +65,7 @@ class CORSConfig:
 class CORSMiddleware:
     """Add CORS headers to every response."""
 
-    def __init__(self, config: Optional[CORSConfig] = None):
+    def __init__(self, config: CORSConfig | None = None):
         self.config = config or CORSConfig()
 
     def apply(self, response_headers: dict) -> dict:
@@ -69,7 +74,9 @@ class CORSMiddleware:
         response_headers["Access-Control-Allow-Methods"] = ", ".join(self.config.allow_methods)
         response_headers["Access-Control-Allow-Headers"] = ", ".join(self.config.allow_headers)
         if self.config.expose_headers:
-            response_headers["Access-Control-Expose-Headers"] = ", ".join(self.config.expose_headers)
+            response_headers["Access-Control-Expose-Headers"] = ", ".join(
+                self.config.expose_headers
+            )
         response_headers["Access-Control-Max-Age"] = str(self.config.max_age)
         if self.config.allow_credentials:
             response_headers["Access-Control-Allow-Credentials"] = "true"
@@ -82,6 +89,7 @@ class CORSMiddleware:
 @dataclass
 class AuthConfig:
     """认证配置。"""
+
     api_key_header: str = "X-API-Key"
     api_key: str = ""
     enabled: bool = True
@@ -90,14 +98,16 @@ class AuthConfig:
 class AuthMiddleware:
     """Simple API-key authentication middleware."""
 
-    def __init__(self, config: Optional[AuthConfig] = None):
+    def __init__(self, config: AuthConfig | None = None):
         self.config = config or AuthConfig()
 
     def authenticate(self, headers: dict) -> tuple[bool, str]:
         """Return (authorized, message)."""
         if not self.config.enabled or not self.config.api_key:
             return True, ""
-        provided = headers.get(self.config.api_key_header.lower(), headers.get(self.config.api_key_header, ""))
+        provided = headers.get(
+            self.config.api_key_header.lower(), headers.get(self.config.api_key_header, "")
+        )
         if provided != self.config.api_key:
             return False, "Invalid or missing API key"
         return True, ""
@@ -109,14 +119,11 @@ class AuthMiddleware:
 class RequestLogMiddleware:
     """Log every request with method, path, status, and elapsed time."""
 
-    def __init__(self, logger: Optional[Callable[[str], None]] = None):
+    def __init__(self, logger: Callable[[str], None] | None = None):
         self._log = logger or print
 
     def log(self, ctx: RequestContext, status: int) -> str:
-        msg = (
-            f"[{ctx.request_id}] {ctx.method} {ctx.path} "
-            f"→ {status} ({ctx.elapsed_ms:.1f}ms)"
-        )
+        msg = f"[{ctx.request_id}] {ctx.method} {ctx.path} " f"→ {status} ({ctx.elapsed_ms:.1f}ms)"
         self._log(msg)
         return msg
 
@@ -129,10 +136,10 @@ class MiddlewareStack:
 
     def __init__(
         self,
-        cors: Optional[CORSMiddleware] = None,
-        auth: Optional[AuthMiddleware] = None,
-        req_log: Optional[RequestLogMiddleware] = None,
-        req_id: Optional[RequestIDMiddleware] = None,
+        cors: CORSMiddleware | None = None,
+        auth: AuthMiddleware | None = None,
+        req_log: RequestLogMiddleware | None = None,
+        req_id: RequestIDMiddleware | None = None,
     ):
         self.cors = cors or CORSMiddleware()
         self.auth = auth or AuthMiddleware()

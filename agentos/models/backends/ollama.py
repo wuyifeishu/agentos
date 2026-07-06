@@ -4,13 +4,15 @@ Supports local LLM inference via Ollama.
 Models: llama3, mistral, codellama, phi3, gemma2, deepseek-r1, etc.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Dict, List, Optional
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
 class OllamaConfig:
     """Configuration for Ollama backend."""
+
     base_url: str = "http://localhost:11434"
     model: str = "llama3"
     temperature: float = 0.7
@@ -33,7 +35,7 @@ class OllamaClient:
     - Custom system prompts
     """
 
-    def __init__(self, config: Optional[OllamaConfig] = None):
+    def __init__(self, config: OllamaConfig | None = None):
         self.config = config or OllamaConfig()
 
     @property
@@ -42,15 +44,15 @@ class OllamaClient:
 
     def _build_payload(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         msgs = messages.copy()
         if system:
             msgs.insert(0, {"role": "system", "content": system})
 
-        payload: Dict[str, Any] = {
+        payload: dict[str, Any] = {
             "model": self.config.model,
             "messages": msgs,
             "stream": False,
@@ -68,7 +70,7 @@ class OllamaClient:
 
         return payload
 
-    async def _async_request(self, payload: Dict) -> Dict:
+    async def _async_request(self, payload: dict) -> dict:
         import httpx
 
         timeout = httpx.Timeout(self.config.timeout)
@@ -82,18 +84,19 @@ class OllamaClient:
                     )
                     resp.raise_for_status()
                     return resp.json()
-            except (httpx.HTTPStatusError, httpx.ConnectError) as e:
+            except (httpx.HTTPStatusError, httpx.ConnectError):
                 if attempt == self.config.max_retries - 1:
                     raise
                 import asyncio
-                await asyncio.sleep(2 ** attempt)
+
+                await asyncio.sleep(2**attempt)
 
     async def chat(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Send a chat completion request.
 
         Returns dict with 'content', 'role', 'usage', 'model'.
@@ -106,11 +109,13 @@ class OllamaClient:
         if "tool_calls" in message:
             for tc in message["tool_calls"]:
                 func = tc.get("function", {})
-                tool_calls.append({
-                    "id": tc.get("id", ""),
-                    "name": func.get("name", ""),
-                    "arguments": func.get("arguments", "{}"),
-                })
+                tool_calls.append(
+                    {
+                        "id": tc.get("id", ""),
+                        "name": func.get("name", ""),
+                        "arguments": func.get("arguments", "{}"),
+                    }
+                )
 
         return {
             "content": message.get("content", ""),
@@ -127,10 +132,10 @@ class OllamaClient:
 
     async def chat_stream(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> AsyncIterator[Dict[str, Any]]:
+    ) -> AsyncIterator[dict[str, Any]]:
         """Stream chat completion tokens."""
         payload = self._build_payload(messages, system, **kwargs)
         payload["stream"] = True
@@ -148,6 +153,7 @@ class OllamaClient:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     import json
+
                     try:
                         event = json.loads(line)
                         message = event.get("message", {})
@@ -163,10 +169,10 @@ class OllamaClient:
 
     def sync_chat(
         self,
-        messages: List[Dict[str, str]],
-        system: Optional[str] = None,
+        messages: list[dict[str, str]],
+        system: str | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Synchronous chat completion."""
         import asyncio
 
@@ -176,7 +182,7 @@ class OllamaClient:
         finally:
             loop.close()
 
-    async def list_models(self) -> List[Dict[str, Any]]:
+    async def list_models(self) -> list[dict[str, Any]]:
         """List locally available Ollama models."""
         import httpx
 
@@ -198,7 +204,7 @@ class OllamaClient:
                 for m in data.get("models", [])
             ]
 
-    async def pull_model(self, model_name: str) -> AsyncIterator[Dict[str, Any]]:
+    async def pull_model(self, model_name: str) -> AsyncIterator[dict[str, Any]]:
         """Pull a model from Ollama registry."""
         import httpx
 
@@ -213,6 +219,7 @@ class OllamaClient:
                 response.raise_for_status()
                 async for line in response.aiter_lines():
                     import json
+
                     try:
                         event = json.loads(line)
                         yield event

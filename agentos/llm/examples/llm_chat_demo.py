@@ -18,9 +18,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 
-from agentos.llm import create_provider, Message, MessageRole, Tool, ToolParameter, ToolCall
+from agentos.llm import Message, MessageRole, Tool, ToolParameter, create_provider
 
 
 def run_chat(provider_name: str, model: str, prompt: str) -> None:
@@ -28,18 +27,25 @@ def run_chat(provider_name: str, model: str, prompt: str) -> None:
     provider = create_provider(provider_name, model=model)
 
     messages = [
-        Message(role=MessageRole.SYSTEM, content="You are a helpful coding assistant. Answer in Chinese."),
+        Message(
+            role=MessageRole.SYSTEM,
+            content="You are a helpful coding assistant. Answer in Chinese.",
+        ),
         Message(role=MessageRole.USER, content=prompt),
     ]
 
     result = provider.chat(messages, temperature=0.7, max_tokens=1024)
 
-    print(f"[provider: {provider.provider_name}] [model: {result.model}] "
-          f"[tokens: {result.usage.total_tokens}] [cost: ${result.usage.cost_usd:.6f}]\n")
+    print(
+        f"[provider: {provider.provider_name}] [model: {result.model}] "
+        f"[tokens: {result.usage.total_tokens}] [cost: ${result.usage.cost_usd:.6f}]\n"
+    )
     print(result.choices[0].message.content)
 
     if result.usage.total_tokens > 0:
-        print(f"\n---\nprompt={result.usage.prompt_tokens} | completion={result.usage.completion_tokens}")
+        print(
+            f"\n---\nprompt={result.usage.prompt_tokens} | completion={result.usage.completion_tokens}"
+        )
 
 
 def run_multi_turn(provider_name: str, model: str) -> None:
@@ -64,7 +70,9 @@ def run_multi_turn(provider_name: str, model: str) -> None:
 
         print(f"[turn {i+1}] user:  {prompt}")
         print(f"[turn {i+1}] agent: {reply}")
-        print(f"          tokens: {result.usage.total_tokens}, cost: ${result.usage.cost_usd:.6f}\n")
+        print(
+            f"          tokens: {result.usage.total_tokens}, cost: ${result.usage.cost_usd:.6f}\n"
+        )
 
 
 def run_streaming(provider_name: str, model: str) -> None:
@@ -90,8 +98,12 @@ def run_function_calling(provider_name: str, model: str) -> None:
             "get_weather",
             "获取指定城市的天气信息",
             {
-                "city": ToolParameter(type="string", description="城市名称，如 Beijing", required=True),
-                "unit": ToolParameter(type="string", description="温度单位", enum=["celsius", "fahrenheit"]),
+                "city": ToolParameter(
+                    type="string", description="城市名称，如 Beijing", required=True
+                ),
+                "unit": ToolParameter(
+                    type="string", description="温度单位", enum=["celsius", "fahrenheit"]
+                ),
             },
             required=["city"],
         ),
@@ -99,7 +111,9 @@ def run_function_calling(provider_name: str, model: str) -> None:
             "calculate",
             "执行数学计算",
             {
-                "expression": ToolParameter(type="string", description="数学表达式，如 '2+3*4'", required=True),
+                "expression": ToolParameter(
+                    type="string", description="数学表达式，如 '2+3*4'", required=True
+                ),
             },
             required=["expression"],
         ),
@@ -130,7 +144,9 @@ def run_function_calling(provider_name: str, model: str) -> None:
         messages.append(choice.message)
         for tc in choice.message.tool_calls:
             if tc.name == "get_weather":
-                tool_result = json.dumps({"city": "Beijing", "temperature": 22, "condition": "Sunny", "unit": "celsius"})
+                tool_result = json.dumps(
+                    {"city": "Beijing", "temperature": 22, "condition": "Sunny", "unit": "celsius"}
+                )
             elif tc.name == "calculate":
                 expr = tc.parsed_arguments.get("expression", "")
                 tool_result = str(eval(expr))
@@ -145,12 +161,22 @@ def run_function_calling(provider_name: str, model: str) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description="Nexus AgentOS LLM Chat Demo")
-    parser.add_argument("--provider", default="openai", choices=["openai", "deepseek", "anthropic"],
-                        help="LLM provider (default: openai)")
+    parser.add_argument(
+        "--provider",
+        default="openai",
+        choices=["openai", "deepseek", "anthropic"],
+        help="LLM provider (default: openai)",
+    )
     parser.add_argument("--model", default="", help="model name (uses provider default if empty)")
-    parser.add_argument("--prompt", default="用 Python 写一个冒泡排序函数", help="single-turn prompt")
-    parser.add_argument("--mode", choices=["chat", "multi", "stream", "functions", "all"], default="all",
-                        help="demo mode (default: all)")
+    parser.add_argument(
+        "--prompt", default="用 Python 写一个冒泡排序函数", help="single-turn prompt"
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["chat", "multi", "stream", "functions", "all"],
+        default="all",
+        help="demo mode (default: all)",
+    )
 
     args = parser.parse_args()
 

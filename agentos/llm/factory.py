@@ -48,13 +48,12 @@ def create_provider(
         LLMProvider 实例。
     """
     if name not in _PROVIDER_REGISTRY:
-        raise ValueError(
-            f"Unknown provider: '{name}'. Available: {sorted(_PROVIDER_REGISTRY)}"
-        )
+        raise ValueError(f"Unknown provider: '{name}'. Available: {sorted(_PROVIDER_REGISTRY)}")
 
     module_path, class_name = _PROVIDER_REGISTRY[name]
 
     import importlib
+
     mod = importlib.import_module(module_path)
     cls = getattr(mod, class_name)
 

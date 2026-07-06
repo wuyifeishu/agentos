@@ -33,24 +33,26 @@ import asyncio
 import time
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, AsyncIterator, Callable, Coroutine, Optional
-
+from collections.abc import AsyncIterator, Callable, Coroutine
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
 
 # ── Task Models ──
 
-class TaskStatus(str, Enum):
+
+class TaskStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
-    SKIPPED = "skipped"     # Dependency failed
+    SKIPPED = "skipped"  # Dependency failed
 
 
 @dataclass
 class TaskResult:
     """Result of a single parallel task."""
+
     task_id: str
     status: TaskStatus
     agent: str
@@ -72,6 +74,7 @@ class TaskResult:
 @dataclass
 class RunResult:
     """Aggregate result of a parallel execution run."""
+
     run_id: str
     total: int
     done: int
@@ -105,7 +108,7 @@ class ParallelExecutor:
     def __init__(
         self,
         max_concurrent: int = 8,
-        agent_fn: Optional[ParallelAgentFn] = None,
+        agent_fn: ParallelAgentFn | None = None,
         max_retries: int = 1,
         timeout: float = 300.0,
     ):
@@ -161,8 +164,7 @@ class ParallelExecutor:
 
                 # Check if dependencies all succeeded
                 deps = dependencies.get(task_id, [])
-                deps_failed = [d for d in deps
-                               if d in all_results and not all_results[d].ok]
+                deps_failed = [d for d in deps if d in all_results and not all_results[d].ok]
 
                 if deps_failed:
                     result = TaskResult(
@@ -284,7 +286,7 @@ class ParallelExecutor:
                 result.status = TaskStatus.DONE
                 break
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 result.error = f"Timeout after {self._timeout}s"
                 result.status = TaskStatus.FAILED
 
@@ -316,9 +318,7 @@ class ParallelExecutor:
     # ── Topological Sort ──
 
     @staticmethod
-    def _topological_sort(
-        dependencies: dict[str, list[str]]
-    ) -> list[list[str]]:
+    def _topological_sort(dependencies: dict[str, list[str]]) -> list[list[str]]:
         """Kahn's algorithm → ordered levels for parallel execution."""
         in_degree: dict[str, int] = {node: 0 for node in dependencies}
         children: dict[str, list[str]] = defaultdict(list)

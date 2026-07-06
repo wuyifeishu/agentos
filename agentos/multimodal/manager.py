@@ -6,18 +6,14 @@ AgentOS v0.40 Multimodal — 多模态输入支持。
 from __future__ import annotations
 
 import base64
-import json
 import logging
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional, Any
-
+from enum import StrEnum
 
 logger = logging.getLogger(__name__)
 
 
-class Modality(str, Enum):
-
+class Modality(StrEnum):
     """模态类型枚举。"""
 
     TEXT = "text"
@@ -30,26 +26,33 @@ class Modality(str, Enum):
 @dataclass
 class MultimodalBlock:
     """多模态输入块 — 遵循OpenAI/Anthropic content block格式。"""
+
     type: str  # text | image_url | audio | image
     text: str = ""
     source: dict = field(default_factory=dict)
     mime_type: str = ""
 
     @classmethod
-    def text_block(cls, text: str) -> "MultimodalBlock":
+    def text_block(cls, text: str) -> MultimodalBlock:
         return cls(type="text", text=text)
 
     @classmethod
-    def image_url(cls, url: str, detail: str = "auto") -> "MultimodalBlock":
-        return cls(type="image_url", source={"type": "image_url", "image_url": {"url": url, "detail": detail}})
+    def image_url(cls, url: str, detail: str = "auto") -> MultimodalBlock:
+        return cls(
+            type="image_url",
+            source={"type": "image_url", "image_url": {"url": url, "detail": detail}},
+        )
 
     @classmethod
-    def image_base64(cls, data: bytes, mime: str = "image/jpeg") -> "MultimodalBlock":
+    def image_base64(cls, data: bytes, mime: str = "image/jpeg") -> MultimodalBlock:
         b64 = base64.b64encode(data).decode()
-        return cls(type="image_url", source={"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+        return cls(
+            type="image_url",
+            source={"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
+        )
 
     @classmethod
-    def audio(cls, data: bytes, mime: str = "audio/wav") -> "MultimodalBlock":
+    def audio(cls, data: bytes, mime: str = "audio/wav") -> MultimodalBlock:
         b64 = base64.b64encode(data).decode()
         return cls(type="audio", mime_type=mime, source={"data": b64})
 
@@ -71,6 +74,7 @@ class ImageProcessor:
     def encode_file(path: str) -> tuple[str, str]:
         """返回(base64, mime_type)。"""
         import mimetypes
+
         mime = mimetypes.guess_type(path)[0] or "image/png"
         with open(path, "rb") as f:
             data = f.read()
@@ -97,8 +101,10 @@ class ImageProcessor:
     def purge_metadata(data: bytes) -> bytes:
         """清除图片EXIF元数据。"""
         try:
-            from PIL import Image
             import io
+
+            from PIL import Image
+
             img = Image.open(io.BytesIO(data))
             data_no_exif = list(img.getdata())
             cleaned = Image.new(img.mode, img.size)
@@ -120,6 +126,7 @@ class AudioProcessor:
         """使用whisper转文字。"""
         try:
             import whisper
+
             model = whisper.load_model(whisper_model)
             result = model.transcribe(path)
             return result["text"]
@@ -130,6 +137,7 @@ class AudioProcessor:
     @staticmethod
     def encode_file(path: str) -> tuple[str, str]:
         import mimetypes
+
         mime = mimetypes.guess_type(path)[0] or "audio/wav"
         with open(path, "rb") as f:
             data = f.read()
@@ -143,6 +151,7 @@ class DocumentParser:
     def parse_pdf(path: str) -> str:
         try:
             import PyPDF2
+
             text = []
             with open(path, "rb") as f:
                 reader = PyPDF2.PdfReader(f)
@@ -159,6 +168,7 @@ class DocumentParser:
     def parse_docx(path: str) -> str:
         try:
             from docx import Document
+
             doc = Document(path)
             return "\n".join(p.text for p in doc.paragraphs if p.text)
         except ImportError:
@@ -208,11 +218,20 @@ class MultimodalManager:
             try:
                 if ext in image_exts:
                     b64, mime = ImageProcessor.encode_file(p)
-                    blocks.append(MultimodalBlock(type="image_url",
-                            source={"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}}))
+                    blocks.append(
+                        MultimodalBlock(
+                            type="image_url",
+                            source={
+                                "type": "image_url",
+                                "image_url": {"url": f"data:{mime};base64,{b64}"},
+                            },
+                        )
+                    )
                 elif ext in audio_exts:
                     b64, mime = AudioProcessor.encode_file(p)
-                    blocks.append(MultimodalBlock(type="audio", mime_type=mime, source={"data": b64}))
+                    blocks.append(
+                        MultimodalBlock(type="audio", mime_type=mime, source={"data": b64})
+                    )
                 elif ext in doc_exts:
                     text, fmt = DocumentParser.parse_auto(p)
                     blocks.append(MultimodalBlock.text_block(text))

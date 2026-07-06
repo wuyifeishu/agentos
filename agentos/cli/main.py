@@ -4,19 +4,17 @@ AgentOS v1.7.1 CLI — System layer + Desktop client: file ops, shell, browser, 
 
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 
-from agentos.llm.factory import create_provider
-from agentos.llm.base import Tool, ToolParameter
-from agentos.agent.tool_agent import ToolAgent, ToolExecutor, AgentConfig, MockLLMProvider
+from agentos.agent.tool_agent import AgentConfig, MockLLMProvider, ToolAgent, ToolExecutor
 from agentos.cli.errors import (
     no_provider_configured,
-    single_provider_failed,
     no_task_provided,
     welcome,
 )
+from agentos.llm.base import Tool, ToolParameter
+from agentos.llm.factory import create_provider
 
 
 def _build_executor() -> ToolExecutor:
@@ -90,11 +88,16 @@ def _build_executor() -> ToolExecutor:
 def _run_shell_unsafe(command: str) -> str:
     import subprocess
     import tempfile
+
     try:
         with tempfile.TemporaryDirectory() as td:
             result = subprocess.run(
-                command, shell=True, capture_output=True, text=True,
-                timeout=30, cwd=td,
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=td,
             )
             out = result.stdout.strip()
             err = result.stderr.strip()
@@ -171,11 +174,12 @@ def _build_agent(provider_name: str = "", verbose: bool = False) -> ToolAgent:
 
 def _run_hello():
     """一键 hello world 体验 — 无需配置，始终可用。"""
-    from agentos import __version__
     import time
 
+    from agentos import __version__
+
     print(f"  \033[36mNexus AgentOS\033[0m v{__version__}")
-    print(f"  \033[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m")
+    print("  \033[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m")
     print()
 
     # Step 1: check provider
@@ -208,28 +212,33 @@ def _run_hello():
 
     time.sleep(0.3)
     print()
-    print(f"  \033[1m一切就绪。\033[0m")
+    print("  \033[1m一切就绪。\033[0m")
     print()
 
-    if os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"):
-        print(f"  快速开始：")
-        print(f"    \033[32magentos\033[0m \"用一句话解释什么是递归\"")
-        print(f"    \033[32magentos demo\033[0m")
+    if (
+        os.environ.get("OPENAI_API_KEY")
+        or os.environ.get("DEEPSEEK_API_KEY")
+        or os.environ.get("ANTHROPIC_API_KEY")
+    ):
+        print("  快速开始：")
+        print('    \033[32magentos\033[0m "用一句话解释什么是递归"')
+        print("    \033[32magentos demo\033[0m")
     else:
-        print(f"  下一步（30 秒配置）：")
-        print(f"    \033[32magentos init\033[0m        终端交互式配置")
-        print(f"    \033[32magentos config-panel\033[0m 浏览器图形界面")
+        print("  下一步（30 秒配置）：")
+        print("    \033[32magentos init\033[0m        终端交互式配置")
+        print("    \033[32magentos config-panel\033[0m 浏览器图形界面")
     print()
 
 
 def _run_file_demo(verbose: bool):
     """文件操作演示 — 创建、读取、列表。"""
-    from agentos.agent.tool_agent import ToolAgent, ToolExecutor, AgentConfig
+    from agentos.agent.tool_agent import AgentConfig, ToolAgent, ToolExecutor
 
     executor = ToolExecutor()
 
     def write_file(path: str, content: str) -> str:
         import os as _os
+
         try:
             _os.makedirs(_os.path.dirname(path) or ".", exist_ok=True)
             with open(path, "w") as f:
@@ -247,28 +256,41 @@ def _run_file_demo(verbose: bool):
 
     def list_dir(path: str) -> str:
         import os as _os
+
         try:
             return "\n".join(sorted(_os.listdir(path))) or "(空)"
         except Exception as e:
             return f"列出失败: {e}"
 
     executor.register(
-        Tool.from_function("write_file", "写入文本到文件", {
-            "path": ToolParameter(type="string", description="文件路径"),
-            "content": ToolParameter(type="string", description="文件内容"),
-        }),
+        Tool.from_function(
+            "write_file",
+            "写入文本到文件",
+            {
+                "path": ToolParameter(type="string", description="文件路径"),
+                "content": ToolParameter(type="string", description="文件内容"),
+            },
+        ),
         write_file,
     )
     executor.register(
-        Tool.from_function("read_file", "读取文件内容", {
-            "path": ToolParameter(type="string", description="文件路径"),
-        }),
+        Tool.from_function(
+            "read_file",
+            "读取文件内容",
+            {
+                "path": ToolParameter(type="string", description="文件路径"),
+            },
+        ),
         read_file,
     )
     executor.register(
-        Tool.from_function("list_dir", "列出目录内容", {
-            "path": ToolParameter(type="string", description="目录路径"),
-        }),
+        Tool.from_function(
+            "list_dir",
+            "列出目录内容",
+            {
+                "path": ToolParameter(type="string", description="目录路径"),
+            },
+        ),
         list_dir,
     )
 
@@ -292,10 +314,71 @@ def _run_file_demo(verbose: bool):
     print(f"\n  演示目录: {demo_dir}")
     print()
 
-    result = agent.run(f"在 {demo_dir} 下创建 hello.txt 写入 'Hello from AgentOS!'，列出目录内容，再读取 hello.txt 确认。")
+    result = agent.run(
+        f"在 {demo_dir} 下创建 hello.txt 写入 'Hello from AgentOS!'，列出目录内容，再读取 hello.txt 确认。"
+    )
     print(f"\n  耗时: {result.total_duration_ms/1000:.1f}s | 步数: {result.total_steps}")
     print(f"  Token: {result.total_tokens} | 费用: ${result.total_cost_usd:.4f}")
     print(f"  结果: {result.final_answer}")
+
+
+def _run_production_agent(cli_args: list[str], verbose: bool = False) -> None:
+    """Run a task through ProductionAgent (ModelRouter + AuditLogger + SmartCache)."""
+    host = "0.0.0.0"
+    port = 8090
+
+    i = 0
+    while i < len(cli_args):
+        a = cli_args[i]
+        if a == "--host" and i + 1 < len(cli_args):
+            host = cli_args[i + 1]
+            i += 2
+            continue
+        elif a == "--port" and i + 1 < len(cli_args):
+            port = int(cli_args[i + 1])
+            i += 2
+            continue
+        elif a == "--budget" and i + 1 < len(cli_args):
+            i += 2
+            continue
+        else:
+            i += 1
+
+    try:
+        from agentos.agent.model_router import ModelRouter
+        from agentos.agent.production import ProductionConfig
+        from agentos.llm.factory import create_provider
+        from agentos.llm.smart_cache import CacheConfig, SmartCache
+        from agentos.server.agent_api import create_agent_api
+    except ImportError as e:
+        print(f"Error: missing dependency — {e}")
+        sys.exit(1)
+
+    try:
+        provider = create_provider("openai")
+    except Exception:
+        print("Warning: no live provider, using mock.")
+        from agentos.agent.tool_agent import MockLLMProvider
+
+        provider = MockLLMProvider()
+
+    executor = _build_executor()
+    router = ModelRouter.with_defaults(daily_budget_usd=50.0)
+    cache = SmartCache(CacheConfig(enabled=True, fuzzy_enabled=True))
+
+    app = create_agent_api(
+        provider=provider,
+        executor=executor,
+        router=router,
+        cache=cache,
+        config=ProductionConfig(budget_usd=50.0),
+    )
+
+    import uvicorn
+
+    print(f"AgentOS Production API → http://{host}:{port}")
+    print("  POST /agent/run    GET /agent/health    GET /agent/stats")
+    uvicorn.run(app, host=host, port=port, log_level="info" if verbose else "warning")
 
 
 def main():
@@ -306,6 +389,7 @@ def main():
     if not args or args[0] in ("help", "--help", "-h"):
         from agentos import __version__
         from agentos.cli.init import config_status_text
+
         print(f"AgentOS v{__version__} — Production Agent Framework CLI\n")
         print(f"Provider: {config_status_text()}\n")
         print("Usage:")
@@ -316,6 +400,8 @@ def main():
         print("  agentos run <task>            Same as above")
         print("  agentos demo                  Run interactive demo (weather/stock/files)")
         print("  agentos serve                 Start API server (port 8080)")
+        print("  agentos run [--port PORT]     Start ProductionAgent API (port 8090)")
+        print("  agentos daemon <cmd>          Server daemon: start|stop|status|restart|run")
         print("  agentos version               Show version")
         print("  agentos skills                List agent marketplace skills")
         print("  agentos docs [output-dir]     Generate API reference docs (→ docs/api/)")
@@ -324,8 +410,12 @@ def main():
         print("  agentos desktop               Launch web desktop client (port 19999)")
         print("  agentos desktop-shell         Launch native desktop shell (pywebview)")
         print("  agentos enterprise <cmd>      Enterprise features: api-key, tenant, audit")
-        print("  agentos marketplace <cmd>      Skill marketplace: search|install|list|update|uninstall|stats")
-        print("  agentos rollback <version>     Rollback to a previous version (--list|--verify|--prune)")
+        print(
+            "  agentos marketplace <cmd>      Skill marketplace: search|install|list|update|uninstall|stats"
+        )
+        print(
+            "  agentos rollback <version>     Rollback to a previous version (--list|--verify|--prune)"
+        )
         print("\nOptions:")
         print("  -v, --verbose                 Show agent step details")
         print("  --provider <name>             Force provider: openai|deepseek|anthropic")
@@ -337,28 +427,32 @@ def main():
         print("\nExamples:")
         print("  agentos hello                 # 30s quick tour")
         print("  agentos init                  # 1-minute setup wizard")
-        print("  agentos \"列出当前目录的文件\"")
-        print("  agentos \"创建一个 hello.py 打印 Hello World\"")
+        print('  agentos "列出当前目录的文件"')
+        print('  agentos "创建一个 hello.py 打印 Hello World"')
         print("  agentos demo")
         sys.exit(0)
 
     cmd = args[0]
     if cmd == "init":
         from agentos.cli.init import init_cli
+
         init_cli(args)
         return
 
     if cmd == "config-panel":
         from agentos.cli.config_panel import start_panel
+
         start_panel()
         return
 
     if cmd == "status":
         from agentos.cli.init import _detect_current_config, config_status_text
+
         print(f"Provider: {config_status_text()}\n")
         config = _detect_current_config()
         for name, info in config["providers"].items():
             from agentos.cli.init import PROVIDERS
+
             p = PROVIDERS[name]
             status_icon = "✅" if info["env_set"] else "⬜"
             key_info = info.get("key_preview", "未配置") or "未配置"
@@ -368,11 +462,13 @@ def main():
 
     if cmd == "version":
         from agentos import __version__
+
         print(f"AgentOS v{__version__}")
         return
 
     if cmd == "skills":
         from agentos.agents.market import AgentMarket
+
         market = AgentMarket()
         stats = market.stats()
         print(f"Agent Skill Market: {stats['total']} skills\n")
@@ -384,8 +480,10 @@ def main():
         return
 
     if cmd == "docs":
-        from agentos.docs.generator import generate_api_docs, generate_quickstart
         import os
+
+        from agentos.docs.generator import generate_api_docs, generate_quickstart
+
         if not os.path.isdir("agentos"):
             print("Error: run 'agentos docs' from the agentos project root directory")
             sys.exit(1)
@@ -395,7 +493,9 @@ def main():
         qs_path = os.path.join(output_dir, "quickstart.md")
         md = generate_api_docs("agentos", api_path)
         generate_quickstart(qs_path)
-        module_count = len([d for d in os.listdir("agentos") if os.path.isdir(os.path.join("agentos", d))])
+        module_count = len(
+            [d for d in os.listdir("agentos") if os.path.isdir(os.path.join("agentos", d))]
+        )
         print(f"Generated API docs: {api_path} ({len(md.splitlines())} lines)")
         print(f"Generated Quickstart: {qs_path}")
         print(f"Scanned ~{module_count} source modules")
@@ -403,12 +503,14 @@ def main():
 
     if cmd == "dashboard":
         from agentos.dashboard.server import start_dashboard
+
         print("Starting AgentOS Dashboard...")
         start_dashboard()
         return
 
     if cmd == "mcp-server":
         from agentos.mcp.server import start_mcp_server
+
         port = 0
         for i, a in enumerate(args[1:]):
             if a == "--port" and i + 2 < len(args):
@@ -418,6 +520,7 @@ def main():
 
     if cmd == "desktop":
         from agentos.desktop.server import launch_desktop
+
         host = "0.0.0.0"
         port = 19999
         mode = "dev"
@@ -433,6 +536,7 @@ def main():
 
     if cmd == "desktop-shell":
         from agentos.desktop.shell import main as shell_main
+
         sys.argv = [sys.argv[0]] + args[1:]
         shell_main()
         return
@@ -447,7 +551,12 @@ def main():
 
     if cmd == "rollback":
         from agentos.cli.rollback import rollback_cli
+
         sys.exit(rollback_cli(args[1:]))
+
+    if cmd == "run":
+        _run_production_agent(args[1:], verbose)
+        return
 
     if cmd == "serve":
         host = "0.0.0.0"
@@ -458,15 +567,25 @@ def main():
             elif a == "--port" and i + 2 < len(args):
                 port = int(args[i + 2])
         from agentos.api.server import AgentAPI
-        from agentos.core.loop import AgentLoop, LoopConfig
         from agentos.core.context import ContextManager
-        from agentos.tools.registry import ToolRegistry
-        from agentos.models.router import ModelRouter, RECOMMENDED_CONFIG
+        from agentos.core.loop import AgentLoop
+        from agentos.models.router import RECOMMENDED_CONFIG, ModelRouter
         from agentos.tools.code_agent import CodeAgentTool, ShellTool
-        from agentos.tools.file_tools import ReadFileTool, WriteFileTool, ListDirectoryTool
+        from agentos.tools.file_tools import ListDirectoryTool, ReadFileTool, WriteFileTool
+        from agentos.tools.registry import ToolRegistry
         from agentos.tools.web_tools import WebFetchTool
+
         registry = ToolRegistry()
-        registry.register_many([ReadFileTool(), WriteFileTool(), ListDirectoryTool(), CodeAgentTool(), ShellTool(), WebFetchTool()])
+        registry.register_many(
+            [
+                ReadFileTool(),
+                WriteFileTool(),
+                ListDirectoryTool(),
+                CodeAgentTool(),
+                ShellTool(),
+                WebFetchTool(),
+            ]
+        )
         ctx = ContextManager(system_prompt="AgentOS API Server v1.0")
         router = ModelRouter(RECOMMENDED_CONFIG)
         loop = AgentLoop(model_router=router, tool_registry=registry, context_manager=ctx)
@@ -474,6 +593,11 @@ def main():
         print(f"AgentOS API starting on http://{host}:{port}")
         api.serve(host=host, port=port)
         return
+
+    if cmd == "daemon":
+        from agentos.server.daemon import daemon_main
+
+        sys.exit(daemon_main(args[1:]))
 
     if cmd == "hello":
         _run_hello()
@@ -511,27 +635,32 @@ def main():
 
     agent = _build_agent(verbose=verbose)
     # 自动记录 tracker
+    import time
+    import uuid
+
     from agentos.dashboard.tracker import Tracker
-    import uuid, time
+
     tracker = Tracker.get()
     session_id = f"run-{uuid.uuid4().hex[:12]}"
-    rec = tracker.start_session(session_id, task, model="auto", provider="auto")
+    tracker.start_session(session_id, task, model="auto", provider="auto")
     t0 = time.time()
     try:
         result = agent.run(task)
-        elapsed = (time.time() - t0) * 1000
+        (time.time() - t0) * 1000
         tracker.finish_session(
             session_id,
             status="completed" if result.success else "error",
             error=result.error if not result.success else "",
-            total_cost=result.total_cost_usd if hasattr(result, 'total_cost_usd') else 0.0,
+            total_cost=result.total_cost_usd if hasattr(result, "total_cost_usd") else 0.0,
         )
         print(f"\n{'─' * 60}")
         if result.success:
-            print(f"Result ({(result.total_duration_ms/1000):.1f}s, "
-                  f"{result.total_steps} steps, "
-                  f"{result.total_tokens} tokens, "
-                  f"${result.total_cost_usd:.4f}):")
+            print(
+                f"Result ({(result.total_duration_ms/1000):.1f}s, "
+                f"{result.total_steps} steps, "
+                f"{result.total_tokens} tokens, "
+                f"${result.total_cost_usd:.4f}):"
+            )
             print(f"{result.final_answer}")
         else:
             print(f"Error: {result.error}")
@@ -556,7 +685,7 @@ def _run_marketplace(args: list[str]):
         print("\n兼容格式: agentos / openclaw / mcp / generic")
         return
 
-    from agentos.marketplace import SkillRegistry, InstallResult
+    from agentos.marketplace import SkillRegistry
 
     registry = SkillRegistry()
     sub = args[0]
@@ -567,7 +696,9 @@ def _run_marketplace(args: list[str]):
         print(f"Searching marketplace for '{query or 'all'}'...\n")
         results = registry.search(query)
         if not results:
-            print("No skills found. Try a broader query, or publish your own with 'agentos-skill-<name>' on PyPI.")
+            print(
+                "No skills found. Try a broader query, or publish your own with 'agentos-skill-<name>' on PyPI."
+            )
             return
         print(f"{'Name':<24s} {'Version':<12s} {'Source':<10s} Description")
         print("-" * 80)
@@ -668,11 +799,11 @@ def _run_marketplace(args: list[str]):
 
     elif sub == "stats":
         stats = registry.stats()
-        print(f"Marketplace Stats:")
+        print("Marketplace Stats:")
         print(f"  Total installed: {stats['total']}")
         print(f"  Market dir:      {stats['market_dir']}")
         if stats.get("by_format"):
-            print(f"  By format:")
+            print("  By format:")
             for fmt, count in stats["by_format"].items():
                 print(f"    {fmt}: {count}")
 
@@ -694,8 +825,9 @@ def _run_enterprise(args: list[str]):
 
     sub = args[0]
     from agentos.enterprise import (
-        APIKeyManager, TenantManager, AuditLogger,
-        KeyCreateRequest, KeyScope, TenantTier,
+        APIKeyManager,
+        AuditLogger,
+        TenantManager,
     )
 
     if sub == "api-key":
@@ -710,13 +842,17 @@ def _run_enterprise(args: list[str]):
 
 
 def _run_enterprise_api_key(args: list[str], mgr):
+    from agentos.enterprise import KeyCreateRequest, KeyScope
+
     if not args:
         print("Usage: agentos enterprise api-key <create|list|revoke|stats>")
         return
     cmd = args[0]
     if cmd == "create":
         name = args[1] if len(args) > 1 else "cli-key"
-        result = mgr.create_key(KeyCreateRequest(name=name, scopes=[KeyScope.AGENT_RUN, KeyScope.READ]))
+        result = mgr.create_key(
+            KeyCreateRequest(name=name, scopes=[KeyScope.AGENT_RUN, KeyScope.READ])
+        )
         print(f"Key created: {result.key_id}")
         print(f"Plaintext (only shown once): {result.plaintext_key}")
         print(f"Prefix: {result.key_prefix}")
@@ -739,13 +875,17 @@ def _run_enterprise_api_key(args: list[str], mgr):
         print(f"{'Revoked' if ok else 'Not found or already revoked'}: {args[1]}")
     elif cmd == "stats":
         stats = mgr.stats()
-        print(f"Total: {stats['total']}  Active: {stats['active']}  Revoked: {stats['revoked']}  "
-              f"Total usage: {stats['total_usage_count']}")
+        print(
+            f"Total: {stats['total']}  Active: {stats['active']}  Revoked: {stats['revoked']}  "
+            f"Total usage: {stats['total_usage_count']}"
+        )
     else:
         print(f"Unknown api-key command: {cmd}")
 
 
 def _run_enterprise_tenant(args: list[str], mgr):
+    from agentos.enterprise import TenantTier
+
     if not args:
         print("Usage: agentos enterprise tenant <create|list|stats>")
         return
@@ -753,7 +893,9 @@ def _run_enterprise_tenant(args: list[str], mgr):
     if cmd == "create":
         name = args[1] if len(args) > 1 else "default"
         tier_str = args[2] if len(args) > 2 else "free"
-        tier = TenantTier(tier_str) if tier_str in [t.value for t in TenantTier] else TenantTier.FREE
+        tier = (
+            TenantTier(tier_str) if tier_str in [t.value for t in TenantTier] else TenantTier.FREE
+        )
         tenant = mgr.create_tenant(name=name, tier=tier)
         print(f"Tenant created: {tenant.tenant_id}")
         print(f"Name: {tenant.name}  Tier: {tenant.tier.value}")
@@ -792,7 +934,7 @@ def _run_enterprise_audit(args: list[str], logger):
             print("No audit events.")
             return
         for e in events:
-            ts = __import__('time').strftime("%H:%M:%S", __import__('time').gmtime(e.timestamp))
+            ts = __import__("time").strftime("%H:%M:%S", __import__("time").gmtime(e.timestamp))
             print(f"[{ts}] {e.category.value:8s} {e.action:24s} {e.status}")
     elif cmd == "export":
         fmt = args[1] if len(args) > 1 else "json"
@@ -806,8 +948,8 @@ def _run_enterprise_audit(args: list[str], logger):
 
 
 def _run_demo(verbose: bool):
-    from agentos.llm import create_provider, Tool, ToolParameter
-    from agentos.agent import ToolAgent, ToolExecutor, AgentConfig
+    from agentos.agent import AgentConfig, ToolAgent, ToolExecutor
+    from agentos.llm import Tool, ToolParameter, create_provider
 
     def get_weather(city: str) -> str:
         data = {
@@ -826,15 +968,23 @@ def _run_demo(verbose: bool):
 
     executor = ToolExecutor()
     executor.register(
-        Tool.from_function("get_weather", "获取城市天气", {
-            "city": ToolParameter(type="string", description="城市名"),
-        }),
+        Tool.from_function(
+            "get_weather",
+            "获取城市天气",
+            {
+                "city": ToolParameter(type="string", description="城市名"),
+            },
+        ),
         get_weather,
     )
     executor.register(
-        Tool.from_function("get_stock_price", "获取股票价格", {
-            "symbol": ToolParameter(type="string", description="股票代码，如 AAPL"),
-        }),
+        Tool.from_function(
+            "get_stock_price",
+            "获取股票价格",
+            {
+                "symbol": ToolParameter(type="string", description="股票代码，如 AAPL"),
+            },
+        ),
         get_stock,
     )
 
@@ -845,15 +995,19 @@ def _run_demo(verbose: bool):
     else:
         print("\n  ⚠️  Mock 演示 — 配置 API Key 获取真实 AI 响应\n")
         print("    运行: agentos init\n")
-        provider = MockLLMProvider([
-            MockLLMProvider.tool_response(
-                "get_weather", {"city": "北京"}, tool_call_id="tc_w1",
-            ),
-            MockLLMProvider.text_response(
-                "北京目前天气晴，气温 22°C，湿度 35%，东北风 3 级。"
-                "适合户外活动，建议带薄外套。"
-            ),
-        ])
+        provider = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response(
+                    "get_weather",
+                    {"city": "北京"},
+                    tool_call_id="tc_w1",
+                ),
+                MockLLMProvider.text_response(
+                    "北京目前天气晴，气温 22°C，湿度 35%，东北风 3 级。"
+                    "适合户外活动，建议带薄外套。"
+                ),
+            ]
+        )
 
     agent = ToolAgent(
         provider=provider,
@@ -863,7 +1017,7 @@ def _run_demo(verbose: bool):
     )
 
     result = agent.run("北京天气怎么样？")
-    print(f"\nTask: 北京天气怎么样？")
+    print("\nTask: 北京天气怎么样？")
     print(f"Steps: {result.total_steps} | Time: {(result.total_duration_ms/1000):.1f}s")
     print(f"Tokens: {result.total_tokens} | Cost: ${result.total_cost_usd:.4f}")
     print(f"Answer: {result.final_answer}")

@@ -7,12 +7,9 @@ SQLite Checkpointer — 零依赖本地持久化。
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
-from typing import Any
 
 from agentos.checkpoint.base import (
     Checkpoint,
@@ -128,9 +125,7 @@ class SQLiteCheckpointer(CheckpointBackend):
             ).fetchone()
         return self._row_to_checkpoint(row) if row else None
 
-    async def list_threads(
-        self, limit: int = 50, offset: int = 0
-    ) -> list[CheckpointMetadata]:
+    async def list_threads(self, limit: int = 50, offset: int = 0) -> list[CheckpointMetadata]:
         with self._get_conn() as conn:
             rows = conn.execute(
                 """SELECT * FROM checkpoints

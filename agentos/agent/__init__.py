@@ -6,20 +6,19 @@ v1.3.38: +流式运行(run_stream)、错误重试、checkpoint/resume、MockLLMP
 v1.3.37: ToolUsingAgent — 基于 LLM Function Calling 的多步推理 Agent。
 """
 
-from agentos.agent.tool_agent import (
-    ToolAgent,
-    ToolExecutor,
-    AgentConfig,
-    AgentStep,
-    AgentResult,
-    MockLLMProvider,
-)
-
 from agentos.agent.pipeline import (
     ConditionalPipeline,
     ParallelPipeline,
-    RouterAgent,
     PipelineResult,
+    RouterAgent,
+)
+from agentos.agent.tool_agent import (
+    AgentConfig,
+    AgentResult,
+    AgentStep,
+    MockLLMProvider,
+    ToolAgent,
+    ToolExecutor,
 )
 
 __all__ = [

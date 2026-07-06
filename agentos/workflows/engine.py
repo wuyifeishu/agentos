@@ -5,13 +5,13 @@ AgentOS v0.20 预设工作流模板。
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable
+from enum import StrEnum
+from typing import Any
 
 
-class WorkflowType(str, Enum):
-
+class WorkflowType(StrEnum):
     """工作流类型枚举。"""
 
     CODE_REVIEW = "code_review"
@@ -24,6 +24,7 @@ class WorkflowType(str, Enum):
 @dataclass
 class WorkflowStep:
     """工作流步骤定义。"""
+
     agent_role: str
     instruction: str
     input_from: int | None = None  # 上一步的index，None=原始输入
@@ -111,7 +112,6 @@ class WorkflowEngine:
 
     async def execute(self, input_text: str, context: dict | None = None) -> str:
         """执行工作流。"""
-        from agentos.models.router import ModelRouter
 
         last_output = input_text
         for round_idx in range(self.workflow.max_rounds):

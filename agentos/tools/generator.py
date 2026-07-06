@@ -18,6 +18,7 @@ import yaml
 @dataclass
 class GeneratedTool:
     """单个生成的工具描述。"""
+
     name: str
     description: str
     operation_id: str = ""
@@ -73,8 +74,14 @@ class OpenAPIToolGenerator:
         "object": {"type": "object"},
     }
 
-    def __init__(self, spec_url: str = "", spec_path: str = "", api_base: str = "",
-                 auth_header: str = "Authorization", auth_value: str = ""):
+    def __init__(
+        self,
+        spec_url: str = "",
+        spec_path: str = "",
+        api_base: str = "",
+        auth_header: str = "Authorization",
+        auth_value: str = "",
+    ):
         self.spec_url = spec_url
         self.spec_path = spec_path
         self.api_base = api_base
@@ -127,8 +134,9 @@ class OpenAPIToolGenerator:
 
         return tools
 
-    def _build_tool(self, path_url: str, method: str, operation: dict,
-                    base_url: str) -> GeneratedTool:
+    def _build_tool(
+        self, path_url: str, method: str, operation: dict, base_url: str
+    ) -> GeneratedTool:
         """从单个endpoint构建GeneratedTool。"""
         operation_id = operation.get("operationId", self._generate_operation_id(method, path_url))
         summary = operation.get("summary", "")
@@ -230,9 +238,7 @@ class OpenAPIToolGenerator:
             resp = await self._http.get(url, params=params, headers=headers)
         else:
             headers.setdefault("Content-Type", "application/json")
-            resp = await self._http.request(
-                tool.method, url, json=params, headers=headers
-            )
+            resp = await self._http.request(tool.method, url, json=params, headers=headers)
 
         resp.raise_for_status()
         return resp.json()

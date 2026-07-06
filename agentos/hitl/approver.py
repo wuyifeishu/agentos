@@ -3,12 +3,13 @@ Human-in-the-Loop approval engine — request construction, risk assessment,
 policy evaluation, and decision processing.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Set
+from enum import StrEnum
+from typing import Any
 
 
-class ApprovalStatus(str, Enum):
+class ApprovalStatus(StrEnum):
     """Status of an approval request."""
 
     PENDING = "pending"
@@ -19,7 +20,7 @@ class ApprovalStatus(str, Enum):
     SKIPPED = "skipped"
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """Risk classification for approval decisions."""
 
     LOW = "low"
@@ -91,8 +92,8 @@ class HumanInTheLoop:
 
     def __init__(
         self,
-        policy: Optional[ApprovalPolicy] = None,
-        callback: Optional[ApprovalCallback] = None,
+        policy: ApprovalPolicy | None = None,
+        callback: ApprovalCallback | None = None,
     ):
         self.policy = policy or ApprovalPolicy()
         self.callback = callback
@@ -112,7 +113,8 @@ class HumanInTheLoop:
         data_affected: list[str] | None = None,
     ) -> ApprovalRequest:
         """Create an approval request and submit it for decision."""
-        import time, uuid
+        import time
+        import uuid
 
         request_id = uuid.uuid4().hex[:12]
         req = ApprovalRequest(
@@ -165,10 +167,11 @@ class HumanInTheLoop:
             # Cache if approved
             if decision.is_approved:
                 import time
+
                 cache_key = f"{req.tool_name}:{req.action}"
                 self._approval_cache[cache_key] = (time.time(), decision)
 
-    def get_decision(self, request_id: str) -> Optional[ApprovalDecision]:
+    def get_decision(self, request_id: str) -> ApprovalDecision | None:
         return self._decisions.get(request_id)
 
     def get_pending(self) -> list[ApprovalRequest]:
@@ -180,7 +183,7 @@ class HumanInTheLoop:
     def clear_cache(self) -> None:
         self._approval_cache.clear()
 
-    def _evaluate_policy(self, req: ApprovalRequest) -> Optional[ApprovalDecision]:
+    def _evaluate_policy(self, req: ApprovalRequest) -> ApprovalDecision | None:
         """Determine if the request can be auto-decided without human input."""
 
         # Blocked domains always rejected

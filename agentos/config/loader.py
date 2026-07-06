@@ -39,6 +39,7 @@ class LoopCfg:
 @dataclass
 class MemoryCfg:
     """记忆系统配置。"""
+
     short_term_capacity: int = 50
     long_term_enabled: bool = True
     long_term_max_entries: int = 100000
@@ -51,6 +52,7 @@ class MemoryCfg:
 @dataclass
 class SecurityCfg:
     """安全策略配置。"""
+
     sandbox_enabled: bool = False
     sandbox_image: str = "agentos-sandbox:latest"
     max_file_size_mb: int = 100
@@ -60,6 +62,7 @@ class SecurityCfg:
 @dataclass
 class ObservabilityCfg:
     """可观测性配置。"""
+
     tracer_enabled: bool = True
     tracer_backend: str = "console"
     langsmith_api_key: str = ""
@@ -69,12 +72,14 @@ class ObservabilityCfg:
 @dataclass
 class MCPServersCfg:
     """MCP 服务器列表配置。"""
+
     servers: list[dict] = field(default_factory=list)
 
 
 @dataclass
 class ReflectionCfg:
     """反思循环配置。"""
+
     enabled: bool = True
     frequency: int = 3
     max_loops: int = 3
@@ -84,6 +89,7 @@ class ReflectionCfg:
 @dataclass
 class CostCfg:
     """成本控制配置。"""
+
     enabled: bool = True
     budget_limit: float = 0.0
     warn_threshold: float = 0.8
@@ -92,6 +98,7 @@ class CostCfg:
 @dataclass
 class FeedbackCfg:
     """反馈回路配置。"""
+
     enabled: bool = True
     human_in_the_loop: bool = False
     approval_trigger: str = "high_risk"
@@ -101,6 +108,7 @@ class FeedbackCfg:
 @dataclass
 class APICfg:
     """API 服务配置。"""
+
     enabled: bool = True
     host: str = "0.0.0.0"
     port: int = 8080
@@ -110,6 +118,7 @@ class APICfg:
 @dataclass
 class SwarmCfg:
     """Swarm 多 Agent 协作配置。"""
+
     enabled: bool = True
     topology: str = "sequential"  # sequential|parallel|debate|hierarchical|broadcast
     max_parallel_agents: int = 4
@@ -120,6 +129,7 @@ class SwarmCfg:
 @dataclass
 class QueueCfg:
     """任务队列配置。"""
+
     enabled: bool = False
     backend: str = "memory"  # memory|redis
     redis_url: str = "redis://localhost:6379/0"
@@ -131,6 +141,7 @@ class QueueCfg:
 @dataclass
 class CacheCfg:
     """语义缓存配置。"""
+
     enabled: bool = True
     lru_size: int = 500
     semantic_enabled: bool = True
@@ -141,6 +152,7 @@ class CacheCfg:
 @dataclass
 class ExperimentCfg:
     """A/B 实验配置。"""
+
     enabled: bool = False
     auto_evaluator: str = "llm_judge"
     trials_per_variant: int = 3
@@ -150,6 +162,7 @@ class ExperimentCfg:
 @dataclass
 class MultimodalCfg:
     """多模态处理配置。"""
+
     enabled: bool = True
     max_image_size: int = 2048
     whisper_model: str = "base"
@@ -159,6 +172,7 @@ class MultimodalCfg:
 @dataclass
 class MCPServerCfg:
     """MCP 服务端配置。"""
+
     enabled: bool = False
     transport: str = "stdio"
     host: str = "0.0.0.0"
@@ -169,6 +183,7 @@ class MCPServerCfg:
 @dataclass
 class GuardrailsCfg:
     """安全护栏配置。"""
+
     enabled: bool = True
     block_pii: bool = True
     block_injection: bool = True
@@ -178,6 +193,7 @@ class GuardrailsCfg:
 @dataclass
 class RateLimitCfg:
     """限流配置。"""
+
     enabled: bool = True
     strategy: str = "token_bucket"
     max_requests: int = 60
@@ -190,6 +206,7 @@ class RateLimitCfg:
 @dataclass
 class StateMachineCfg:
     """状态机配置。"""
+
     max_thinking_time: float = 300.0
     max_acting_time: float = 120.0
     max_observing_time: float = 60.0
@@ -200,6 +217,7 @@ class StateMachineCfg:
 @dataclass
 class ResilienceCfg:
     """弹性容错配置。"""
+
     retry_max: int = 3
     retry_base_delay: float = 1.0
     retry_max_delay: float = 30.0
@@ -209,9 +227,11 @@ class ResilienceCfg:
 
 # ── v0.70 新增配置段 ────────────────────────────────────────────────────
 
+
 @dataclass
 class PluginsCfg:
     """插件系统配置。"""
+
     enabled: bool = True
     plugins_dir: str = "./plugins"
     auto_discover: bool = True
@@ -222,6 +242,7 @@ class PluginsCfg:
 @dataclass
 class GeminiCfg:
     """Gemini 模型配置。"""
+
     enabled: bool = True
     api_key: str = ""
     default_model: str = "gemini-2.5-flash"
@@ -233,6 +254,7 @@ class GeminiCfg:
 @dataclass
 class ContractsCfg:
     """能力契约配置。"""
+
     enabled: bool = True
     auto_discover: bool = True
     heartbeat_interval: float = 30.0
@@ -243,6 +265,7 @@ class ContractsCfg:
 @dataclass
 class OrchestratorCfg:
     """编排器配置。"""
+
     enabled: bool = True
     global_timeout: float = 300.0
     default_retries: int = 3
@@ -253,6 +276,7 @@ class OrchestratorCfg:
 @dataclass
 class ScorerCfg:
     """评分器配置。"""
+
     enabled: bool = True
     strategy: str = "composite"
     pass_threshold: float = 0.6
@@ -261,9 +285,11 @@ class ScorerCfg:
 
 # ── v0.80 新增配置段 ────────────────────────────────────────────────────
 
+
 @dataclass
 class BenchmarkCfg:
     """性能基准配置。"""
+
     enabled: bool = True
     output_dir: str = "./benchmarks"
     warmup_iterations: int = 3
@@ -275,6 +301,7 @@ class BenchmarkCfg:
 @dataclass
 class HealthCfg:
     """健康检查配置。"""
+
     readiness_enabled: bool = True
     liveness_enabled: bool = True
     disk_threshold_mb: int = 100
@@ -284,6 +311,7 @@ class HealthCfg:
 @dataclass
 class AuditCfg:
     """安全审计配置。"""
+
     enabled: bool = False
     severity_threshold: str = "medium"
     report_format: str = "markdown"
@@ -293,6 +321,7 @@ class AuditCfg:
 @dataclass
 class DeployCfg:
     """部署配置。"""
+
     base_image: str = "python:3.11-slim"
     port: int = 8000
     workers: int = 4
@@ -302,6 +331,7 @@ class DeployCfg:
 @dataclass
 class MiddlewareCfg:
     """中间件配置。"""
+
     cors_enabled: bool = True
     cors_origins: list = field(default_factory=lambda: ["*"])
     auth_enabled: bool = False
@@ -361,6 +391,7 @@ def load_config(path: str | None = None) -> AgentOSConfig:
     if path and os.path.exists(path):
         try:
             import yaml
+
             with open(path) as f:
                 data = yaml.safe_load(f)
             _merge(config, data)

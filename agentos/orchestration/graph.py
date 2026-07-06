@@ -10,13 +10,15 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class NodeStatus(str, Enum):
+class NodeStatus(StrEnum):
     """Node execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -40,6 +42,7 @@ class GraphNode:
         error: Error message (if failed)
         metadata: Additional metadata
     """
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     name: str = ""
     func: Callable[..., Any] = None
@@ -47,7 +50,7 @@ class GraphNode:
     outputs: dict[str, Any] = field(default_factory=dict)
     status: NodeStatus = NodeStatus.PENDING
     duration: float = 0.0
-    error: Optional[str] = None
+    error: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -75,9 +78,10 @@ class GraphEdge:
         condition: Optional condition function
         metadata: Additional metadata
     """
+
     source: str
     target: str
-    condition: Optional[Callable[[dict[str, Any]], bool]] = None
+    condition: Callable[[dict[str, Any]], bool] | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -101,11 +105,12 @@ class GraphResult:
         success: Whether execution succeeded
         error: Error message (if failed)
     """
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     node_results: dict[str, dict[str, Any]] = field(default_factory=dict)
     total_duration: float = 0.0
     success: bool = True
-    error: Optional[str] = None
+    error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict."""
@@ -148,12 +153,7 @@ class GraphOrchestrator:
         self._start_nodes: list[str] = []
         self._end_nodes: list[str] = []
 
-    def add_node(
-        self,
-        name: str,
-        func: Callable[..., Any],
-        **metadata
-    ) -> GraphNode:
+    def add_node(self, name: str, func: Callable[..., Any], **metadata) -> GraphNode:
         """
         Add a node to the graph.
 
@@ -194,10 +194,7 @@ class GraphOrchestrator:
         del self._nodes[name]
 
         # Remove edges
-        self._edges = [
-            e for e in self._edges
-            if e.source != name and e.target != name
-        ]
+        self._edges = [e for e in self._edges if e.source != name and e.target != name]
 
         # Update start/end nodes
         if name in self._start_nodes:
@@ -211,8 +208,8 @@ class GraphOrchestrator:
         self,
         source: str,
         target: str,
-        condition: Optional[Callable[[dict[str, Any]], bool]] = None,
-        **metadata
+        condition: Callable[[dict[str, Any]], bool] | None = None,
+        **metadata,
     ) -> GraphEdge:
         """
         Add an edge to the graph.
@@ -272,7 +269,7 @@ class GraphOrchestrator:
                 return True
         return False
 
-    def get_node(self, name: str) -> Optional[GraphNode]:
+    def get_node(self, name: str) -> GraphNode | None:
         """
         Get a node by name.
 
@@ -302,11 +299,7 @@ class GraphOrchestrator:
         """
         return [(e.source, e.target) for e in self._edges]
 
-    async def execute(
-        self,
-        inputs: dict[str, Any],
-        **metadata
-    ) -> GraphResult:
+    async def execute(self, inputs: dict[str, Any], **metadata) -> GraphResult:
         """
         Execute the graph.
 

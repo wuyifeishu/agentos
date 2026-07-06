@@ -21,24 +21,22 @@ Core features:
 from __future__ import annotations
 
 import asyncio
-import json
+import queue
+import threading
 import time
 import uuid
-import threading
-import queue
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from pathlib import Path
+from enum import StrEnum
 from typing import (
-    Any, Callable, Dict, List, Optional, Set, Tuple, Union,
+    Any,
 )
-
 
 # ── UI Data Models ──────────────────────────
 
 
-class ApprovalStatus(str, Enum):
+class ApprovalStatus(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
     DENIED = "denied"
@@ -46,7 +44,7 @@ class ApprovalStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class RiskLevelUI(str, Enum):
+class RiskLevelUI(StrEnum):
     SAFE = "safe"
     LOW = "low"
     MEDIUM = "medium"
@@ -60,16 +58,16 @@ class ApprovalRequestUI:
 
     request_id: str = field(default_factory=lambda: f"apr-{uuid.uuid4().hex[:8]}")
     agent_name: str = ""
-    action: str = ""                    # 人类可读的操作描述
-    details: str = ""                   # 详细说明
+    action: str = ""  # 人类可读的操作描述
+    details: str = ""  # 详细说明
     risk_level: RiskLevelUI = RiskLevelUI.MEDIUM
     status: ApprovalStatus = ApprovalStatus.PENDING
     created_at: float = field(default_factory=time.time)
-    expires_at: float = 0.0             # 超时自动拒绝
-    source_file: str = ""               # 触发操作的文件/代码位置
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    expires_at: float = 0.0  # 超时自动拒绝
+    source_file: str = ""  # 触发操作的文件/代码位置
+    metadata: dict[str, Any] = field(default_factory=dict)
     # Callback when approved/denied
-    on_decision: Optional[Callable] = None
+    on_decision: Callable | None = None
 
     @property
     def elapsed_seconds(self) -> float:
@@ -88,7 +86,7 @@ class ApprovalHistory:
 
     request: ApprovalRequestUI
     decision: ApprovalStatus
-    decided_by: str = "user"          # "user" | "auto" | "timeout"
+    decided_by: str = "user"  # "user" | "auto" | "timeout"
     reason: str = ""
     decided_at: float = field(default_factory=time.time)
 
@@ -112,7 +110,7 @@ class AgentStatusSnapshot:
 
     agent_id: str = ""
     agent_name: str = ""
-    status: str = "idle"               # idle | running | waiting_approval | paused | error
+    status: str = "idle"  # idle | running | waiting_approval | paused | error
     current_task: str = ""
     elapsed_seconds: float = 0.0
     pending_approvals: int = 0
@@ -131,9 +129,9 @@ class ApprovalQueue:
 
     def __init__(self, max_size: int = 100, default_timeout: float = 300.0):
         self._queue: queue.Queue = queue.Queue(maxsize=max_size)
-        self._pending: Dict[str, ApprovalRequestUI] = {}
-        self._history: List[ApprovalHistory] = []
-        self._subscribers: List[Callable] = []  # WebSocket callbacks
+        self._pending: dict[str, ApprovalRequestUI] = {}
+        self._history: list[ApprovalHistory] = []
+        self._subscribers: list[Callable] = []  # WebSocket callbacks
         self._default_timeout = default_timeout
         self._lock = threading.Lock()
 
@@ -145,17 +143,19 @@ class ApprovalQueue:
         with self._lock:
             self._pending[request.request_id] = request
 
-        self._notify_subscribers({
-            "event": "new_request",
-            "request_id": request.request_id,
-            "action": request.action,
-            "risk_level": request.risk_level.value,
-            "pending_count": len(self._pending),
-        })
+        self._notify_subscribers(
+            {
+                "event": "new_request",
+                "request_id": request.request_id,
+                "action": request.action,
+                "risk_level": request.risk_level.value,
+                "pending_count": len(self._pending),
+            }
+        )
 
         return request.request_id
 
-    def decide(self, request_id: str, approved: bool, reason: str = "") -> Optional[ApprovalHistory]:
+    def decide(self, request_id: str, approved: bool, reason: str = "") -> ApprovalHistory | None:
         """处理审批决定。"""
         with self._lock:
             request = self._pending.pop(request_id, None)
@@ -180,13 +180,15 @@ class ApprovalQueue:
         with self._lock:
             self._history.append(history)
 
-        self._notify_subscribers({
-            "event": "decision",
-            "request_id": request_id,
-            "approved": approved,
-            "reason": reason,
-            "pending_count": len(self._pending),
-        })
+        self._notify_subscribers(
+            {
+                "event": "decision",
+                "request_id": request_id,
+                "approved": approved,
+                "reason": reason,
+                "pending_count": len(self._pending),
+            }
+        )
 
         return history
 
@@ -206,7 +208,7 @@ class ApprovalQueue:
 
     def check_timeouts(self) -> int:
         """检查并自动拒绝超时请求。"""
-        now = time.time()
+        time.time()
         expired_ids = []
         with self._lock:
             for rid, req in self._pending.items():
@@ -221,7 +223,7 @@ class ApprovalQueue:
         return len(expired_ids)
 
     @property
-    def pending_requests(self) -> List[ApprovalRequestUI]:
+    def pending_requests(self) -> list[ApprovalRequestUI]:
         with self._lock:
             return list(self._pending.values())
 
@@ -231,7 +233,7 @@ class ApprovalQueue:
             return len(self._pending)
 
     @property
-    def recent_history(self, limit: int = 50) -> List[ApprovalHistory]:
+    def recent_history(self, limit: int = 50) -> list[ApprovalHistory]:
         with self._lock:
             return self._history[-limit:]
 
@@ -278,7 +280,7 @@ class ApprovalDashboard:
         self._theme = theme
         self._auto_launch = auto_launch
         self._app = None
-        self._agent_statuses: Dict[str, AgentStatusSnapshot] = {}
+        self._agent_statuses: dict[str, AgentStatusSnapshot] = {}
         self._selected_request_id: str = ""
 
     def launch(self, share: bool = False) -> Any:
@@ -290,8 +292,7 @@ class ApprovalDashboard:
             import gradio as gr
         except ImportError:
             raise ImportError(
-                "Gradio is required for ApprovalDashboard. "
-                "Install with: pip install gradio>=4.0"
+                "Gradio is required for ApprovalDashboard. " "Install with: pip install gradio>=4.0"
             )
 
         with gr.Blocks(title=self._title, theme=self._theme) as app:
@@ -312,10 +313,7 @@ class ApprovalDashboard:
         import gradio as gr
 
         # ── Header ──
-        gr.Markdown(
-            f"# {self._title}\n"
-            f"### Real-time Human-in-the-Loop Approval Dashboard"
-        )
+        gr.Markdown(f"# {self._title}\n" f"### Real-time Human-in-the-Loop Approval Dashboard")
 
         # ── Agent Status Bar ──
         with gr.Row():
@@ -334,12 +332,8 @@ class ApprovalDashboard:
                     every=2.0,
                 )
                 with gr.Row():
-                    self._btn_approve_all = gr.Button(
-                        "Approve All", variant="primary", size="sm"
-                    )
-                    self._btn_deny_all = gr.Button(
-                        "Deny All", variant="stop", size="sm"
-                    )
+                    self._btn_approve_all = gr.Button("Approve All", variant="primary", size="sm")
+                    self._btn_deny_all = gr.Button("Deny All", variant="stop", size="sm")
 
             # Right: Detail + History
             with gr.Column(scale=2):
@@ -349,12 +343,8 @@ class ApprovalDashboard:
                             value="<p>Select a request from the queue...</p>"
                         )
                         with gr.Row():
-                            self._btn_approve = gr.Button(
-                                "Approve", variant="primary"
-                            )
-                            self._btn_deny = gr.Button(
-                                "Deny", variant="stop"
-                            )
+                            self._btn_approve = gr.Button("Approve", variant="primary")
+                            self._btn_deny = gr.Button("Deny", variant="stop")
                         self._reason_input = gr.Textbox(
                             label="Reason (optional)",
                             placeholder="Why this decision...",
@@ -367,9 +357,7 @@ class ApprovalDashboard:
                         )
 
                     with gr.TabItem("Policy"):
-                        self._policy_view = gr.HTML(
-                            value=self._render_policy_editor()
-                        )
+                        self._policy_view = gr.HTML(value=self._render_policy_editor())
 
             # ── Event Handlers ──
             self._btn_approve.click(
@@ -391,7 +379,7 @@ class ApprovalDashboard:
                 outputs=[],
             )
 
-    def _handle_approve(self, reason: str) -> Tuple[str, str, str]:
+    def _handle_approve(self, reason: str) -> tuple[str, str, str]:
         if not self._selected_request_id:
             return self._detail_view, self._queue_list, self._history_view
         self._queue.decide(self._selected_request_id, True, reason)
@@ -402,7 +390,7 @@ class ApprovalDashboard:
             self._render_history(),
         )
 
-    def _handle_deny(self, reason: str) -> Tuple[str, str, str]:
+    def _handle_deny(self, reason: str) -> tuple[str, str, str]:
         if not self._selected_request_id:
             return self._detail_view, self._queue_list, self._history_view
         self._queue.decide(self._selected_request_id, False, reason)
@@ -438,11 +426,11 @@ class ApprovalDashboard:
             rows.append(
                 f'<div style="display:inline-block;margin:4px 8px;padding:8px 12px;'
                 f'background:#fff;border-radius:6px;border-left:4px solid {status_color};">'
-                f'<b>{snap.agent_name}</b> '
+                f"<b>{snap.agent_name}</b> "
                 f'<span style="color:{status_color};">● {snap.status}</span> '
-                f'| {snap.current_task[:30]} '
-                f'| {snap.pending_approvals} pending'
-                f'</div>'
+                f"| {snap.current_task[:30]} "
+                f"| {snap.pending_approvals} pending"
+                f"</div>"
             )
 
         return (
@@ -470,15 +458,15 @@ class ApprovalDashboard:
             color = risk_colors.get(req.risk_level.value, "#999")
             elapsed = int(req.elapsed_seconds)
             cards.append(
-                f'<div onclick="selectRequest(\'{req.request_id}\')" '
+                f"<div onclick=\"selectRequest('{req.request_id}')\" "
                 f'style="cursor:pointer;margin:6px 0;padding:10px;'
-                f'background:#fff;border-radius:6px;'
+                f"background:#fff;border-radius:6px;"
                 f'border-left:4px solid {color};">'
                 f'<div style="font-weight:bold;">{req.action[:60]}</div>'
                 f'<div style="color:{color};font-size:0.85em;">'
-                f'Risk: {req.risk_level.value} | Agent: {req.agent_name} | '
-                f'{elapsed}s ago</div>'
-                f'</div>'
+                f"Risk: {req.risk_level.value} | Agent: {req.agent_name} | "
+                f"{elapsed}s ago</div>"
+                f"</div>"
             )
 
         return "".join(cards)
@@ -551,8 +539,8 @@ class HITLUIBridge:
         self._queue = approval_queue
         self.agent_id = agent_id
         self.agent_name = agent_name
-        self._decision_events: Dict[str, asyncio.Event] = {}
-        self._decision_results: Dict[str, Tuple[bool, str]] = {}
+        self._decision_events: dict[str, asyncio.Event] = {}
+        self._decision_results: dict[str, tuple[bool, str]] = {}
 
     async def send_approval_request(
         self,
@@ -561,8 +549,8 @@ class HITLUIBridge:
         risk_level: str = "medium",
         source_file: str = "",
         timeout: float = 300.0,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[bool, str]:
+        metadata: dict[str, Any] | None = None,
+    ) -> tuple[bool, str]:
         """发送审批请求到 UI，阻塞等待用户决定。
 
         Returns:
@@ -596,7 +584,7 @@ class HITLUIBridge:
             result = self._decision_results.pop(request_id, (False, "timeout"))
             self._decision_events.pop(request_id, None)
             return result
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._queue.decide(request_id, False, "timeout")
             self._decision_events.pop(request_id, None)
             return (False, "timeout")
@@ -609,7 +597,7 @@ def create_hitl_dashboard(
     port: int = 7860,
     theme: str = "soft",
     share: bool = False,
-) -> Tuple[ApprovalDashboard, ApprovalQueue]:
+) -> tuple[ApprovalDashboard, ApprovalQueue]:
     """一键创建并启动 HITL 审批面板。
 
     Usage:

@@ -17,13 +17,12 @@ import hmac
 import secrets
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 
-class KeyScope(str, Enum):
+class KeyScope(StrEnum):
     """API Key 权限范围。"""
+
     READ = "read"
     WRITE = "write"
     ADMIN = "admin"
@@ -35,38 +34,41 @@ class KeyScope(str, Enum):
 @dataclass
 class APIKey:
     """API Key 实体。只存储哈希，不存明文。"""
-    key_id: str                          # 唯一标识，如 "ak_abc123"
-    key_hash: str                        # SHA-256 哈希
-    key_prefix: str                      # 前 8 位明文，用于快速匹配
-    name: str                            # 人类可读名称，如 "生产环境 Bot"
-    created_by: str                      # 创建者
-    scopes: list[KeyScope]               # 权限范围
+
+    key_id: str  # 唯一标识，如 "ak_abc123"
+    key_hash: str  # SHA-256 哈希
+    key_prefix: str  # 前 8 位明文，用于快速匹配
+    name: str  # 人类可读名称，如 "生产环境 Bot"
+    created_by: str  # 创建者
+    scopes: list[KeyScope]  # 权限范围
     created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None   # 过期时间戳（None = 永不过期）
-    last_used_at: Optional[float] = None
+    expires_at: float | None = None  # 过期时间戳（None = 永不过期）
+    last_used_at: float | None = None
     usage_count: int = 0
     revoked: bool = False
-    revoked_at: Optional[float] = None
+    revoked_at: float | None = None
     metadata: dict = field(default_factory=dict)
 
 
 @dataclass
 class KeyCreateRequest:
     """创建 API Key 的请求。"""
+
     name: str
     scopes: list[KeyScope]
-    expires_in_days: Optional[int] = None  # None = 永不过期
+    expires_in_days: int | None = None  # None = 永不过期
     metadata: dict = field(default_factory=dict)
 
 
 @dataclass
 class KeyCreateResult:
     """创建结果 — 包含仅此一次可见的明文 Key。"""
+
     key_id: str
-    plaintext_key: str                    # ⚠️ 仅返回一次
+    plaintext_key: str  # ⚠️ 仅返回一次
     key_prefix: str
     scopes: list[KeyScope]
-    expires_at: Optional[float]
+    expires_at: float | None
 
 
 class APIKeyManager:
@@ -80,8 +82,8 @@ class APIKeyManager:
     """
 
     def __init__(self, secret_salt: str = ""):
-        self._keys: dict[str, APIKey] = {}           # key_id → APIKey
-        self._prefix_index: dict[str, str] = {}       # key_prefix → key_id
+        self._keys: dict[str, APIKey] = {}  # key_id → APIKey
+        self._prefix_index: dict[str, str] = {}  # key_prefix → key_id
         self._secret_salt = secret_salt or secrets.token_hex(16)
 
     # ── 创建 ──
@@ -121,7 +123,7 @@ class APIKeyManager:
 
     # ── 验证 ──
 
-    def validate_key(self, plaintext: str) -> Optional[APIKey]:
+    def validate_key(self, plaintext: str) -> APIKey | None:
         """验证 API Key 并返回对应的 Key 对象。无效/已撤销/过期返回 None。"""
         key_hash = self._hash(plaintext)
 
@@ -168,7 +170,7 @@ class APIKeyManager:
         key.revoked_at = time.time()
         return True
 
-    def rotate_key(self, key_id: str, created_by: str = "admin") -> Optional[KeyCreateResult]:
+    def rotate_key(self, key_id: str, created_by: str = "admin") -> KeyCreateResult | None:
         """轮转 API Key：撤销旧 Key，创建新 Key。"""
         old = self._keys.get(key_id)
         if not old or old.revoked:
@@ -195,7 +197,7 @@ class APIKeyManager:
         """列出所有 Key（不含明文）。"""
         return sorted(self._keys.values(), key=lambda k: k.created_at, reverse=True)
 
-    def get_key(self, key_id: str) -> Optional[APIKey]:
+    def get_key(self, key_id: str) -> APIKey | None:
         """获取单个 Key 信息。"""
         return self._keys.get(key_id)
 

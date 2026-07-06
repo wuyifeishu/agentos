@@ -20,9 +20,10 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Coroutine, Optional, TypeVar, Union
+from enum import StrEnum
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -30,8 +31,10 @@ R = TypeVar("R")
 
 # ── Data Structures ──────────────────────────────────────────────
 
-class TaskStatus(str, Enum):
+
+class TaskStatus(StrEnum):
     """Individual task execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -43,10 +46,11 @@ class TaskStatus(str, Enum):
 @dataclass
 class TaskResult:
     """Result of a single parallel task."""
+
     task_id: str
     status: TaskStatus = TaskStatus.PENDING
     result: Any = None
-    error: Optional[Exception] = None
+    error: Exception | None = None
     started_at: float = 0.0
     finished_at: float = 0.0
     duration_ms: float = 0.0
@@ -56,6 +60,7 @@ class TaskResult:
 @dataclass
 class GatherResult:
     """Aggregated result from parallel_gather."""
+
     results: list[TaskResult] = field(default_factory=list)
     total: int = 0
     completed: int = 0
@@ -79,6 +84,7 @@ class GatherResult:
 
 
 # ── Semaphore-based Task Throttler ───────────────────────────────
+
 
 class TaskThrottler:
     """
@@ -120,6 +126,7 @@ class TaskThrottler:
 
 # ── Parallel Executor ────────────────────────────────────────────
 
+
 class ParallelExecutor:
     """
     Fan-out/fan-in executor for running multiple coroutines concurrently.
@@ -151,7 +158,7 @@ class ParallelExecutor:
     async def gather(
         self,
         coros: list[Coroutine],
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
         return_partial: bool = True,
     ) -> GatherResult:
         """
@@ -183,7 +190,7 @@ class ParallelExecutor:
                     tr.status = TaskStatus.CANCELLED
                     if self.fail_fast:
                         raise
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     tr.status = TaskStatus.TIMEOUT
                     tr.error = TimeoutError(f"Task {task_id} timed out")
                     if self.fail_fast:
@@ -208,7 +215,9 @@ class ParallelExecutor:
             done, pending = await asyncio.wait(
                 tasks.values(),
                 timeout=effective_timeout,
-                return_when=asyncio.ALL_COMPLETED if not self.fail_fast else asyncio.FIRST_EXCEPTION,
+                return_when=(
+                    asyncio.ALL_COMPLETED if not self.fail_fast else asyncio.FIRST_EXCEPTION
+                ),
             )
 
             # Cancel remaining on fail-fast
@@ -259,7 +268,7 @@ class ParallelExecutor:
         self,
         func: Callable[[T], Coroutine],
         items: list[T],
-        timeout: Optional[float] = None,
+        timeout: float | None = None,
     ) -> GatherResult:
         """
         Map an async function over a list of items with bounded concurrency.
@@ -277,6 +286,7 @@ class ParallelExecutor:
 
 
 # ── Convenience Functions ────────────────────────────────────────
+
 
 async def parallel_gather(
     *coros: Coroutine,
@@ -320,9 +330,11 @@ async def parallel_map(
 
 # ── Fan-Out / Fan-In with Aggregation ────────────────────────────
 
+
 @dataclass
 class FanOutConfig:
     """Configuration for fan-out pattern."""
+
     max_concurrent: int = 8
     timeout: float = 60.0
     aggregation: str = "all"  # "all" | "first" | "merge"
@@ -340,7 +352,9 @@ class FanOutExecutor:
     - "merge": Run all, merge results with a merge function
     """
 
-    def __init__(self, config: Optional[FanOutConfig] = None):
+    def __init__(self, config: FanOutConfig | None = None, max_concurrent: int = 0):
+        if config is None and max_concurrent > 0:
+            config = FanOutConfig(max_concurrent=max_concurrent)
         self.config = config or FanOutConfig()
         self.executor = ParallelExecutor(
             max_concurrent=self.config.max_concurrent,
@@ -350,8 +364,8 @@ class FanOutExecutor:
     async def fan_out(
         self,
         worker_coros: list[Coroutine],
-        merge_fn: Optional[Callable[[list[Any]], Any]] = None,
-    ) -> Union[list[Any], Any, GatherResult]:
+        merge_fn: Callable[[list[Any]], Any] | None = None,
+    ) -> list[Any] | Any | GatherResult:
         """
         Fan out tasks to workers and collect results.
 
@@ -392,7 +406,6 @@ class FanOutExecutor:
             gather_result = await self.executor.gather(worker_coros)
             if self.config.retry_failed and gather_result.failed > 0:
                 # Retry failed tasks
-                retry_coros = []
                 for r in gather_result.results:
                     if r.status == TaskStatus.FAILED:
                         # Note: retry requires caller to provide a way to rebuild the coro
@@ -401,6 +414,7 @@ class FanOutExecutor:
 
 
 # ── Agent Loop Integration ────────────────────────────────────────
+
 
 def create_parallel_agent_gather(
     max_concurrent: int = 8,
@@ -412,6 +426,7 @@ def create_parallel_agent_gather(
     Usage:
         agent_tools["parallel_gather"] = create_parallel_agent_gather(max_concurrent=5)
     """
+
     async def agent_gather(*coros: Coroutine) -> GatherResult:
         return await parallel_gather(*coros, max_concurrent=max_concurrent, timeout=timeout)
 

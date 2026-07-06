@@ -13,11 +13,11 @@ Agent Card 是标准化的 Agent 自描述卡片，支持:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional
-
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 # ── AgentCard ───────────────────────────────────
+
 
 @dataclass
 class AgentCard:
@@ -40,15 +40,15 @@ class AgentCard:
     description: str
     version: str
     url: str = ""
-    capabilities: List[str] = field(default_factory=list)
-    skills: List[str] = field(default_factory=list)
-    input_schema: Dict[str, Any] = field(default_factory=dict)
-    output_schema: Dict[str, Any] = field(default_factory=dict)
+    capabilities: list[str] = field(default_factory=list)
+    skills: list[str] = field(default_factory=list)
+    input_schema: dict[str, Any] = field(default_factory=dict)
+    output_schema: dict[str, Any] = field(default_factory=dict)
     provider: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    tags: List[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """导出为字典，保留所有字段（含空值）。"""
         return asdict(self)
 
@@ -57,12 +57,12 @@ class AgentCard:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AgentCard":
+    def from_dict(cls, data: dict[str, Any]) -> AgentCard:
         """从字典重建 AgentCard。"""
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
     @classmethod
-    def from_json(cls, json_str: str) -> "AgentCard":
+    def from_json(cls, json_str: str) -> AgentCard:
         """从 JSON 字符串重建。"""
         return cls.from_dict(json.loads(json_str))
 
@@ -93,6 +93,7 @@ class AgentCard:
 
 # ── AgentCardRegistry ───────────────────────────
 
+
 @dataclass
 class AgentCardRegistry:
     """Agent Card 注册中心。
@@ -100,37 +101,37 @@ class AgentCardRegistry:
     支持注册、注销、搜索、过滤。
     """
 
-    cards: Dict[str, AgentCard] = field(default_factory=dict)
+    cards: dict[str, AgentCard] = field(default_factory=dict)
 
     def register(self, card: AgentCard) -> None:
         """注册一张 Agent Card（同名覆盖）。"""
         self.cards[card.name] = card
 
-    def unregister(self, name: str) -> Optional[AgentCard]:
+    def unregister(self, name: str) -> AgentCard | None:
         """注销并返回被移除的卡片，不存在返回 None。"""
         return self.cards.pop(name, None)
 
-    def get(self, name: str) -> Optional[AgentCard]:
+    def get(self, name: str) -> AgentCard | None:
         """按名称查找。"""
         return self.cards.get(name)
 
-    def list_all(self) -> List[AgentCard]:
+    def list_all(self) -> list[AgentCard]:
         """列出所有注册的卡片。"""
         return list(self.cards.values())
 
-    def find_by_query(self, query: str) -> List[AgentCard]:
+    def find_by_query(self, query: str) -> list[AgentCard]:
         """按关键词搜索（匹配 name/description/skills/tags）。"""
         return [c for c in self.cards.values() if c.matches_query(query)]
 
-    def find_by_capability(self, capability: str) -> List[AgentCard]:
+    def find_by_capability(self, capability: str) -> list[AgentCard]:
         """按能力关键词查找。"""
         return [c for c in self.cards.values() if c.has_capability(capability)]
 
-    def find_by_skill(self, skill: str) -> List[AgentCard]:
+    def find_by_skill(self, skill: str) -> list[AgentCard]:
         """按技能关键词查找。"""
         return [c for c in self.cards.values() if c.has_skill(skill)]
 
-    def find_by_tag(self, tag: str) -> List[AgentCard]:
+    def find_by_tag(self, tag: str) -> list[AgentCard]:
         """按标签查找。"""
         return [c for c in self.cards.values() if c.has_tag(tag)]
 
@@ -142,7 +143,7 @@ class AgentCardRegistry:
 
     def import_from_file(self, filepath: str) -> int:
         """从 JSON 文件导入卡片到注册中心，返回导入数量。"""
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
         count = 0
         for name, card_data in data.items():
@@ -151,7 +152,7 @@ class AgentCardRegistry:
         return count
 
     @classmethod
-    def from_file(cls, filepath: str) -> "AgentCardRegistry":
+    def from_file(cls, filepath: str) -> AgentCardRegistry:
         """从 JSON 文件创建注册中心。"""
         reg = cls()
         reg.import_from_file(filepath)
@@ -166,6 +167,7 @@ class AgentCardRegistry:
 
 # ── AgentCardDiscovery (远程发现) ───────────────
 
+
 class AgentCardDiscovery:
     """Agent Card 远程发现器。
 
@@ -173,7 +175,7 @@ class AgentCardDiscovery:
     """
 
     @staticmethod
-    async def fetch(url: str, timeout: float = 10.0) -> Optional[AgentCard]:
+    async def fetch(url: str, timeout: float = 10.0) -> AgentCard | None:
         """从远程 URL 获取 AgentCard JSON 并解析。
 
         默认期望端点返回 {"name":..., "description":..., ...}
@@ -187,6 +189,7 @@ class AgentCardDiscovery:
         """
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=timeout) as client:
                 resp = await client.get(url)
                 resp.raise_for_status()
@@ -195,7 +198,7 @@ class AgentCardDiscovery:
             return None
 
     @staticmethod
-    async def fetch_all(urls: List[str], timeout: float = 10.0) -> Dict[str, Optional[AgentCard]]:
+    async def fetch_all(urls: list[str], timeout: float = 10.0) -> dict[str, AgentCard | None]:
         """并发获取多个 Agent Card。
 
         Args:
@@ -206,25 +209,24 @@ class AgentCardDiscovery:
             {url: AgentCard 或 None} 字典
         """
         import asyncio
+
         results = await asyncio.gather(
             *(AgentCardDiscovery.fetch(url, timeout) for url in urls),
             return_exceptions=True,
         )
-        return {
-            url: (None if isinstance(r, Exception) else r)
-            for url, r in zip(urls, results)
-        }
+        return {url: (None if isinstance(r, Exception) else r) for url, r in zip(urls, results)}
 
 
 # ── 便捷函数 ───────────────────────────────────
+
 
 def create_card(
     name: str,
     description: str,
     version: str = "1.0.0",
     url: str = "",
-    capabilities: List[str] | None = None,
-    skills: List[str] | None = None,
+    capabilities: list[str] | None = None,
+    skills: list[str] | None = None,
     **metadata,
 ) -> AgentCard:
     """快速创建 AgentCard 的便捷函数。"""
@@ -239,7 +241,7 @@ def create_card(
     )
 
 
-def discover_local(directory: str, pattern: str = "agent-card*.json") -> List[AgentCard]:
+def discover_local(directory: str, pattern: str = "agent-card*.json") -> list[AgentCard]:
     """从本地目录发现 AgentCard JSON 文件。
 
     Args:
@@ -249,15 +251,16 @@ def discover_local(directory: str, pattern: str = "agent-card*.json") -> List[Ag
     Returns:
         发现的 AgentCard 列表
     """
-    import os
     import fnmatch
-    cards: List[AgentCard] = []
+    import os
+
+    cards: list[AgentCard] = []
     try:
         for fname in os.listdir(directory):
             if fnmatch.fnmatch(fname, pattern):
                 fpath = os.path.join(directory, fname)
                 try:
-                    with open(fpath, "r", encoding="utf-8") as f:
+                    with open(fpath, encoding="utf-8") as f:
                         cards.append(AgentCard.from_json(f.read()))
                 except Exception:
                     continue

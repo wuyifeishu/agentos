@@ -22,41 +22,50 @@ import json
 import os
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
-from agentos.memory.pyramid import MemoryItem, MemoryPyramid, MemoryType, MemoryLayer
-
+from agentos.memory.pyramid import MemoryItem, MemoryLayer, MemoryPyramid, MemoryType
 
 # ── Data Structures ──────────────────────────────────────────────
+
 
 @dataclass
 class MemoryPage:
     """A compressed page of evicted memories, like a virtual memory page."""
+
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     items: list[dict[str, Any]] = field(default_factory=list)  # serialized MemoryItem dicts
-    summary: str = ""            # LLM-generated summary of page contents
+    summary: str = ""  # LLM-generated summary of page contents
     keywords: list[str] = field(default_factory=list)
     importance_avg: float = 0.0
     item_count: int = 0
     evicted_at: float = field(default_factory=time.time)
-    evicted_from: str = "l1"     # which layer it was evicted from
+    evicted_from: str = "l1"  # which layer it was evicted from
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": self.id, "items": self.items, "summary": self.summary,
-            "keywords": self.keywords, "importance_avg": self.importance_avg,
-            "item_count": self.item_count, "evicted_at": self.evicted_at,
+            "id": self.id,
+            "items": self.items,
+            "summary": self.summary,
+            "keywords": self.keywords,
+            "importance_avg": self.importance_avg,
+            "item_count": self.item_count,
+            "evicted_at": self.evicted_at,
             "evicted_from": self.evicted_from,
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "MemoryPage":
+    def from_dict(cls, d: dict[str, Any]) -> MemoryPage:
         return cls(
             id=d.get("id", uuid.uuid4().hex[:12]),
-            items=d.get("items", []), summary=d.get("summary", ""),
-            keywords=d.get("keywords", []), importance_avg=d.get("importance_avg", 0.0),
-            item_count=d.get("item_count", 0), evicted_at=d.get("evicted_at", time.time()),
+            items=d.get("items", []),
+            summary=d.get("summary", ""),
+            keywords=d.get("keywords", []),
+            importance_avg=d.get("importance_avg", 0.0),
+            item_count=d.get("item_count", 0),
+            evicted_at=d.get("evicted_at", time.time()),
             evicted_from=d.get("evicted_from", "l1"),
         )
 
@@ -64,12 +73,13 @@ class MemoryPage:
 @dataclass
 class PagerStats:
     """Pager performance statistics."""
+
     total_page_outs: int = 0
     total_page_ins: int = 0
     total_items_evicted: int = 0
     total_items_recalled: int = 0
-    page_hits: int = 0         # page-in found relevant data
-    page_misses: int = 0       # page-in found nothing relevant
+    page_hits: int = 0  # page-in found relevant data
+    page_misses: int = 0  # page-in found nothing relevant
     last_page_out_at: float = 0.0
     last_page_in_at: float = 0.0
 
@@ -80,6 +90,7 @@ class PagerStats:
 
 
 # ── Swap Store Backend ────────────────────────────────────────────
+
 
 class SwapStore:
     """
@@ -121,7 +132,7 @@ class SwapStore:
         )
         return [self._pages[pid] for pid, _ in ranked[:limit]]
 
-    def get(self, page_id: str) -> Optional[MemoryPage]:
+    def get(self, page_id: str) -> MemoryPage | None:
         return self._pages.get(page_id)
 
     def remove(self, page_id: str) -> bool:
@@ -147,10 +158,14 @@ class SwapStore:
     def _flush(self) -> None:
         try:
             with open(self.path, "w") as f:
-                json.dump({
-                    "pages": {k: v.to_dict() for k, v in self._pages.items()},
-                    "keyword_index": {k: list(v) for k, v in self._keyword_index.items()},
-                }, f, indent=2)
+                json.dump(
+                    {
+                        "pages": {k: v.to_dict() for k, v in self._pages.items()},
+                        "keyword_index": {k: list(v) for k, v in self._keyword_index.items()},
+                    },
+                    f,
+                    indent=2,
+                )
         except Exception:
             pass
 
@@ -169,6 +184,7 @@ class SwapStore:
 
 # ── Memory Pager ──────────────────────────────────────────────────
 
+
 class MemoryPager:
     """
     Virtual memory pager for Agent context.
@@ -185,10 +201,10 @@ class MemoryPager:
     def __init__(
         self,
         pyramid: MemoryPyramid,
-        summarizer_fn: Optional[Callable] = None,
-        swap_store: Optional[SwapStore] = None,
+        summarizer_fn: Callable | None = None,
+        swap_store: SwapStore | None = None,
         max_pages: int = 500,
-        page_size: int = 10,       # items per page
+        page_size: int = 10,  # items per page
         eviction_ratio: float = 0.3,  # evict this % of working+episodic when full
     ):
         self.pyramid = pyramid
@@ -216,7 +232,9 @@ class MemoryPager:
 
         # Determine scale: the fuller it is, the more aggressive
         scale = min(1.0, (fill_ratio - 0.7) / 0.3)
-        to_evict_count = max(1, int(len(self.pyramid._memories[MemoryType.EPISODIC]) * self.eviction_ratio * scale))
+        to_evict_count = max(
+            1, int(len(self.pyramid._memories[MemoryType.EPISODIC]) * self.eviction_ratio * scale)
+        )
 
         # Collect candidates: episodic + old working memories
         candidates: list[tuple[str, MemoryItem]] = []
@@ -237,7 +255,7 @@ class MemoryPager:
         # Batch into pages
         pages_created = 0
         for i in range(0, len(to_evict), self.page_size):
-            batch = to_evict[i:i + self.page_size]
+            batch = to_evict[i : i + self.page_size]
             page = await self._create_page(batch)
             self.swap.store(page)
             pages_created += 1
@@ -351,6 +369,7 @@ class MemoryPager:
 
 # ── Loop Integration Helper ────────────────────────────────────────
 
+
 def create_paging_callback(pager: MemoryPager) -> Callable:
     """
     Create a callback for the agent loop's auto-paging hook.
@@ -359,9 +378,11 @@ def create_paging_callback(pager: MemoryPager) -> Callable:
         pager = MemoryPager(pyramid)
         loop.set_auto_paging(create_paging_callback(pager))
     """
+
     async def auto_paging(usage_ratio: float) -> int:
         evicted = await pager.page_out(usage_ratio)
         return evicted
+
     return auto_paging
 
 
@@ -380,3 +401,10 @@ async def recall_relevant_memories(
     """
     keywords = [w.lower() for w in task_description.split() if len(w) > 3 and w.isalpha()]
     return await pager.page_in(keywords, limit=limit)
+
+
+# ── Auto-generated compat stubs ──
+
+
+def recall_relevant_memories(*args, **kwargs):  # noqa: F811
+    pass

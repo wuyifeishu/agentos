@@ -7,8 +7,8 @@ from __future__ import annotations
 from typing import Any
 
 from agentos.checkpoint.base import CheckpointBackend
-from agentos.checkpoint.sqlite import SQLiteCheckpointer
 from agentos.checkpoint.postgres import PostgresCheckpointer
+from agentos.checkpoint.sqlite import SQLiteCheckpointer
 
 __all__ = ["create_checkpointer"]
 
@@ -41,6 +41,4 @@ def create_checkpointer(
     if backend == "postgres":
         return PostgresCheckpointer(**kwargs)
 
-    raise ValueError(
-        f"Unknown checkpoint backend: '{backend}'. Available: sqlite, postgres"
-    )
+    raise ValueError(f"Unknown checkpoint backend: '{backend}'. Available: sqlite, postgres")

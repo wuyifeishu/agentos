@@ -1,21 +1,18 @@
 """测试 SubAgent 父子通信 — 状态共享、心跳、生命周期管理。"""
 
 import asyncio
-import time
+
 import pytest
 
 pytestmark = pytest.mark.asyncio
-from agentos.subagent import (
-    SubAgentManager,
-    SubAgentMode,
-    SubAgentSpec,
-    SubAgentResult,
-    ChildStatus,
-    ChildHeartbeat,
-    ChildInfo,
-    SharedState,
+from agentos.subagent import (  # noqa: E402
     ChildContext,
     ChildHandle,
+    ChildHeartbeat,
+    ChildStatus,
+    SharedState,
+    SubAgentManager,
+    SubAgentSpec,
 )
 
 
@@ -188,10 +185,15 @@ class TestChildHandle:
     async def test_heartbeat_updates_info(self):
         handle = ChildHandle("h8", "task", "fork")
         handle.create_context()
-        await handle._receive_heartbeat(ChildHeartbeat(
-            agent_id="h8", progress=0.5, current_step="s1",
-            message="working", iteration=5,
-        ))
+        await handle._receive_heartbeat(
+            ChildHeartbeat(
+                agent_id="h8",
+                progress=0.5,
+                current_step="s1",
+                message="working",
+                iteration=5,
+            )
+        )
         assert handle.info.progress == 0.5
         assert handle.info.current_step == "s1"
         assert handle.info.iterations == 5
@@ -210,7 +212,6 @@ class TestChildHandle:
 
 class TestSubAgentManager:
     async def test_spawn_fork_with_child_context(self):
-        hbs = []
 
         async def run_func(spec: SubAgentSpec, ctx: ChildContext):
             await ctx.report_progress(0.3, "init")
@@ -261,12 +262,10 @@ class TestSubAgentManager:
         mgr = SubAgentManager()
 
         # 启动
-        task = asyncio.create_task(
-            mgr.spawn_fork("pause test", run_func=run_func)
-        )
+        task = asyncio.create_task(mgr.spawn_fork("pause test", run_func=run_func))
 
         await asyncio.sleep(0.05)  # 让子Agent跑到 step
-        handle = mgr.get_handle(task.result().handle.agent_id) if hasattr(task, 'result') else None
+        mgr.get_handle(task.result().handle.agent_id) if hasattr(task, "result") else None
 
         # 等task完成
         result = await task
@@ -284,9 +283,7 @@ class TestSubAgentManager:
             return (f"done_{spec.task}", 1)
 
         mgr = SubAgentManager()
-        results = await mgr.spawn_swarm(
-            ["A", "B", "C"], run_func=run_func
-        )
+        results = await mgr.spawn_swarm(["A", "B", "C"], run_func=run_func)
         assert len(results) == 3
         assert len(results_log) == 3
         for r in results:
@@ -305,12 +302,8 @@ class TestSubAgentManager:
             return ("done", 50)
 
         mgr = SubAgentManager()
-        t1 = asyncio.create_task(
-            mgr.spawn_fork("long task 1", run_func=run_func)
-        )
-        t2 = asyncio.create_task(
-            mgr.spawn_fork("long task 2", run_func=run_func)
-        )
+        t1 = asyncio.create_task(mgr.spawn_fork("long task 1", run_func=run_func))
+        t2 = asyncio.create_task(mgr.spawn_fork("long task 2", run_func=run_func))
 
         await asyncio.sleep(0.05)
         await mgr.cancel_all()
@@ -328,7 +321,7 @@ class TestSubAgentManager:
 
     async def test_cleanup(self):
         mgr = SubAgentManager()
-        r = await mgr.spawn_fork("cleanup test")
+        await mgr.spawn_fork("cleanup test")
         assert len(mgr._agents) == 1
 
         cleaned = await mgr.cleanup(max_age_seconds=-1.0)

@@ -7,17 +7,17 @@ v1.5.1: 支持条件路由(ConditionalPipeline)、并行扇出(ParallelPipeline)
 
 from __future__ import annotations
 
-import asyncio
 import concurrent.futures
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
 
-from agentos.agent.tool_agent import ToolAgent, AgentConfig, AgentResult
+from agentos.agent.tool_agent import AgentConfig, AgentResult, ToolAgent
 
 
 @dataclass
 class PipelineAgent:
     """管道中的单个 Agent 节点。"""
+
     name: str
     agent: ToolAgent
     config: AgentConfig | None = None
@@ -26,6 +26,7 @@ class PipelineAgent:
 @dataclass
 class PipelineResult:
     """管道执行结果。"""
+
     success: bool = True
     steps: list[dict] = field(default_factory=list)
     final_output: str = ""
@@ -42,6 +43,7 @@ class PipelineResult:
 @dataclass
 class StepResult:
     """单个步骤的结果包装。"""
+
     agent_name: str
     result: AgentResult
     output_key: str | None = None
@@ -81,7 +83,9 @@ class ConditionalPipeline:
     def add(self, name: str, agent: ToolAgent, config: AgentConfig | None = None):
         self._agents[name] = PipelineAgent(name=name, agent=agent, config=config)
 
-    def run(self, task: str, start_agent: str | None = None, router: ConditionFn | None = None) -> PipelineResult:
+    def run(
+        self, task: str, start_agent: str | None = None, router: ConditionFn | None = None
+    ) -> PipelineResult:
         if start_agent is None and self._agents:
             start_agent = next(iter(self._agents))
         if start_agent not in self._agents:
@@ -98,14 +102,16 @@ class ConditionalPipeline:
             pa = self._agents[current]
             result = pa.agent.run(task)
 
-            steps.append({
-                "hop": hop,
-                "agent": current,
-                "output": result.final_answer,
-                "tokens": result.total_tokens,
-                "cost": result.total_cost_usd,
-                "duration_ms": result.total_duration_ms,
-            })
+            steps.append(
+                {
+                    "hop": hop,
+                    "agent": current,
+                    "output": result.final_answer,
+                    "tokens": result.total_tokens,
+                    "cost": result.total_cost_usd,
+                    "duration_ms": result.total_duration_ms,
+                }
+            )
             total_tokens += result.total_tokens
             total_cost += result.total_cost_usd
             total_ms += result.total_duration_ms
@@ -113,9 +119,13 @@ class ConditionalPipeline:
 
             if not result.success:
                 return PipelineResult(
-                    success=False, steps=steps, final_output=pipeline_output,
-                    total_tokens=total_tokens, total_cost_usd=total_cost,
-                    total_duration_ms=total_ms, error=result.error,
+                    success=False,
+                    steps=steps,
+                    final_output=pipeline_output,
+                    total_tokens=total_tokens,
+                    total_cost_usd=total_cost,
+                    total_duration_ms=total_ms,
+                    error=result.error,
                 )
 
             if router is None:
@@ -129,13 +139,17 @@ class ConditionalPipeline:
             current = next_agent
 
         return PipelineResult(
-            success=True, steps=steps, final_output=pipeline_output,
-            total_tokens=total_tokens, total_cost_usd=total_cost,
+            success=True,
+            steps=steps,
+            final_output=pipeline_output,
+            total_tokens=total_tokens,
+            total_cost_usd=total_cost,
             total_duration_ms=total_ms,
         )
 
 
 # ── ParallelPipeline — 并行扇出 ──────────────────────────────────
+
 
 class ParallelPipeline:
     """并行执行多个 Agent，聚合结果。
@@ -149,7 +163,7 @@ class ParallelPipeline:
         pp.add("analyst_2", agent_2)
         pp.add("analyst_3", agent_3)
 
-        result = pp.run("分析 Q3 财报", 
+        result = pp.run("分析 Q3 财报",
                         aggregator=lambda results: "\\n---\\n".join(results.values()))
     """
 
@@ -160,7 +174,9 @@ class ParallelPipeline:
     def add(self, name: str, agent: ToolAgent, config: AgentConfig | None = None):
         self._agents[name] = PipelineAgent(name=name, agent=agent, config=config)
 
-    def run(self, task: str, aggregator: Callable[[dict[str, str]], str] | None = None) -> PipelineResult:
+    def run(
+        self, task: str, aggregator: Callable[[dict[str, str]], str] | None = None
+    ) -> PipelineResult:
         if not self._agents:
             return PipelineResult(success=False, error="No agents registered")
 
@@ -241,9 +257,7 @@ class RouterAgent:
             return PipelineResult(success=False, error="No routes registered")
 
         # 构建分类提示
-        route_desc = "\n".join(
-            f"- {name}: {desc}" for name, (_, desc) in self._routes.items()
-        )
+        route_desc = "\n".join(f"- {name}: {desc}" for name, (_, desc) in self._routes.items())
         classify_task = (
             f"Analyze the following task and output ONLY the best matching route name "
             f"from the list below. Output just the name, nothing else.\n\n"

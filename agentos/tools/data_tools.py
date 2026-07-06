@@ -22,9 +22,16 @@ class JsonTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "description": "操作类型：parse/format/query/validate", "enum": ["parse", "format", "query", "validate"]},
+                "action": {
+                    "type": "string",
+                    "description": "操作类型：parse/format/query/validate",
+                    "enum": ["parse", "format", "query", "validate"],
+                },
                 "input": {"type": "string", "description": "JSON 字符串或 .json 文件路径"},
-                "jsonpath": {"type": "string", "description": "JSONPath 查询表达式（仅 query），如 $.store.book[0].title"},
+                "jsonpath": {
+                    "type": "string",
+                    "description": "JSONPath 查询表达式（仅 query），如 $.store.book[0].title",
+                },
                 "indent": {"type": "integer", "description": "缩进空格数，默认 2"},
             },
             "required": ["action", "input"],
@@ -39,7 +46,7 @@ class JsonTool(BaseTool):
         # Read file if path
         if os.path.isfile(input_data):
             try:
-                with open(input_data, "r", encoding="utf-8") as f:
+                with open(input_data, encoding="utf-8") as f:
                     data_str = f.read()
             except Exception as e:
                 return ToolResult.fail(call_id="", error=f"File read error: {e}")
@@ -67,7 +74,11 @@ class JsonTool(BaseTool):
 
         elif action == "query":
             result = self._jsonpath_query(data, jsonpath)
-            output = json.dumps(result, indent=indent, ensure_ascii=False) if result is not None else "null"
+            output = (
+                json.dumps(result, indent=indent, ensure_ascii=False)
+                if result is not None
+                else "null"
+            )
             return ToolResult.ok(call_id="", output=output)
 
         elif action == "validate":
@@ -111,7 +122,11 @@ class CsvTool(BaseTool):
         return {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "description": "操作类型：read/stats/query", "enum": ["read", "stats", "query"]},
+                "action": {
+                    "type": "string",
+                    "description": "操作类型：read/stats/query",
+                    "enum": ["read", "stats", "query"],
+                },
                 "input": {"type": "string", "description": ".csv 文件路径"},
                 "columns": {"type": "string", "description": "要提取的列名，逗号分隔（仅 query）"},
                 "limit": {"type": "integer", "description": "最大行数，默认 50"},
@@ -128,7 +143,7 @@ class CsvTool(BaseTool):
         # Try as file path
         if os.path.isfile(input_data):
             try:
-                with open(input_data, "r", encoding="utf-8", errors="ignore") as f:
+                with open(input_data, encoding="utf-8", errors="ignore") as f:
                     data_str = f.read()
             except Exception as e:
                 return ToolResult.fail(call_id="", error=f"File read error: {e}")

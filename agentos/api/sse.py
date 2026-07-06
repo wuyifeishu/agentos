@@ -8,16 +8,17 @@ client heartbeat, backpressure control, and typed event dispatching.
 import asyncio
 import json
 import time
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, AsyncIterator, Callable, Dict, Optional
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
 
 DEFAULT_RETRY_MS = 3000
 DEFAULT_HEARTBEAT_S = 30
 MAX_QUEUE_SIZE = 256
 
 
-class SSEEventType(str, Enum):
+class SSEEventType(StrEnum):
     """Standard SSE event types plus AgentOS extensions."""
 
     MESSAGE = "message"
@@ -123,7 +124,7 @@ class SSEStream:
         self.heartbeat_s = heartbeat_s
         self.queue: asyncio.Queue[SSEEvent | None] = asyncio.Queue(maxsize=max_queue)
         self._closed = False
-        self._heartbeat_task: Optional[asyncio.Task] = None
+        self._heartbeat_task: asyncio.Task | None = None
         self._last_event_id = 0
 
     async def start(self):

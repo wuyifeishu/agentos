@@ -23,7 +23,11 @@ class HttpRequestTool(BaseTool):
             "type": "object",
             "properties": {
                 "url": {"type": "string", "description": "请求 URL"},
-                "method": {"type": "string", "description": "HTTP 方法：GET/POST/PUT/DELETE，默认 GET", "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"]},
+                "method": {
+                    "type": "string",
+                    "description": "HTTP 方法：GET/POST/PUT/DELETE，默认 GET",
+                    "enum": ["GET", "POST", "PUT", "DELETE", "PATCH"],
+                },
                 "body": {"type": "string", "description": "请求体（JSON 字符串）"},
                 "headers": {"type": "string", "description": "自定义 Header，JSON 格式串"},
                 "timeout": {"type": "integer", "description": "超时秒数，默认 30"},
@@ -32,8 +36,8 @@ class HttpRequestTool(BaseTool):
         }
 
     async def execute(self, arguments: dict, sandbox=None) -> ToolResult:
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         url = arguments.get("url", "")
         method = arguments.get("method", "GET").upper()
@@ -99,7 +103,10 @@ class DownloadTool(BaseTool):
             "type": "object",
             "properties": {
                 "url": {"type": "string", "description": "下载 URL"},
-                "output_path": {"type": "string", "description": "输出目录或文件路径，默认临时目录"},
+                "output_path": {
+                    "type": "string",
+                    "description": "输出目录或文件路径，默认临时目录",
+                },
             },
             "required": ["url"],
         }

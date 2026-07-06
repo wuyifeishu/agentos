@@ -10,29 +10,30 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class BreakpointType(str, Enum):
+class BreakpointType(StrEnum):
     """Types of human-in-the-loop breakpoints."""
 
-    BEFORE_TASK = "before_task"       # Before a sub-task starts
-    AFTER_RESULT = "after_result"     # After a sub-task produces output
-    ON_FAILURE = "on_failure"         # When a sub-task fails
+    BEFORE_TASK = "before_task"  # Before a sub-task starts
+    AFTER_RESULT = "after_result"  # After a sub-task produces output
+    ON_FAILURE = "on_failure"  # When a sub-task fails
     ON_LOW_CONFIDENCE = "on_low_confidence"  # When fusion confidence is low
-    MANUAL = "manual"                 # Explicitly placed by developer
+    MANUAL = "manual"  # Explicitly placed by developer
 
 
-class HumanDecision(str, Enum):
+class HumanDecision(StrEnum):
     """Human responses at a breakpoint."""
 
-    APPROVE = "approve"       # Approve and continue
-    REJECT = "reject"         # Reject and skip/retry
-    RETRY = "retry"           # Reject and retry with feedback
-    MODIFY = "modify"         # Accept with modifications
-    ABORT = "abort"           # Abort entire task
+    APPROVE = "approve"  # Approve and continue
+    REJECT = "reject"  # Reject and skip/retry
+    RETRY = "retry"  # Reject and retry with feedback
+    MODIFY = "modify"  # Accept with modifications
+    ABORT = "abort"  # Abort entire task
 
 
 @dataclass
@@ -45,7 +46,7 @@ class Breakpoint:
     context: dict[str, Any] = field(default_factory=dict)
     message: str = ""
     options: list[str] = field(default_factory=lambda: ["approve", "reject", "retry", "abort"])
-    timeout: float = 0.0       # 0 = no timeout
+    timeout: float = 0.0  # 0 = no timeout
     created_at: float = field(default_factory=time.time)
     resolved_at: float = 0.0
     decision: HumanDecision | None = None
@@ -70,12 +71,12 @@ class HITLConfig:
 
     enabled: bool = True
     break_on_failure: bool = True
-    break_on_low_confidence: float = 0.3   # confidence below this triggers break
-    break_on_first_task: bool = False      # break before first sub-task
+    break_on_low_confidence: float = 0.3  # confidence below this triggers break
+    break_on_first_task: bool = False  # break before first sub-task
     break_on_every_task: bool = False
-    break_on_final_result: bool = False    # break before returning final result
-    max_pending_breakpoints: int = 5       # queue limit
-    default_timeout: float = 300.0         # 5 min default
+    break_on_final_result: bool = False  # break before returning final result
+    max_pending_breakpoints: int = 5  # queue limit
+    default_timeout: float = 300.0  # 5 min default
 
 
 class HITLManager:
@@ -187,7 +188,7 @@ class HITLManager:
                 )
                 bp.decision = decision
                 bp.feedback = feedback
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 bp.decision = HumanDecision.APPROVE
 
         bp.resolved = True
@@ -207,12 +208,10 @@ class HITLManager:
     ) -> None:
         """Provide a decision for a pending breakpoint (alternative to handler)."""
         if breakpoint_id in self._breakpoints:
-            bp = self._breakpoints[breakpoint_id]
+            self._breakpoints[breakpoint_id]
             self._decision_queue.put_nowait((decision, feedback))
 
-    async def should_break_before_task(
-        self, task_id: str, task_name: str
-    ) -> bool:
+    async def should_break_before_task(self, task_id: str, task_name: str) -> bool:
         """Check if we should break before a sub-task."""
         if not self.config.enabled:
             return False

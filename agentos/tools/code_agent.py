@@ -7,8 +7,6 @@ CodeAgent 工具 — Agent直接写代码执行，不输出JSON。
 from __future__ import annotations
 
 import subprocess
-import tempfile
-import os
 
 from agentos.tools.base import BaseTool, PermissionLevel, ToolResult
 

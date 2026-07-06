@@ -8,11 +8,12 @@ the output is automatically validated.
 
 from __future__ import annotations
 
-from typing import Any, TypeVar, Generic, get_type_hints, get_origin, get_args
 from dataclasses import dataclass
+from typing import Any, Generic, TypeVar, get_args, get_origin, get_type_hints
 
 try:
     from pydantic import BaseModel, ValidationError
+
     PYDANTIC_AVAILABLE = True
 except ImportError:
     BaseModel = None
@@ -27,7 +28,6 @@ if PYDANTIC_AVAILABLE:
 
 
 class StructuredOutput(BaseModel if PYDANTIC_AVAILABLE else object):
-
     """Agent 结构化输出。"""
 
     """
@@ -53,6 +53,7 @@ class ValidationResult(Generic[T]):
         output: Validated output (if success)
         error: Validation error (if failed)
     """
+
     success: bool
     output: T | None = None
     error: str | None = None
@@ -78,9 +79,9 @@ class OutputValidator(Generic[T]):
         """
         self.output_type = output_type
         self._is_pydantic = (
-            PYDANTIC_AVAILABLE and
-            isinstance(output_type, type) and
-            issubclass(output_type, BaseModel)
+            PYDANTIC_AVAILABLE
+            and isinstance(output_type, type)
+            and issubclass(output_type, BaseModel)
         )
 
     def validate(self, data: Any) -> ValidationResult[T]:
@@ -99,8 +100,7 @@ class OutputValidator(Generic[T]):
                 return ValidationResult(success=True, output=data)
             else:
                 return ValidationResult(
-                    success=False,
-                    error=f"Expected {self.output_type}, got {type(data)}"
+                    success=False, error=f"Expected {self.output_type}, got {type(data)}"
                 )
 
         # Pydantic validation
@@ -174,8 +174,8 @@ def get_output_type(agent_class: type) -> type | None:
     """
     # Check type hints
     hints = get_type_hints(agent_class)
-    if 'Out' in hints:
-        return hints['Out']
+    if "Out" in hints:
+        return hints["Out"]
 
     # Check generic base
     for base in agent_class.__mro__:
@@ -183,6 +183,7 @@ def get_output_type(agent_class: type) -> type | None:
         if origin is not None:
             # Check if it's Agent
             from agentos.core.di import Agent
+
             if issubclass(origin, Agent):
                 args = get_args(base)
                 if len(args) >= 2:

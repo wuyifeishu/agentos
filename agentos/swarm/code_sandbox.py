@@ -7,10 +7,8 @@ test case validation, and structured error extraction for feedback loops.
 
 from __future__ import annotations
 
-import asyncio
+import json
 import os
-import resource
-import signal
 import subprocess
 import tempfile
 import traceback
@@ -54,8 +52,8 @@ class TestCase:
     input_args: tuple = ()
     input_kwargs: dict = field(default_factory=dict)
     expected_output: Any = None
-    expected_type: str = ""        # e.g. "int", "str", "list"
-    expected_exception: str = ""   # e.g. "ValueError"
+    expected_type: str = ""  # e.g. "int", "str", "list"
+    expected_exception: str = ""  # e.g. "ValueError"
     weight: float = 1.0
 
     def to_dict(self) -> dict:
@@ -90,8 +88,14 @@ class CodeSandbox:
         self.max_memory_mb = max_memory_mb
         self.allow_imports = allow_imports
         self.forbidden_modules = forbidden_modules or [
-            "os.system", "subprocess", "shutil", "socket",
-            "requests", "urllib", "http", "ftp",
+            "os.system",
+            "subprocess",
+            "shutil",
+            "socket",
+            "requests",
+            "urllib",
+            "http",
+            "ftp",
         ]
 
     def run(
@@ -134,8 +138,7 @@ class CodeSandbox:
 
         # Write code to temp file and execute
         with tempfile.NamedTemporaryFile(
-            mode="w", suffix=".py", delete=False,
-            prefix="sandbox_"
+            mode="w", suffix=".py", delete=False, prefix="sandbox_"
         ) as f:
             script = self._build_script(code, func_name, test_cases, setup_code)
             f.write(script)
@@ -406,6 +409,7 @@ print(json.dumps({{
 def time_module() -> float:
     """Get current time in seconds."""
     import time as _time
+
     return _time.time()
 
 

@@ -11,19 +11,19 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class MiddlewarePhase(str, Enum):
+class MiddlewarePhase(StrEnum):
     """中间件触发阶段。"""
 
-    PRE_LLM = "pre_llm"          # LLM 调用前
-    POST_LLM = "post_llm"        # LLM 调用后、输出解析前
-    PRE_TOOL = "pre_tool"        # 工具调用前
-    POST_TOOL = "post_tool"      # 工具调用后
-    ON_ERROR = "on_error"        # 执行出错时
-    ON_START = "on_start"        # Agent 启动时
+    PRE_LLM = "pre_llm"  # LLM 调用前
+    POST_LLM = "post_llm"  # LLM 调用后、输出解析前
+    PRE_TOOL = "pre_tool"  # 工具调用前
+    POST_TOOL = "post_tool"  # 工具调用后
+    ON_ERROR = "on_error"  # 执行出错时
+    ON_START = "on_start"  # Agent 启动时
     ON_COMPLETE = "on_complete"  # Agent 执行完成时
 
 
@@ -35,15 +35,15 @@ class MiddlewareContext:
     agent_name: str = ""
     run_id: str = ""
     # LLM 阶段
-    prompt: Optional[str] = None
-    model_name: Optional[str] = None
-    llm_output: Optional[str] = None
+    prompt: str | None = None
+    model_name: str | None = None
+    llm_output: str | None = None
     # Tool 阶段
-    tool_name: Optional[str] = None
-    tool_args: Optional[dict] = None
+    tool_name: str | None = None
+    tool_args: dict | None = None
     tool_result: Any = None
     # Error
-    error: Optional[Exception] = None
+    error: Exception | None = None
     # 额外元数据
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -58,7 +58,7 @@ class MiddlewareDecision:
     reason: str = ""
     """决策理由。"""
 
-    modified_context: Optional[MiddlewareContext] = None
+    modified_context: MiddlewareContext | None = None
     """修改后的上下文（如脱敏后的 prompt）。"""
 
     action: str = "allow"  # allow / warn / block / transform / escalate
@@ -73,6 +73,8 @@ class AgentMiddleware(ABC):
 
     每个中间件声明自己监听的阶段，通过 process() 返回决策。
     返回 MiddlewareDecision(allow=False) 阻断执行链。
+
+    __call__ 提供便捷调用：mw(ctx) → process(ctx)。
     """
 
     name: str = "base_middleware"
@@ -87,8 +89,13 @@ class AgentMiddleware(ABC):
         """处理中间件逻辑。返回决策。"""
         ...
 
+    async def __call__(self, ctx: MiddlewareContext) -> MiddlewareDecision:
+        """便捷调用，等价于 process(ctx)。"""
+        return await self.process(ctx)
+
 
 # ── 内置中间件 ──────────────────────────────────────────────────────────────
+
 
 class PIIMaskingMiddleware(AgentMiddleware):
     """PII脱敏中间件：在 pre-LLM 阶段对 prompt 脱敏。"""
@@ -103,6 +110,7 @@ class PIIMaskingMiddleware(AgentMiddleware):
         if not ctx.prompt:
             return MiddlewareDecision(allow=True)
         from agentos.security.guard import PIIDetector
+
         detector = PIIDetector(auto_redact=True)
         sanitized, items = detector.redact(ctx.prompt)
         count = len(items)
@@ -111,7 +119,8 @@ class PIIMaskingMiddleware(AgentMiddleware):
             new_ctx.prompt = sanitized
             new_ctx.metadata["pii_count"] = count
             return MiddlewareDecision(
-                allow=True, action="transform",
+                allow=True,
+                action="transform",
                 reason=f"Masked {count} PII instances",
                 modified_context=new_ctx,
             )
@@ -139,13 +148,15 @@ class BudgetGuardMiddleware(AgentMiddleware):
         ratio = spent / self.budget_limit
         if ratio >= 1.0:
             return MiddlewareDecision(
-                allow=False, action="block",
+                allow=False,
+                action="block",
                 reason=f"Budget exceeded: ${spent:.4f} / ${self.budget_limit:.2f}",
                 blocked_by=self.name,
             )
         if ratio >= self.warn_ratio:
             return MiddlewareDecision(
-                allow=True, action="warn",
+                allow=True,
+                action="warn",
                 reason=f"Budget warning: {ratio:.0%} used (${spent:.4f} / ${self.budget_limit:.2f})",
             )
         return MiddlewareDecision(allow=True)
@@ -158,6 +169,7 @@ class ToolRiskGuardMiddleware(AgentMiddleware):
 
     def __init__(self, max_auto_level: str = "medium"):
         from agentos.tools.risk import ToolRiskLevel
+
         self.max_auto_level = ToolRiskLevel(max_auto_level)
 
     @property
@@ -169,11 +181,13 @@ class ToolRiskGuardMiddleware(AgentMiddleware):
             return MiddlewareDecision(allow=True)
 
         from agentos.tools.risk import infer_risk_level
+
         risk = infer_risk_level(ctx.tool_name, tool_args=ctx.tool_args)
 
         if risk.requires_user_confirm():
             return MiddlewareDecision(
-                allow=False, action="escalate",
+                allow=False,
+                action="escalate",
                 reason=f"Tool '{ctx.tool_name}' requires user approval: {risk.description}",
                 blocked_by=self.name,
             )
@@ -181,7 +195,8 @@ class ToolRiskGuardMiddleware(AgentMiddleware):
         levels = ["low", "medium", "high", "critical"]
         if levels.index(risk.level.value) > levels.index(self.max_auto_level.value):
             return MiddlewareDecision(
-                allow=False, action="block",
+                allow=False,
+                action="block",
                 reason=f"Tool '{ctx.tool_name}' risk {risk.level.value} exceeds auto limit {self.max_auto_level.value}",
                 blocked_by=self.name,
             )
@@ -197,13 +212,17 @@ class AuditLogMiddleware(AgentMiddleware):
     @property
     def phases(self) -> list[MiddlewarePhase]:
         return [
-            MiddlewarePhase.ON_START, MiddlewarePhase.PRE_LLM,
-            MiddlewarePhase.PRE_TOOL, MiddlewarePhase.POST_TOOL,
-            MiddlewarePhase.ON_ERROR, MiddlewarePhase.ON_COMPLETE,
+            MiddlewarePhase.ON_START,
+            MiddlewarePhase.PRE_LLM,
+            MiddlewarePhase.PRE_TOOL,
+            MiddlewarePhase.POST_TOOL,
+            MiddlewarePhase.ON_ERROR,
+            MiddlewarePhase.ON_COMPLETE,
         ]
 
     async def process(self, ctx: MiddlewareContext) -> MiddlewareDecision:
         import logging
+
         logger = logging.getLogger("agentos.audit")
         logger.info(
             f"[{ctx.phase.value}] agent={ctx.agent_name} run={ctx.run_id} "
@@ -212,7 +231,88 @@ class AuditLogMiddleware(AgentMiddleware):
         return MiddlewareDecision(allow=True)
 
 
+class TimingMiddleware(AgentMiddleware):
+    """计时中间件：记录每个阶段的耗时。"""
+
+    name = "timing"
+
+    def __init__(self):
+        self.timings: dict[str, float] = {}
+        self._phase_start: dict[str, float] = {}
+
+    @property
+    def phases(self) -> list[MiddlewarePhase]:
+        return [
+            MiddlewarePhase.ON_START,
+            MiddlewarePhase.PRE_LLM,
+            MiddlewarePhase.POST_LLM,
+            MiddlewarePhase.PRE_TOOL,
+            MiddlewarePhase.POST_TOOL,
+            MiddlewarePhase.ON_COMPLETE,
+            MiddlewarePhase.ON_ERROR,
+        ]
+
+    async def process(self, ctx: MiddlewareContext) -> MiddlewareDecision:
+        import time
+
+        phase_key = f"{ctx.phase.value}.{ctx.tool_name or ctx.agent_name or 'default'}"
+        self._phase_start[phase_key] = time.monotonic()
+        self.timings[phase_key] = self.timings.get(phase_key, 0.0)
+        return MiddlewareDecision(allow=True)
+
+    def get_timings(self) -> dict[str, float]:
+        return dict(self.timings)
+
+    def total_ms(self) -> float:
+        return sum(self.timings.values()) * 1000
+
+
+class RetryMiddleware(AgentMiddleware):
+    """重试中间件：在 ON_ERROR 阶段自动重试。"""
+
+    name = "retry"
+
+    def __init__(self, max_retries: int = 2, backoff_base: float = 1.0):
+        self.max_retries = max_retries
+        self.backoff_base = backoff_base
+        self._retry_counts: dict[str, int] = {}
+
+    @property
+    def phases(self) -> list[MiddlewarePhase]:
+        return [MiddlewarePhase.ON_ERROR]
+
+    async def process(self, ctx: MiddlewareContext) -> MiddlewareDecision:
+        import asyncio
+
+        run_key = ctx.run_id or "default"
+        count = self._retry_counts.get(run_key, 0)
+
+        if count >= self.max_retries:
+            return MiddlewareDecision(
+                allow=True,
+                action="warn",
+                reason=f"Max retries ({self.max_retries}) exhausted",
+            )
+
+        self._retry_counts[run_key] = count + 1
+        delay = self.backoff_base * (2**count)
+        await asyncio.sleep(delay)
+
+        return MiddlewareDecision(
+            allow=True,
+            action="warn",
+            reason=f"Retry {count + 1}/{self.max_retries} after {delay:.1f}s",
+        )
+
+    def reset(self, run_id: str = "") -> None:
+        if run_id:
+            self._retry_counts.pop(run_id, None)
+        else:
+            self._retry_counts.clear()
+
+
 # ── 中间件管道 ──────────────────────────────────────────────────────────────
+
 
 class MiddlewarePipeline:
     """编排多个中间件按阶段执行。
@@ -224,7 +324,7 @@ class MiddlewarePipeline:
     4. 若返回 modified_context 则传递给后续中间件
     """
 
-    def __init__(self, middlewares: Optional[list[AgentMiddleware]] = None):
+    def __init__(self, middlewares: list[AgentMiddleware] | None = None):
         self._middlewares: list[AgentMiddleware] = list(middlewares or [])
 
     def add(self, middleware: AgentMiddleware) -> MiddlewarePipeline:
@@ -277,3 +377,27 @@ class MiddlewarePipeline:
 
     async def on_complete(self, ctx: MiddlewareContext) -> MiddlewareDecision:
         return await self.execute_phase(MiddlewarePhase.ON_COMPLETE, ctx)
+
+    async def run(
+        self,
+        ctx: MiddlewareContext,
+        phases: list[MiddlewarePhase] | None = None,
+    ) -> MiddlewareDecision:
+        """便捷方法：按阶段列表依次执行管道。
+
+        phases 默认为完整的生命周期序列。
+        """
+        if phases is None:
+            phases = [
+                MiddlewarePhase.ON_START,
+                MiddlewarePhase.PRE_LLM,
+                MiddlewarePhase.POST_LLM,
+                MiddlewarePhase.ON_COMPLETE,
+            ]
+        decision = MiddlewareDecision(allow=True, modified_context=ctx)
+        for phase in phases:
+            current_ctx = decision.modified_context or ctx
+            decision = await self.execute_phase(phase, current_ctx)
+            if not decision.allow:
+                return decision
+        return decision

@@ -7,14 +7,11 @@ from __future__ import annotations
 
 import asyncio
 import time
-import math
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional
+from dataclasses import dataclass
+from enum import StrEnum
 
 
-class RateLimitStrategy(str, Enum):
-
+class RateLimitStrategy(StrEnum):
     """限流策略枚举。"""
 
     TOKEN_BUCKET = "token_bucket"
@@ -25,18 +22,20 @@ class RateLimitStrategy(str, Enum):
 @dataclass
 class RateLimitConfig:
     """限流配置。"""
+
     strategy: RateLimitStrategy = RateLimitStrategy.TOKEN_BUCKET
-    max_requests: int = 60          # 每单位时间的最大请求数
-    per_seconds: float = 60.0       # 时间窗口（秒）
-    burst_size: int = 10            # 突发容量（token bucket 专用）
-    max_concurrent: int = 5         # 最大并发数
-    queue_timeout: float = 30.0     # 排队超时
-    retry_after_header: bool = True # 是否在拒绝时返回 Retry-After
+    max_requests: int = 60  # 每单位时间的最大请求数
+    per_seconds: float = 60.0  # 时间窗口（秒）
+    burst_size: int = 10  # 突发容量（token bucket 专用）
+    max_concurrent: int = 5  # 最大并发数
+    queue_timeout: float = 30.0  # 排队超时
+    retry_after_header: bool = True  # 是否在拒绝时返回 Retry-After
 
 
 @dataclass
 class RateLimitResult:
     """限流检查结果。"""
+
     allowed: bool
     remaining: int = 0
     reset_at: float = 0.0
@@ -49,8 +48,8 @@ class TokenBucket:
     """令牌桶算法实现。"""
 
     def __init__(self, rate: float, capacity: int):
-        self.rate = rate              # 令牌填充速率（个/秒）
-        self.capacity = capacity      # 桶容量（最大突发）
+        self.rate = rate  # 令牌填充速率（个/秒）
+        self.capacity = capacity  # 桶容量（最大突发）
         self.tokens = float(capacity)
         self.last_refill = time.monotonic()
         self._lock = asyncio.Lock()
@@ -125,8 +124,7 @@ class RateLimiter:
         cfg = config or RateLimitConfig()
         self.config = cfg
         self._bucket = TokenBucket(
-            rate=cfg.max_requests / cfg.per_seconds,
-            capacity=cfg.burst_size or cfg.max_requests
+            rate=cfg.max_requests / cfg.per_seconds, capacity=cfg.burst_size or cfg.max_requests
         )
         self._window = SlidingWindow(cfg.max_requests, cfg.per_seconds)
         self._concurrency = ConcurrencyLimiter(cfg.max_concurrent)
@@ -162,7 +160,8 @@ class RateLimiter:
                     limit=self.config.max_requests,
                 )
             return RateLimitResult(
-                allowed=False, remaining=0,
+                allowed=False,
+                remaining=0,
                 retry_after=self.config.per_seconds,
                 limit=self.config.max_requests,
                 reason="window_exceeded",
@@ -201,4 +200,3 @@ class QuotaManager:
 
     def clear_expired(self, ttl: float = 3600):
         """清除超过TTL未使用的限流器（预留接口）。"""
-        pass

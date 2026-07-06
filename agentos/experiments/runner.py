@@ -5,16 +5,15 @@ AgentOS v0.40 Experiments — A/B测试与Prompt实验框架。
 
 from __future__ import annotations
 
-import json
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional, Any
 
 
 @dataclass
 class PromptVariant:
     """Prompt变体。"""
+
     name: str
     system_prompt: str
     user_template: str = ""
@@ -27,6 +26,7 @@ class PromptVariant:
 @dataclass
 class TrialResult:
     """单次试验结果。"""
+
     variant_name: str
     input: str
     output: str
@@ -41,6 +41,7 @@ class TrialResult:
 @dataclass
 class ExperimentConfig:
     """实验配置。"""
+
     name: str
     variants: list[PromptVariant]
     test_inputs: list[str]
@@ -53,6 +54,7 @@ class ExperimentConfig:
 @dataclass
 class ExperimentReport:
     """实验报告。"""
+
     id: str
     config: ExperimentConfig
     results: list[TrialResult]
@@ -84,7 +86,9 @@ class Evaluator:
         overlap = len(out_words & exp_words) / len(exp_words)
 
         # 长度惩罚
-        length_ratio = min(len(output_lower), len(expected_lower)) / max(len(output_lower), len(expected_lower), 1)
+        length_ratio = min(len(output_lower), len(expected_lower)) / max(
+            len(output_lower), len(expected_lower), 1
+        )
 
         return overlap * 0.7 + length_ratio * 0.3
 
@@ -110,6 +114,7 @@ class ExperimentRunner:
     async def run(self, config: ExperimentConfig) -> ExperimentReport:
         """执行A/B实验。"""
         import random
+
         all_results: list[TrialResult] = []
 
         # 构建所有 (variant, input) 组合
@@ -128,7 +133,14 @@ class ExperimentRunner:
                 if self.router:
                     messages = [
                         {"role": "system", "content": variant.system_prompt},
-                        {"role": "user", "content": variant.user_template.format(input=inp) if variant.user_template else inp},
+                        {
+                            "role": "user",
+                            "content": (
+                                variant.user_template.format(input=inp)
+                                if variant.user_template
+                                else inp
+                            ),
+                        },
                     ]
                     output = await self.router.call_chat(messages)
                 else:
@@ -137,19 +149,26 @@ class ExperimentRunner:
                 latency = (time.time() - start) * 1000
                 score = Evaluator.llm_judge(output, inp)  # 可自定义evaluator
 
-                all_results.append(TrialResult(
-                    variant_name=variant.name,
-                    input=inp,
-                    output=output,
-                    latency_ms=latency,
-                    score=score,
-                    judged_by="auto",
-                ))
+                all_results.append(
+                    TrialResult(
+                        variant_name=variant.name,
+                        input=inp,
+                        output=output,
+                        latency_ms=latency,
+                        score=score,
+                        judged_by="auto",
+                    )
+                )
             except Exception as e:
-                all_results.append(TrialResult(
-                    variant_name=variant.name, input=inp, output="",
-                    error=str(e), score=0.0,
-                ))
+                all_results.append(
+                    TrialResult(
+                        variant_name=variant.name,
+                        input=inp,
+                        output="",
+                        error=str(e),
+                        score=0.0,
+                    )
+                )
 
         # 汇总分析
         summary = self._analyze(all_results, config)
@@ -170,7 +189,12 @@ class ExperimentRunner:
         variant_stats = {}
         for r in results:
             if r.variant_name not in variant_stats:
-                variant_stats[r.variant_name] = {"scores": [], "latencies": [], "errors": 0, "trials": 0}
+                variant_stats[r.variant_name] = {
+                    "scores": [],
+                    "latencies": [],
+                    "errors": 0,
+                    "trials": 0,
+                }
             vs = variant_stats[r.variant_name]
             if r.error:
                 vs["errors"] += 1
@@ -213,12 +237,19 @@ class ExperimentRunner:
         mean = sum(values) / len(values)
         return (sum((v - mean) ** 2 for v in values) / len(values)) ** 0.5
 
-    def get_report(self, report_id: str) -> Optional[ExperimentReport]:
+    def get_report(self, report_id: str) -> ExperimentReport | None:
         return self._reports.get(report_id)
 
     def list_reports(self) -> list[dict]:
-        return [{"id": rid, "name": r.config.name, "winner": r.winner, "variants": len(r.config.variants)}
-                for rid, r in self._reports.items()]
+        return [
+            {
+                "id": rid,
+                "name": r.config.name,
+                "winner": r.winner,
+                "variants": len(r.config.variants),
+            }
+            for rid, r in self._reports.items()
+        ]
 
     def generate_markdown_report(self, report: ExperimentReport) -> str:
         """生成Markdown格式实验报告。"""

@@ -7,7 +7,6 @@ Bot Token + Intents → Gateway connection → on_message → ChannelMessage.
 from __future__ import annotations
 
 import json
-from typing import Optional
 
 from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
 from agentos.channels.message import ChannelMessage, ChannelType, MessageType
@@ -34,7 +33,7 @@ class DiscordAdapter(BaseChannelAdapter):
 
     # ── Message parsing ──
 
-    async def parse_incoming(self, payload: dict) -> Optional[ChannelMessage]:
+    async def parse_incoming(self, payload: dict) -> ChannelMessage | None:
         """Parse Discord gateway message event into ChannelMessage."""
         event_type = payload.get("t", "")  # Gateway event type
         data = payload.get("d", {})
@@ -55,7 +54,7 @@ class DiscordAdapter(BaseChannelAdapter):
 
         return None
 
-    def _parse_message(self, data: dict) -> Optional[ChannelMessage]:
+    def _parse_message(self, data: dict) -> ChannelMessage | None:
         """Parse a Discord Message Create event."""
         author = data.get("author", {})
         if author.get("bot", False):
@@ -80,7 +79,7 @@ class DiscordAdapter(BaseChannelAdapter):
         # Strip command prefix
         stripped = content
         if content.startswith(self._command_prefix):
-            stripped = content[len(self._command_prefix):]
+            stripped = content[len(self._command_prefix) :]
             msg_type = MessageType.COMMAND
         else:
             msg_type = MessageType.TEXT
@@ -101,7 +100,7 @@ class DiscordAdapter(BaseChannelAdapter):
             },
         )
 
-    def _parse_interaction(self, data: dict) -> Optional[ChannelMessage]:
+    def _parse_interaction(self, data: dict) -> ChannelMessage | None:
         """Parse Discord slash command interaction."""
         interaction_data = data.get("data", {})
         command_name = interaction_data.get("name", "")
@@ -114,9 +113,9 @@ class DiscordAdapter(BaseChannelAdapter):
             channel_type=ChannelType.DISCORD,
             channel_id=channel_id,
             user_id=user_id,
-            content=f"/{command_name} " + " ".join(
-                f"{o.get('name')}:{o.get('value')}"
-                for o in interaction_data.get("options", [])
+            content=f"/{command_name} "
+            + " ".join(
+                f"{o.get('name')}:{o.get('value')}" for o in interaction_data.get("options", [])
             ),
             message_type=MessageType.COMMAND,
             raw=data,
@@ -144,22 +143,27 @@ class DiscordAdapter(BaseChannelAdapter):
 
         try:
             import aiohttp
+
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, headers=headers, json=body) as resp:
                     data = await resp.json()
                     return ReplyResult(success=True, message_id=data.get("id", ""))
         except ImportError:
             import urllib.request
-            req = urllib.request.Request(
-                url, data=json.dumps(body).encode(), headers=headers
-            )
+
+            req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers)
             with urllib.request.urlopen(req) as resp:
                 data = json.loads(resp.read())
                 return ReplyResult(success=True, message_id=data.get("id", ""))
 
     async def reply_embed(
-        self, channel_id: str, title: str, description: str,
-        color: int = 0x5865F2, fields: list = None, **kwargs,
+        self,
+        channel_id: str,
+        title: str,
+        description: str,
+        color: int = 0x5865F2,
+        fields: list = None,
+        **kwargs,
     ) -> ReplyResult:
         """Send a Discord embed message."""
         embed = {

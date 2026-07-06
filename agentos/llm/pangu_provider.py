@@ -36,9 +36,7 @@ class PanguProvider(OpenAIProvider):
     ):
         import os
 
-        resolved_base = base_url or os.getenv(
-            "PANGU_BASE_URL", PANGU_DEFAULT_BASE
-        )
+        resolved_base = base_url or os.getenv("PANGU_BASE_URL", PANGU_DEFAULT_BASE)
         resolved_key = api_key or os.getenv("PANGU_API_KEY", "")
 
         super().__init__(

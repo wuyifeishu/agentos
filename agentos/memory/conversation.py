@@ -1,4 +1,4 @@
-"""
+"""  # noqa: E501
 Conversation Memory with sliding window management.
 
 Manages multi-turn conversations with configurable window strategies:
@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class WindowStrategy(Enum):
@@ -60,7 +60,7 @@ class WindowConfig:
     importance_threshold: float = 0.3
     """Minimum importance score to keep (importance / hybrid)."""
 
-    system_prompt: Optional[str] = None
+    system_prompt: str | None = None
     """System prompt always kept at top of window."""
 
     preserve_last_n: int = 2
@@ -79,7 +79,7 @@ class ConversationMemory:
         messages = mem.get_messages()  # [{"role": "user", "content": "Hello"}, ...]
     """
 
-    def __init__(self, config: Optional[WindowConfig] = None):
+    def __init__(self, config: WindowConfig | None = None):
         self.config = config or WindowConfig()
         self._turns: list[ConversationTurn] = []
         self._token_count_cache: int = 0
@@ -87,26 +87,40 @@ class ConversationMemory:
     def add_turn(self, turn: ConversationTurn) -> None:
         """Add a turn and apply window eviction if needed."""
         self._turns.append(turn)
-        self._token_count_cache += turn.token_count if turn.token_count > 0 else self._estimate_tokens(turn.content)
+        self._token_count_cache += (
+            turn.token_count if turn.token_count > 0 else self._estimate_tokens(turn.content)
+        )
         self._apply_window()
 
     def add_user_message(self, content: str, importance: float = 0.5) -> None:
-        self.add_turn(ConversationTurn(
-            role="user", content=content, importance=importance,
-            token_count=self._estimate_tokens(content),
-        ))
+        self.add_turn(
+            ConversationTurn(
+                role="user",
+                content=content,
+                importance=importance,
+                token_count=self._estimate_tokens(content),
+            )
+        )
 
     def add_assistant_message(self, content: str, importance: float = 0.5) -> None:
-        self.add_turn(ConversationTurn(
-            role="assistant", content=content, importance=importance,
-            token_count=self._estimate_tokens(content),
-        ))
+        self.add_turn(
+            ConversationTurn(
+                role="assistant",
+                content=content,
+                importance=importance,
+                token_count=self._estimate_tokens(content),
+            )
+        )
 
     def add_system_message(self, content: str) -> None:
-        self.add_turn(ConversationTurn(
-            role="system", content=content, importance=1.0,
-            token_count=self._estimate_tokens(content),
-        ))
+        self.add_turn(
+            ConversationTurn(
+                role="system",
+                content=content,
+                importance=1.0,
+                token_count=self._estimate_tokens(content),
+            )
+        )
 
     def _apply_window(self) -> None:
         """Apply the configured window strategy to evict excess turns."""
@@ -115,7 +129,10 @@ class ConversationMemory:
         if strategy == WindowStrategy.SLIDING:
             self._evict_sliding()
         elif strategy == WindowStrategy.TOKEN_AWARE:
-            while self._token_count_cache > self.config.max_tokens and len(self._turns) > self.config.preserve_last_n:
+            while (
+                self._token_count_cache > self.config.max_tokens
+                and len(self._turns) > self.config.preserve_last_n
+            ):
                 self._evict_one(0)
         elif strategy == WindowStrategy.IMPORTANCE:
             self._evict_by_importance()
@@ -195,7 +212,9 @@ class ConversationMemory:
         """Remove a single turn at given index."""
         if 0 <= index < len(self._turns):
             turn = self._turns.pop(index)
-            self._token_count_cache -= turn.token_count if turn.token_count > 0 else self._estimate_tokens(turn.content)
+            self._token_count_cache -= (
+                turn.token_count if turn.token_count > 0 else self._estimate_tokens(turn.content)
+            )
             self._token_count_cache = max(0, self._token_count_cache)
 
     def get_messages(self) -> list[dict[str, str]]:
@@ -247,4 +266,56 @@ class ConversationMemory:
         return len(self._turns)
 
     def __repr__(self) -> str:
-        return f"ConversationMemory(turns={len(self._turns)}, tokens={self._token_count_cache}, strategy={self.config.strategy.value})"
+        return f"ConversationMemory(turns={len(self._turns)}, tokens={self._token_count_cache}, strategy={self.config.strategy.value})"  # noqa: E501
+
+    # ── Persistence (v1.14.9) ────────────────
+
+    def get_state(self) -> dict[str, Any]:
+        """Export conversation memory state for persistence."""
+        return {
+            "config": {
+                "strategy": self.config.strategy.value,
+                "max_turns": self.config.max_turns,
+                "max_tokens": self.config.max_tokens,
+                "importance_threshold": self.config.importance_threshold,
+                "system_prompt": self.config.system_prompt,
+                "preserve_last_n": self.config.preserve_last_n,
+            },
+            "turns": [
+                {
+                    "role": turn.role,
+                    "content": turn.content,
+                    "timestamp": turn.timestamp,
+                    "token_count": turn.token_count,
+                    "importance": turn.importance,
+                    "metadata": turn.metadata,
+                }
+                for turn in self._turns
+            ],
+            "token_count_cache": self._token_count_cache,
+        }
+
+    def restore_state(self, state: dict[str, Any]) -> None:
+        """Restore conversation memory from a persisted snapshot."""
+        config_data = state.get("config", {})
+        self.config = WindowConfig(
+            strategy=WindowStrategy(config_data.get("strategy", "sliding")),
+            max_turns=config_data.get("max_turns", 20),
+            max_tokens=config_data.get("max_tokens", 8000),
+            importance_threshold=config_data.get("importance_threshold", 0.3),
+            system_prompt=config_data.get("system_prompt"),
+            preserve_last_n=config_data.get("preserve_last_n", 2),
+        )
+        self._turns = []
+        for turn_data in state.get("turns", []):
+            self._turns.append(
+                ConversationTurn(
+                    role=turn_data.get("role", "user"),
+                    content=turn_data.get("content", ""),
+                    timestamp=turn_data.get("timestamp", 0.0),
+                    token_count=turn_data.get("token_count", 0),
+                    importance=turn_data.get("importance", 0.5),
+                    metadata=turn_data.get("metadata", {}),
+                )
+            )
+        self._token_count_cache = state.get("token_count_cache", 0)

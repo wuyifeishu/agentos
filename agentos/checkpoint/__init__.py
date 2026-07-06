@@ -17,12 +17,12 @@ AgentOS Checkpointer — 对话与工作流持久化引擎。
 
 from agentos.checkpoint.base import (
     Checkpoint,
-    CheckpointMetadata,
     CheckpointBackend,
+    CheckpointMetadata,
 )
-from agentos.checkpoint.sqlite import SQLiteCheckpointer
-from agentos.checkpoint.postgres import PostgresCheckpointer
 from agentos.checkpoint.factory import create_checkpointer
+from agentos.checkpoint.postgres import PostgresCheckpointer
+from agentos.checkpoint.sqlite import SQLiteCheckpointer
 
 __all__ = [
     "Checkpoint",

@@ -6,12 +6,11 @@ AgentOS v0.20 流式输出系统。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class StreamEvent(str, Enum):
-
+class StreamEvent(StrEnum):
     """流式事件。"""
 
     START = "start"
@@ -35,6 +34,7 @@ class StreamChunk:
 
     def to_sse(self) -> str:
         import json
+
         payload = {
             "event": self.event.value,
             **self.data,
@@ -52,10 +52,12 @@ class StreamEmitter:
 
     def __init__(self):
         import time
+
         self._start = time.time()
 
     def emit(self, event: StreamEvent, **data) -> StreamChunk:
         import time
+
         chunk = StreamChunk(event=event, data=data)
         chunk.timestamp = (time.time() - self._start) * 1000
         return chunk

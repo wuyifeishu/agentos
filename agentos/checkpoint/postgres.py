@@ -61,6 +61,7 @@ class PostgresCheckpointer(CheckpointBackend):
         if self._pool is not None:
             return
         import asyncpg
+
         self._pool = await asyncpg.create_pool(dsn=self._dsn, **self._kwargs)
         async with self._pool.acquire() as conn:
             await conn.execute(_SCHEMA)
@@ -107,9 +108,7 @@ class PostgresCheckpointer(CheckpointBackend):
             )
         return self._row_to_checkpoint(row) if row else None
 
-    async def list_threads(
-        self, limit: int = 50, offset: int = 0
-    ) -> list[CheckpointMetadata]:
+    async def list_threads(self, limit: int = 50, offset: int = 0) -> list[CheckpointMetadata]:
         await self._ensure_pool()
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
@@ -117,7 +116,8 @@ class PostgresCheckpointer(CheckpointBackend):
                    FROM checkpoints
                    ORDER BY thread_id, step DESC
                    LIMIT $1 OFFSET $2""",
-                limit, offset,
+                limit,
+                offset,
             )
         return [self._row_to_metadata(r) for r in rows]
 
@@ -128,16 +128,16 @@ class PostgresCheckpointer(CheckpointBackend):
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
                 "SELECT * FROM checkpoints WHERE thread_id = $1 ORDER BY step DESC LIMIT $2 OFFSET $3",
-                thread_id, limit, offset,
+                thread_id,
+                limit,
+                offset,
             )
         return [self._row_to_metadata(r) for r in rows]
 
     async def delete_thread(self, thread_id: str) -> int:
         await self._ensure_pool()
         async with self._pool.acquire() as conn:
-            result = await conn.execute(
-                "DELETE FROM checkpoints WHERE thread_id = $1", thread_id
-            )
+            result = await conn.execute("DELETE FROM checkpoints WHERE thread_id = $1", thread_id)
         return int(result.split()[-1]) if result else 0
 
     async def delete_before(self, thread_id: str, before_step: int) -> int:
@@ -145,7 +145,8 @@ class PostgresCheckpointer(CheckpointBackend):
         async with self._pool.acquire() as conn:
             result = await conn.execute(
                 "DELETE FROM checkpoints WHERE thread_id = $1 AND step < $2",
-                thread_id, before_step,
+                thread_id,
+                before_step,
             )
         return int(result.split()[-1]) if result else 0
 
@@ -168,9 +169,21 @@ class PostgresCheckpointer(CheckpointBackend):
 
     @staticmethod
     def _row_to_checkpoint(row: Any) -> Checkpoint:
-        messages = row["messages_blob"] if isinstance(row["messages_blob"], list) else json.loads(row["messages_blob"])
-        state = row["state_blob"] if isinstance(row["state_blob"], dict) else json.loads(row["state_blob"])
-        tools = row["tools_blob"] if isinstance(row["tools_blob"], dict) else json.loads(row["tools_blob"])
+        messages = (
+            row["messages_blob"]
+            if isinstance(row["messages_blob"], list)
+            else json.loads(row["messages_blob"])
+        )
+        state = (
+            row["state_blob"]
+            if isinstance(row["state_blob"], dict)
+            else json.loads(row["state_blob"])
+        )
+        tools = (
+            row["tools_blob"]
+            if isinstance(row["tools_blob"], dict)
+            else json.loads(row["tools_blob"])
+        )
         return Checkpoint(
             metadata=PostgresCheckpointer._row_to_metadata(row),
             messages=messages,

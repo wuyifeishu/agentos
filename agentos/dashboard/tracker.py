@@ -8,11 +8,8 @@ from __future__ import annotations
 
 import json
 import time
-import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
-
 
 TRACKER_DIR = Path.home() / ".agentos" / "tracker"
 
@@ -20,9 +17,10 @@ TRACKER_DIR = Path.home() / ".agentos" / "tracker"
 @dataclass
 class StepRecord:
     """单步执行记录。"""
+
     step_index: int
-    step_type: str       # "thinking" | "tool_call" | "tool_result" | "final_answer"
-    detail: str          # 步骤内容摘要
+    step_type: str  # "thinking" | "tool_call" | "tool_result" | "final_answer"
+    detail: str  # 步骤内容摘要
     duration_ms: float
     tokens: int = 0
 
@@ -30,13 +28,14 @@ class StepRecord:
 @dataclass
 class SessionRecord:
     """单次会话完整记录。"""
+
     session_id: str
     task: str
     model: str
     provider: str
     started_at: float = field(default_factory=time.time)
     finished_at: float = 0.0
-    status: str = "running"   # "running" | "completed" | "error" | "cancelled"
+    status: str = "running"  # "running" | "completed" | "error" | "cancelled"
     steps: list[StepRecord] = field(default_factory=list)
     total_tokens: int = 0
     total_cost_usd: float = 0.0
@@ -63,12 +62,21 @@ class Tracker:
             cls._instance = cls()
         return cls._instance
 
-    def start_session(self, session_id: str, task: str, model: str = "", provider: str = "") -> SessionRecord:
+    def start_session(
+        self, session_id: str, task: str, model: str = "", provider: str = ""
+    ) -> SessionRecord:
         rec = SessionRecord(session_id=session_id, task=task, model=model, provider=provider)
         self._active[session_id] = rec
         return rec
 
-    def add_step(self, session_id: str, step_type: str, detail: str, duration_ms: float = 0.0, tokens: int = 0):
+    def add_step(
+        self,
+        session_id: str,
+        step_type: str,
+        detail: str,
+        duration_ms: float = 0.0,
+        tokens: int = 0,
+    ):
         rec = self._active.get(session_id)
         if rec is None:
             return
@@ -81,9 +89,20 @@ class Tracker:
         )
         rec.steps.append(step)
         rec.total_tokens += tokens
-        self._notify("step", {"session_id": session_id, "step_type": step_type, "detail": detail, "duration_ms": duration_ms, "tokens": tokens})
+        self._notify(
+            "step",
+            {
+                "session_id": session_id,
+                "step_type": step_type,
+                "detail": detail,
+                "duration_ms": duration_ms,
+                "tokens": tokens,
+            },
+        )
 
-    def finish_session(self, session_id: str, status: str = "completed", error: str = "", total_cost: float = 0.0):
+    def finish_session(
+        self, session_id: str, status: str = "completed", error: str = "", total_cost: float = 0.0
+    ):
         rec = self._active.pop(session_id, None)
         if rec is None:
             return
@@ -116,7 +135,7 @@ class Tracker:
     def list_sessions(self, limit: int = 50) -> list[dict]:
         sessions = []
         if self._sessions_file.exists():
-            with open(self._sessions_file, "r") as f:
+            with open(self._sessions_file) as f:
                 for line in f:
                     if line.strip():
                         sessions.append(json.loads(line))
@@ -131,7 +150,7 @@ class Tracker:
             return asdict(rec)
         # 再从文件中找
         if self._sessions_file.exists():
-            with open(self._sessions_file, "r") as f:
+            with open(self._sessions_file) as f:
                 for line in f:
                     if line.strip():
                         d = json.loads(line)

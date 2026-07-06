@@ -6,12 +6,11 @@ A2A协议路由 — 跨框架Agent互操作。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class TaskStatus(str, Enum):
-
+class TaskStatus(StrEnum):
     """任务状态枚举。"""
 
     PENDING = "pending"
@@ -23,6 +22,7 @@ class TaskStatus(str, Enum):
 @dataclass
 class AgentCard:
     """Agent名片 — A2A协议中Agent互相发现的基础。"""
+
     id: str
     name: str
     description: str
@@ -34,6 +34,7 @@ class AgentCard:
 @dataclass
 class Task:
     """结构化任务 — A2A协议的任务定义。"""
+
     id: str
     description: str
     input_data: dict[str, Any] = field(default_factory=dict)
@@ -43,6 +44,7 @@ class Task:
 @dataclass
 class TaskResult:
     """Result of an A2A routed task execution."""
+
     task_id: str
     output: str
     artifacts: list[str] = field(default_factory=list)
@@ -64,6 +66,10 @@ class A2ARouter:
         self.local_agents: dict[str, AgentCard] = {}
         self.remote_agents: dict[str, AgentCard] = {}
         self._task_results: dict[str, TaskResult] = {}
+
+    def register(self, card: AgentCard) -> None:
+        """Register an agent card (compliance test entry point)."""
+        self.local_agents[card.id] = card
 
     def register_local(self, card: AgentCard):
         self.local_agents[card.id] = card

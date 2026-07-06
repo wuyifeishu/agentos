@@ -17,15 +17,15 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Optional, Callable, Awaitable
+from enum import StrEnum
 
 from agentos.system.permissions import PermissionTier
 
 
-class ApprovalStatus(str, Enum):
+class ApprovalStatus(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
     DENIED = "denied"
@@ -36,10 +36,11 @@ class ApprovalStatus(str, Enum):
 @dataclass
 class ApprovalTicket:
     """授权申请票据。"""
+
     ticket_id: str
     tier: PermissionTier
-    resource: str                    # 申请访问的资源路径/命令
-    reason: str                      # Agent 申请原因（AI 生成的中文说明）
+    resource: str  # 申请访问的资源路径/命令
+    reason: str  # Agent 申请原因（AI 生成的中文说明）
     status: ApprovalStatus = ApprovalStatus.PENDING
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     resolved_at: str = ""
@@ -55,7 +56,7 @@ class ApprovalTicket:
         """等待审批结果。"""
         try:
             return await asyncio.wait_for(asyncio.shield(self._future), timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.status = ApprovalStatus.TIMEOUT
             self.resolved_at = datetime.now().isoformat()
             return ApprovalStatus.TIMEOUT
@@ -95,7 +96,7 @@ class ApprovalEngine:
     def __init__(self, perm_manager, session_id: str):
         self._pm = perm_manager
         self._sid = session_id
-        self._push_callback: Optional[Callable[[dict], Awaitable[None]]] = None
+        self._push_callback: Callable[[dict], Awaitable[None]] | None = None
         self._pending: dict[str, ApprovalTicket] = {}
         self._denied_remember: set[str] = set()  # 本次会话已记住拒绝的 (tier, pattern)
 
@@ -103,8 +104,9 @@ class ApprovalEngine:
         """设置推送回调（发送到 WebSocket 客户端）。"""
         self._push_callback = callback
 
-    async def request(self, tier: PermissionTier, resource: str, reason: str,
-                      timeout: float = 60.0) -> bool:
+    async def request(
+        self, tier: PermissionTier, resource: str, reason: str, timeout: float = 60.0
+    ) -> bool:
         """Agent 发起权限申请，返回是否获批。
 
         如果已有 DENIED_REMEMBER 记录，直接返回 False。
@@ -126,18 +128,20 @@ class ApprovalEngine:
         # 推送到客户端
         if self._push_callback:
             try:
-                await self._push_callback({
-                    "type": "approval_request",
-                    "data": {
-                        "ticket_id": ticket.ticket_id,
-                        "tier": ticket.tier.value,
-                        "tier_label": ticket.tier.label,
-                        "resource": ticket.resource,
-                        "reason": ticket.reason,
-                        "session_id": self._sid,
-                        "timeout": timeout,
-                    },
-                })
+                await self._push_callback(
+                    {
+                        "type": "approval_request",
+                        "data": {
+                            "ticket_id": ticket.ticket_id,
+                            "tier": ticket.tier.value,
+                            "tier_label": ticket.tier.label,
+                            "resource": ticket.resource,
+                            "reason": ticket.reason,
+                            "session_id": self._sid,
+                            "timeout": timeout,
+                        },
+                    }
+                )
             except Exception:
                 pass  # 推送失败不阻塞
 
@@ -179,9 +183,9 @@ class ApprovalEngine:
                 "resource": t.resource,
                 "reason": t.reason,
                 "created_at": t.created_at,
-                "timeout_remaining": max(0, 60 - (
-                    datetime.now() - datetime.fromisoformat(t.created_at)
-                ).total_seconds()),
+                "timeout_remaining": max(
+                    0, 60 - (datetime.now() - datetime.fromisoformat(t.created_at)).total_seconds()
+                ),
             }
             for t in self._pending.values()
             if t.status == ApprovalStatus.PENDING

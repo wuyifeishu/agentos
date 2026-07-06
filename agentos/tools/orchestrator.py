@@ -16,15 +16,15 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Coroutine
-
+from enum import StrEnum
+from typing import Any
 
 # ── Core Types ──────────────────────────────────
 
-class NodeState(str, Enum):
 
+class NodeState(StrEnum):
     """DAG 节点状态。"""
 
     PENDING = "pending"
@@ -38,6 +38,7 @@ class NodeState(str, Enum):
 @dataclass
 class NodeResult:
     """DAG 节点执行结果。"""
+
     node_id: str
     state: NodeState
     output: Any = None
@@ -49,6 +50,7 @@ class NodeResult:
 @dataclass
 class DAGResult:
     """DAG 执行结果。"""
+
     nodes: dict[str, NodeResult]
     final_output: Any = None
     total_duration_ms: float = 0.0
@@ -59,18 +61,21 @@ class DAGResult:
 @dataclass
 class RetryPolicy:
     """重试策略类。"""
+
     max_retries: int = 3
-    base_delay: float = 1.0      # seconds
-    max_delay: float = 30.0      # seconds
-    backoff: str = "exponential" # exponential | fixed | linear
+    base_delay: float = 1.0  # seconds
+    max_delay: float = 30.0  # seconds
+    backoff: str = "exponential"  # exponential | fixed | linear
     retry_on: tuple = (Exception,)
 
 
 # ── DAG Node Types ─────────────────────────────
 
+
 @dataclass
 class ToolNode:
     """工具执行节点。"""
+
     tool_name: str
     tool_args: dict[str, Any] = field(default_factory=dict)
     depends_on: list[str] = field(default_factory=list)  # upstream node IDs
@@ -84,6 +89,7 @@ class ToolNode:
 @dataclass
 class ConditionNode:
     """条件分支节点。"""
+
     condition: Callable[[dict[str, Any]], str]  # returns target node_id
     depends_on: list[str] = field(default_factory=list)
 
@@ -91,6 +97,7 @@ class ConditionNode:
 @dataclass
 class ParallelGroup:
     """并行执行组 — 所有节点同时执行。"""
+
     node_ids: list[str]
     depends_on: list[str] = field(default_factory=list)
     max_concurrency: int = 5
@@ -99,6 +106,7 @@ class ParallelGroup:
 @dataclass
 class DAGSpec:
     """DAG编排规格。"""
+
     name: str
     nodes: dict[str, ToolNode] = field(default_factory=dict)
     parallels: list[ParallelGroup] = field(default_factory=list)
@@ -108,6 +116,7 @@ class DAGSpec:
 
 
 # ── Checkpoint Data (v1.1.7) ──────────────────
+
 
 @dataclass
 class CheckpointData:
@@ -129,7 +138,7 @@ class CheckpointData:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "CheckpointData":
+    def from_dict(cls, data: dict) -> CheckpointData:
         return cls(
             dag_name=data.get("dag_name", ""),
             completed_nodes=data.get("completed_nodes", {}),
@@ -142,11 +151,12 @@ class CheckpointData:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
 
     @classmethod
-    def from_json(cls, json_str: str) -> "CheckpointData":
+    def from_json(cls, json_str: str) -> CheckpointData:
         return cls.from_dict(json.loads(json_str))
 
 
 # ── Orchestrator Engine ────────────────────────
+
 
 class ToolOrchestrator:
     """
@@ -171,7 +181,7 @@ class ToolOrchestrator:
                 self._execute_entry(dag),
                 timeout=dag.global_timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return DAGResult(
                 nodes=self._results,
                 total_duration_ms=(time.time() - start) * 1000,
@@ -203,11 +213,19 @@ class ToolOrchestrator:
         """递归执行入口节点。"""
         pending = set(dag.entry or dag.nodes.keys())
         # v1.1.7: 跳过checkpoint恢复后已完成的节点，并发现其下游节点
-        completed = {nid for nid in pending if nid in self._results and self._results[nid].state == NodeState.SUCCESS}
+        completed = {
+            nid
+            for nid in pending
+            if nid in self._results and self._results[nid].state == NodeState.SUCCESS
+        }
         pending -= completed
         for nid in completed:
             for other_nid, other_node in dag.nodes.items():
-                if nid in other_node.depends_on and other_nid not in pending and other_nid not in self._results:
+                if (
+                    nid in other_node.depends_on
+                    and other_nid not in pending
+                    and other_nid not in self._results
+                ):
                     pending.add(other_nid)
 
         while pending:
@@ -226,7 +244,8 @@ class ToolOrchestrator:
                 if stuck:
                     for nid in stuck:
                         self._results[nid] = NodeResult(
-                            node_id=nid, state=NodeState.FAILED,
+                            node_id=nid,
+                            state=NodeState.FAILED,
                             error="Deadlock: dependencies not met",
                         )
                     break
@@ -254,9 +273,11 @@ class ToolOrchestrator:
                 group_ready = [nid for nid in pg.node_ids if nid in ready]
                 if group_ready:
                     sem = asyncio.Semaphore(pg.max_concurrency)
+
                     async def bounded(nid):
                         async with sem:
                             await self._run_node(dag, nid)
+
                     await asyncio.gather(*[bounded(nid) for nid in group_ready])
 
             pending -= set(ready)
@@ -264,7 +285,11 @@ class ToolOrchestrator:
             # v1.1.7: 发现已完成节点的下游节点（支持checkpoint恢复 & 多节点链）
             for nid in list(ready):
                 for other_nid, other_node in dag.nodes.items():
-                    if nid in other_node.depends_on and other_nid not in pending and other_nid not in self._results:
+                    if (
+                        nid in other_node.depends_on
+                        and other_nid not in pending
+                        and other_nid not in self._results
+                    ):
                         pending.add(other_nid)
 
             # Process conditions
@@ -312,13 +337,15 @@ class ToolOrchestrator:
                 )
                 duration_ms = (time.time() - step_start) * 1000
                 result = NodeResult(
-                    node_id=nid, state=NodeState.SUCCESS,
-                    output=output, duration_ms=duration_ms,
+                    node_id=nid,
+                    state=NodeState.SUCCESS,
+                    output=output,
+                    duration_ms=duration_ms,
                     retries=attempt,
                 )
                 self._results[nid] = result
                 return result
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 last_error = f"Tool timeout ({node.timeout}s)"
                 result = NodeResult(nid, NodeState.TIMEOUT, error=last_error, retries=attempt)
             except Exception as e:
@@ -327,7 +354,9 @@ class ToolOrchestrator:
                     delay = self._calc_retry_delay(retry_policy, attempt)
                     await asyncio.sleep(delay)
 
-        result = NodeResult(nid, NodeState.FAILED, error=last_error, retries=retry_policy.max_retries)
+        result = NodeResult(
+            nid, NodeState.FAILED, error=last_error, retries=retry_policy.max_retries
+        )
         self._results[nid] = result
         return result
 
@@ -381,7 +410,7 @@ class ToolOrchestrator:
         elif policy.backoff == "linear":
             return min(policy.base_delay * (attempt + 1), policy.max_delay)
         else:  # exponential
-            return min(policy.base_delay * (2 ** attempt), policy.max_delay)
+            return min(policy.base_delay * (2**attempt), policy.max_delay)
 
     @property
     def results(self) -> dict[str, NodeResult]:
@@ -441,10 +470,9 @@ class ToolOrchestrator:
         Returns:
             最终执行结果
         """
-        last_checkpoint_time = 0.0
         try:
             await self.execute(dag)
-        except (asyncio.TimeoutError, Exception) as e:
+        except (TimeoutError, Exception):
             # 异常时保存当前状态
             cp = self.checkpoint(dag)
             if checkpoint_callback:
@@ -459,6 +487,7 @@ class ToolOrchestrator:
 
 
 # ── DAG Builder (Fluent API) ────────────────────
+
 
 class DAGBuilder:
     """流式构建DAG。"""
@@ -479,7 +508,7 @@ class DAGBuilder:
         timeout: float = 60.0,
         retry: RetryPolicy | None = None,
         input_transform: Callable | None = None,
-    ) -> "DAGBuilder":
+    ) -> DAGBuilder:
         self._nodes[node_id] = ToolNode(
             tool_name=tool_name,
             tool_args=tool_args or {},
@@ -492,15 +521,19 @@ class DAGBuilder:
             self._entry.append(node_id)
         return self
 
-    def parallel(self, node_ids: list[str], depends_on: list[str] | None = None, max_concurrency: int = 5) -> "DAGBuilder":
-        self._parallels.append(ParallelGroup(
-            node_ids=node_ids,
-            depends_on=depends_on or [],
-            max_concurrency=max_concurrency,
-        ))
+    def parallel(
+        self, node_ids: list[str], depends_on: list[str] | None = None, max_concurrency: int = 5
+    ) -> DAGBuilder:
+        self._parallels.append(
+            ParallelGroup(
+                node_ids=node_ids,
+                depends_on=depends_on or [],
+                max_concurrency=max_concurrency,
+            )
+        )
         return self
 
-    def condition(self, cond_id: str, condition: Callable, depends_on: list[str]) -> "DAGBuilder":
+    def condition(self, cond_id: str, condition: Callable, depends_on: list[str]) -> DAGBuilder:
         self._conditions[cond_id] = ConditionNode(
             condition=condition,
             depends_on=depends_on,
@@ -520,10 +553,10 @@ class DAGBuilder:
 
 # ── Pre-built Chains ────────────────────────────
 
+
 def chain_builder(name: str, tool_names: list[str]) -> DAGSpec:
     """构建简单顺序链。"""
     builder = DAGBuilder(name)
-    prev = None
     for i, tool_name in enumerate(tool_names):
         nid = f"step_{i}"
         deps = [f"step_{i - 1}"] if i > 0 else []
@@ -548,7 +581,11 @@ def if_then_else(name: str, check_tool: str, true_tool: str, false_tool: str) ->
     """构建 if-then-else 条件分支。"""
     builder = DAGBuilder(name)
     builder.node("check", check_tool)
-    builder.condition("cond", lambda up: "true_branch" if up.get("check", {}).get("output") else "false_branch", depends_on=["check"])
+    builder.condition(
+        "cond",
+        lambda up: "true_branch" if up.get("check", {}).get("output") else "false_branch",
+        depends_on=["check"],
+    )
     builder.node("true_branch", true_tool, depends_on=["check"])
     builder.node("false_branch", false_tool, depends_on=["check"])
     return builder.build()

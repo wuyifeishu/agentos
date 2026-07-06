@@ -13,11 +13,12 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class CacheKeyStrategy(Enum):
     """Strategy for generating cache lookup keys."""
+
     EXACT = "exact"
     """Hash of the full prompt/message."""
 
@@ -103,7 +104,7 @@ class ResponseCache:
         self._store: OrderedDict[str, CacheEntry] = OrderedDict()
         self._stats = CacheStats(max_size=max_entries)
 
-    def get(self, prompt: str, **context: Any) -> Optional[Any]:
+    def get(self, prompt: str, **context: Any) -> Any | None:
         """
         Retrieve cached response for a prompt.
 
@@ -138,7 +139,7 @@ class ResponseCache:
         self,
         prompt: str,
         value: Any,
-        ttl: Optional[float] = None,
+        ttl: float | None = None,
         **context: Any,
     ) -> str:
         """
@@ -203,7 +204,7 @@ class ResponseCache:
         self._stats.size = len(self._store)
         return self._stats
 
-    def get_entry(self, prompt: str, **context: Any) -> Optional[CacheEntry]:
+    def get_entry(self, prompt: str, **context: Any) -> CacheEntry | None:
         """Get the full cache entry (including metadata) without updating LRU."""
         key = self._make_key(prompt, context)
         return self._store.get(key)

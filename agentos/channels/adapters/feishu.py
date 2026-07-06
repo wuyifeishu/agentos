@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Optional
 
 import httpx
 
@@ -36,10 +35,29 @@ class FeishuAdapter(BaseChannelAdapter):
     # ── Webhook ──
 
     def verify_signature(self, raw_body: bytes, headers: dict) -> bool:
-        """飞书不要求 webhook 签名验证（在事件订阅 URL 验证时完成）。"""
-        return True
+        """验证飞书事件订阅签名。
 
-    def parse_webhook(self, raw_body: bytes, headers: dict) -> ChannelMessage | list[ChannelMessage]:
+        签名算法: Base64Encode(SHA256(timestamp + nonce + encrypt_key))
+        文档: https://open.feishu.cn/document/server-docs/event-subscription-guide/event-subscription-configure-/encrypt-key-encryption-configuration-
+        """
+        import base64
+        import hashlib
+
+        timestamp = headers.get("X-Lark-Request-Timestamp", "")
+        nonce = headers.get("X-Lark-Request-Nonce", "")
+        signature = headers.get("X-Lark-Signature", "")
+
+        encrypt_key = self.config.encoding_aes_key or self.config.verify_token
+        if not all([timestamp, nonce, signature, encrypt_key]):
+            return False
+
+        raw = f"{timestamp}{nonce}{encrypt_key}"
+        computed = base64.b64encode(hashlib.sha256(raw.encode()).digest()).decode()
+        return signature == computed
+
+    def parse_webhook(
+        self, raw_body: bytes, headers: dict
+    ) -> ChannelMessage | list[ChannelMessage]:
         data = json.loads(raw_body.decode("utf-8"))
         # 飞书事件格式: {"schema": "2.0", "header": {...}, "event": {...}}
         event = data.get("event", data)
@@ -58,9 +76,12 @@ class FeishuAdapter(BaseChannelAdapter):
 
         msg_type_str = event.get("message", {}).get("message_type", "text")
         msg_type_map = {
-            "text": MessageType.TEXT, "image": MessageType.IMAGE,
-            "audio": MessageType.VOICE, "media": MessageType.FILE,
-            "file": MessageType.FILE, "post": MessageType.TEXT,
+            "text": MessageType.TEXT,
+            "image": MessageType.IMAGE,
+            "audio": MessageType.VOICE,
+            "media": MessageType.FILE,
+            "file": MessageType.FILE,
+            "post": MessageType.TEXT,
         }
         msg_type = msg_type_map.get(msg_type_str, MessageType.TEXT)
 
@@ -95,10 +116,12 @@ class FeishuAdapter(BaseChannelAdapter):
         )
 
     def build_reply(self, msg: ChannelMessage, reply_text: str) -> str:
-        return json.dumps({
-            "msg_type": "text",
-            "content": json.dumps({"text": reply_text}),
-        })
+        return json.dumps(
+            {
+                "msg_type": "text",
+                "content": json.dumps({"text": reply_text}),
+            }
+        )
 
     # ── 主动推送 ──
 
@@ -112,11 +135,19 @@ class FeishuAdapter(BaseChannelAdapter):
         }
         headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, params={"receive_id_type": "open_id"}, json=payload, headers=headers, timeout=10)
+            resp = await client.post(
+                url,
+                params={"receive_id_type": "open_id"},
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
             data = resp.json()
             if data.get("code") == 0:
                 return ReplyResult(success=True, msg_id=data.get("data", {}).get("message_id", ""))
-            return ReplyResult(success=False, error=f"feishu error {data.get('code')}: {data.get('msg')}")
+            return ReplyResult(
+                success=False, error=f"feishu error {data.get('code')}: {data.get('msg')}"
+            )
 
     async def send_image(self, user_id: str, image_url: str) -> ReplyResult:
         token = await self.get_access_token()
@@ -128,7 +159,13 @@ class FeishuAdapter(BaseChannelAdapter):
         }
         headers = {"Authorization": f"Bearer {token}"}
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, params={"receive_id_type": "open_id"}, json=payload, headers=headers, timeout=10)
+            resp = await client.post(
+                url,
+                params={"receive_id_type": "open_id"},
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
             return ReplyResult(success=resp.json().get("code") == 0)
 
     async def send_file(self, user_id: str, file_url: str, filename: str) -> ReplyResult:
@@ -141,7 +178,13 @@ class FeishuAdapter(BaseChannelAdapter):
         }
         headers = {"Authorization": f"Bearer {token}"}
         async with httpx.AsyncClient() as client:
-            resp = await client.post(url, params={"receive_id_type": "open_id"}, json=payload, headers=headers, timeout=10)
+            resp = await client.post(
+                url,
+                params={"receive_id_type": "open_id"},
+                json=payload,
+                headers=headers,
+                timeout=10,
+            )
             return ReplyResult(success=resp.json().get("code") == 0)
 
     # ── Token ──

@@ -7,41 +7,54 @@ Components:
   - AutoPilot: Closed-loop self-evolution pipeline (v2, auto-generate/appply/validate diffs)
 """
 
+from agentos.evolution.autopilot import (
+    ABEvaluator,
+    AutoPilot,
+    AutoPilotMode,
+    AutoTester,
+    CodeGenerator,
+    EvolutionJournal,
+    EvolutionRun,
+    RollbackManager,
+)
 from agentos.evolution.engine import (
     EvolutionEngine,
     EvolutionProposal,
     EvolutionStatus,
 )
-from agentos.evolution.signals import (
-    BehaviorSignal,
-    SignalCollector,
-    SignalSummary,
-    SignalType,
-    FeedbackPolarity,
-)
 from agentos.evolution.learner import (
     Learner,
     LearningInsight,
 )
-from agentos.evolution.autopilot import (
-    AutoPilot,
-    AutoPilotMode,
-    CodeGenerator,
-    AutoTester,
-    RollbackManager,
-    ABEvaluator,
-    EvolutionJournal,
-    EvolutionRun,
+from agentos.evolution.signals import (
+    BehaviorSignal,
+    FeedbackPolarity,
+    SignalCollector,
+    SignalSummary,
+    SignalType,
 )
 
 __all__ = [
     # Engine
-    "EvolutionEngine", "EvolutionProposal", "EvolutionStatus",
+    "EvolutionEngine",
+    "EvolutionProposal",
+    "EvolutionStatus",
     # Signals
-    "BehaviorSignal", "SignalCollector", "SignalSummary", "SignalType", "FeedbackPolarity",
+    "BehaviorSignal",
+    "SignalCollector",
+    "SignalSummary",
+    "SignalType",
+    "FeedbackPolarity",
     # Learner
-    "Learner", "LearningInsight",
+    "Learner",
+    "LearningInsight",
     # AutoPilot v2
-    "AutoPilot", "AutoPilotMode", "CodeGenerator", "AutoTester",
-    "RollbackManager", "ABEvaluator", "EvolutionJournal", "EvolutionRun",
+    "AutoPilot",
+    "AutoPilotMode",
+    "CodeGenerator",
+    "AutoTester",
+    "RollbackManager",
+    "ABEvaluator",
+    "EvolutionJournal",
+    "EvolutionRun",
 ]

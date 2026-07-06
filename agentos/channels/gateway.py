@@ -20,14 +20,13 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import logging
 import time
-from pathlib import Path
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
-from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
-from agentos.channels.message import ChannelMessage, ChannelType, MessageType, ConversationContext
+from agentos.channels.base import BaseChannelAdapter
+from agentos.channels.message import ChannelMessage, ChannelType, ConversationContext
 from agentos.channels.router import ChannelRouter
 
 logger = logging.getLogger("agentos.channels.gateway")
@@ -36,7 +35,7 @@ _router = ChannelRouter()
 
 # ── 用户自定义消息处理器 ──
 
-_on_message: Optional[Callable[[ChannelMessage, ConversationContext], Any]] = None
+_on_message: Callable[[ChannelMessage, ConversationContext], Any] | None = None
 
 
 def on_message(handler: Callable[[ChannelMessage, ConversationContext], Any]):
@@ -56,8 +55,7 @@ def _check_signature(adapter: BaseChannelAdapter, raw_data: bytes, headers: dict
     return adapter.verify_signature(raw_data, headers)
 
 
-def _process_message_async(adapter: BaseChannelAdapter, raw_data: bytes,
-                           headers: dict) -> Any:
+def _process_message_async(adapter: BaseChannelAdapter, raw_data: bytes, headers: dict) -> Any:
     """异步处理消息：签名校验 → 解析 → 路由 → 调用 handler → 回复。
 
     此函数作为同步入口，内部使用 asyncio.run 驱动异步流程。
@@ -70,15 +68,15 @@ def _process_message_async(adapter: BaseChannelAdapter, raw_data: bytes,
     return asyncio.run(_process_message_coro(adapter, raw_data, headers))
 
 
-async def _process_message_coro(adapter: BaseChannelAdapter, raw_data: bytes,
-                                headers: dict) -> Any:
+async def _process_message_coro(adapter: BaseChannelAdapter, raw_data: bytes, headers: dict) -> Any:
     """消息处理协程。"""
     # 1. 签名校验
     if not _check_signature(adapter, raw_data, headers):
         logger.warning(f"[{adapter.channel_type.value}] 签名校验失败")
         return adapter.build_reply(
             ChannelMessage(channel=adapter.channel_type, content="signature_error"),
-            "签名校验失败", success=False,
+            "签名校验失败",
+            success=False,
         )
 
     try:
@@ -88,7 +86,8 @@ async def _process_message_coro(adapter: BaseChannelAdapter, raw_data: bytes,
         logger.exception(f"[{adapter.channel_type.value}] 消息解析失败: {e}")
         return adapter.build_reply(
             ChannelMessage(channel=adapter.channel_type, content="parse_error"),
-            "消息解析失败", success=False,
+            "消息解析失败",
+            success=False,
         )
 
     if not msg.content and not msg.media_url:
@@ -110,7 +109,9 @@ async def _process_message_coro(adapter: BaseChannelAdapter, raw_data: bytes,
             elif isinstance(result, dict):
                 reply_text = result.get("reply", "")
         else:
-            reply_text = f"[AgentOS Gateway] 收到来自 {msg.channel.value} 的消息，但未注册消息处理器。"
+            reply_text = (
+                f"[AgentOS Gateway] 收到来自 {msg.channel.value} 的消息，但未注册消息处理器。"
+            )
     except Exception as e:
         logger.exception(f"[{adapter.channel_type.value}] handler 异常: {e}")
         reply_text = f"处理失败: {e}"
@@ -125,10 +126,12 @@ async def _process_message_coro(adapter: BaseChannelAdapter, raw_data: bytes,
 
 # ── FASTAPI 应用工厂 ──
 
-def create_app(title: str = "AgentOS Channel Gateway",
-               version: str = "1.0.0",
-               adapter_webhook_paths: Optional[dict[ChannelType, str]] = None,
-               ) -> Any:
+
+def create_app(
+    title: str = "AgentOS Channel Gateway",
+    version: str = "1.0.0",
+    adapter_webhook_paths: dict[ChannelType, str] | None = None,
+) -> Any:
     """创建 FastAPI 应用实例。
 
     Args:
@@ -158,7 +161,7 @@ def create_app(title: str = "AgentOS Channel Gateway",
             uvicorn.run(app, host="0.0.0.0", port=8000)
     """
     try:
-        from fastapi import FastAPI, Request, HTTPException
+        from fastapi import FastAPI, HTTPException, Request
         from fastapi.responses import JSONResponse, PlainTextResponse, Response
     except ImportError:
         raise ImportError(
@@ -184,6 +187,7 @@ def create_app(title: str = "AgentOS Channel Gateway",
 
     def _make_webhook_handler(adapter: BaseChannelAdapter):
         """为每个渠道适配器创建 webhook handler。"""
+
         async def handler(request: Request):
             # 读取原始 body
             try:
@@ -197,7 +201,8 @@ def create_app(title: str = "AgentOS Channel Gateway",
                 if adapter.channel_type == ChannelType.FEISHU:
                     return adapter.build_reply(
                         ChannelMessage(channel=ChannelType.FEISHU, content=""),
-                        query.get("challenge", ""), success=True,
+                        query.get("challenge", ""),
+                        success=True,
                     )
                 if adapter.channel_type == ChannelType.WECHAT_MP:
                     # 微信公众号 URL 验证
@@ -212,7 +217,9 @@ def create_app(title: str = "AgentOS Channel Gateway",
                         if sig == expected:
                             return PlainTextResponse(echostr)
                         else:
-                            raise HTTPException(status_code=403, detail="Signature verification failed")
+                            raise HTTPException(
+                                status_code=403, detail="Signature verification failed"
+                            )
                     return PlainTextResponse(echostr)
                 return JSONResponse({"status": "ok"})
 
@@ -223,9 +230,14 @@ def create_app(title: str = "AgentOS Channel Gateway",
                 if result is None:
                     return JSONResponse({"status": "ok"})
                 if isinstance(result, (str, bytes)):
-                    return Response(content=result if isinstance(result, bytes) else result.encode(),
-                                    media_type="application/xml" if adapter.channel_type in
-                                    (ChannelType.WECHAT_MP, ChannelType.WECOM) else "application/json")
+                    return Response(
+                        content=result if isinstance(result, bytes) else result.encode(),
+                        media_type=(
+                            "application/xml"
+                            if adapter.channel_type in (ChannelType.WECHAT_MP, ChannelType.WECOM)
+                            else "application/json"
+                        ),
+                    )
                 if isinstance(result, dict):
                     return JSONResponse(result)
                 return result
@@ -253,8 +265,12 @@ def create_app(title: str = "AgentOS Channel Gateway",
             webhook_path = adapter.config.webhook_path or default_paths.get(channel, "")
             if webhook_path:
                 _router._adapters[webhook_path] = adapter
-                app.add_api_route(webhook_path, _make_webhook_handler(adapter),
-                                  methods=["GET", "POST"], name=f"webhook_{channel.value}")
+                app.add_api_route(
+                    webhook_path,
+                    _make_webhook_handler(adapter),
+                    methods=["GET", "POST"],
+                    name=f"webhook_{channel.value}",
+                )
 
     # ── 管理接口 ──
 
@@ -274,6 +290,7 @@ def create_app(title: str = "AgentOS Channel Gateway",
 
 
 # ── 便利函数 ──
+
 
 def get_router() -> ChannelRouter:
     """获取全局路由器实例。"""

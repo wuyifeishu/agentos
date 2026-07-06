@@ -1,5 +1,5 @@
 """
-AgentOS Skill Marketplace Platform (v1.8.1)
+AgentOS Skill Marketplace Platform (v1.8.1)  # noqa: E501
 
 Full-stack developer marketplace:
   - User registration & JWT authentication
@@ -20,22 +20,21 @@ import json
 import os
 import re
 import secrets
-import shutil
 import sqlite3
-import tempfile
 import time
 import zipfile
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 import jwt as pyjwt
+
 try:
-    from fastapi import FastAPI, HTTPException, Query, UploadFile, File, Form, Depends, Request
-    from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
-    from fastapi.staticfiles import StaticFiles
+    from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+    from fastapi.responses import FileResponse, HTMLResponse
+    from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+    from fastapi.staticfiles import StaticFiles
 except ImportError:
     raise RuntimeError("FastAPI, pyjwt required. Run: pip install fastapi uvicorn pyjwt")
 
@@ -57,6 +56,7 @@ JWT_EXPIRY_HOURS = 72
 
 
 # ── Database ─────────────────────────────────
+
 
 def get_db() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH))
@@ -150,27 +150,65 @@ def _verify_password(password: str, password_hash: str) -> bool:
 
 # ── Security Scanner ─────────────────────────
 
+
 class SecurityScanner:
     """Scans uploaded skill packages for security issues."""
 
     DANGEROUS_IMPORTS = {
-        "os.system", "subprocess", "eval(", "exec(", "compile(",
-        "__import__", "importlib", "builtins", "ctypes",
-        "socket", "requests", "urllib", "http.client",
-        "shutil.rmtree", "shutil.copy", "pathlib.Path.unlink",
-        "pickle", "marshal", "dill",
+        "os.system",
+        "subprocess",
+        "eval(",
+        "exec(",
+        "compile(",
+        "__import__",
+        "importlib",
+        "builtins",
+        "ctypes",
+        "socket",
+        "requests",
+        "urllib",
+        "http.client",
+        "shutil.rmtree",
+        "shutil.copy",
+        "pathlib.Path.unlink",
+        "pickle",
+        "marshal",
+        "dill",
     }
 
-    DANGEROUS_SHELL = {" rm ", "rm -rf", "sudo ", "chmod 777", "chown ",
-                        " | sh", " | bash", "$(", "`", "; rm", "wget ", "curl ",
-                        "/dev/null", "> /etc/", "> ~/.ssh/"}
+    DANGEROUS_SHELL = {
+        " rm ",
+        "rm -rf",
+        "sudo ",
+        "chmod 777",
+        "chown ",
+        " | sh",
+        " | bash",
+        "$(",
+        "`",
+        "; rm",
+        "wget ",
+        "curl ",
+        "/dev/null",
+        "> /etc/",
+        "> ~/.ssh/",
+    }
 
-    OBFUSCATION_SIGNALS = {"base64.b64decode", "base64.b64encode", "exec(base64",
-                           "decode('utf-8')", "eval(compile", "globals()", "__builtins__",
-                           "lambda.*exec", "lambda.*eval", "getattr.*__"}
+    OBFUSCATION_SIGNALS = {
+        "base64.b64decode",
+        "base64.b64encode",
+        "exec(base64",
+        "decode('utf-8')",
+        "eval(compile",
+        "globals()",
+        "__builtins__",
+        "lambda.*exec",
+        "lambda.*eval",
+        "getattr.*__",
+    }
 
     @classmethod
-    def scan_zip(cls, zip_path: str) -> Dict[str, Any]:
+    def scan_zip(cls, zip_path: str) -> dict[str, Any]:
         """Scan a skill zip package and return security report."""
         findings = []
         score = 100
@@ -186,7 +224,10 @@ class SecurityScanner:
                     name = info.filename.lower()
 
                     # Skip binary files
-                    if any(name.endswith(ext) for ext in (".pyc", ".so", ".dll", ".exe", ".png", ".jpg", ".ico")):
+                    if any(
+                        name.endswith(ext)
+                        for ext in (".pyc", ".so", ".dll", ".exe", ".png", ".jpg", ".ico")
+                    ):
                         continue
 
                     try:
@@ -195,33 +236,53 @@ class SecurityScanner:
                     except Exception:
                         continue
 
-                    lines = content.split("\n")
+                    content.split("\n")
 
                     # Check for dangerous imports
                     for imp in cls.DANGEROUS_IMPORTS:
                         if imp in content:
-                            findings.append({"file": info.filename, "severity": "high",
-                                            "rule": f"dangerous_import:{imp}", "line": content.find(imp)})
+                            findings.append(
+                                {
+                                    "file": info.filename,
+                                    "severity": "high",
+                                    "rule": f"dangerous_import:{imp}",
+                                    "line": content.find(imp),
+                                }
+                            )
                             score -= 20
 
                     # Check for shell injection
                     for pat in cls.DANGEROUS_SHELL:
                         if pat in content:
-                            findings.append({"file": info.filename, "severity": "critical",
-                                            "rule": f"shell_injection:{pat.strip()}"})
+                            findings.append(
+                                {
+                                    "file": info.filename,
+                                    "severity": "critical",
+                                    "rule": f"shell_injection:{pat.strip()}",
+                                }
+                            )
                             score -= 30
 
                     # Check for obfuscation
                     for pat in cls.OBFUSCATION_SIGNALS:
                         if re.search(pat, content):
-                            findings.append({"file": info.filename, "severity": "medium",
-                                            "rule": f"obfuscation:{pat}"})
+                            findings.append(
+                                {
+                                    "file": info.filename,
+                                    "severity": "medium",
+                                    "rule": f"obfuscation:{pat}",
+                                }
+                            )
                             score -= 15
 
                     # Check for hardcoded secrets
-                    if re.search(r'(api_key|secret|password|token)\s*[:=]\s*["\'][a-zA-Z0-9_\-]{20,}', content):
-                        findings.append({"file": info.filename, "severity": "high",
-                                        "rule": "hardcoded_secret"})
+                    if re.search(
+                        r'(api_key|secret|password|token)\s*[:=]\s*["\'][a-zA-Z0-9_\-]{20,}',
+                        content,
+                    ):
+                        findings.append(
+                            {"file": info.filename, "severity": "high", "rule": "hardcoded_secret"}
+                        )
                         score -= 25
         except zipfile.BadZipFile:
             return {"score": 0, "findings": [{"severity": "critical", "rule": "invalid_zip"}]}
@@ -231,11 +292,15 @@ class SecurityScanner:
             "findings": findings,
             "files_scanned": files_scanned,
             "total_size": total_size,
-            "risk_level": "low" if score >= 80 else "medium" if score >= 50 else "high" if score >= 20 else "critical",
+            "risk_level": (
+                "low"
+                if score >= 80
+                else "medium" if score >= 50 else "high" if score >= 20 else "critical"
+            ),
         }
 
     @classmethod
-    def validate_manifest(cls, manifest: Dict) -> List[str]:
+    def validate_manifest(cls, manifest: dict) -> list[str]:
         """Validate skill manifest structure. Returns list of errors."""
         errors = []
         required = ["name", "version", "description"]
@@ -245,12 +310,14 @@ class SecurityScanner:
 
         if "name" in manifest:
             name = manifest["name"]
-            if not re.match(r'^[a-zA-Z][a-zA-Z0-9_\-]*$', name):
-                errors.append(f"Invalid skill name: {name}. Use alphanumeric, hyphens, underscores.")
+            if not re.match(r"^[a-zA-Z][a-zA-Z0-9_\-]*$", name):
+                errors.append(
+                    f"Invalid skill name: {name}. Use alphanumeric, hyphens, underscores."
+                )
 
         if "version" in manifest:
             version = manifest["version"]
-            if not re.match(r'^\d+\.\d+\.\d+$', version):
+            if not re.match(r"^\d+\.\d+\.\d+$", version):
                 errors.append(f"Invalid version format: {version}. Use semver (e.g., 0.1.0).")
 
         return errors
@@ -272,14 +339,16 @@ def create_token(user_id: int, username: str, is_admin: bool) -> str:
     return pyjwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
-def decode_token(token: str) -> Optional[Dict]:
+def decode_token(token: str) -> dict | None:
     try:
         return pyjwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except Exception:
         return None
 
 
-async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme)):
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(security_scheme),
+):
     if not credentials:
         raise HTTPException(status_code=401, detail="Authentication required")
     payload = decode_token(credentials.credentials)
@@ -300,6 +369,7 @@ async def get_admin_user(user: dict = Depends(get_current_user)):
 
 
 # ── FastAPI App ──────────────────────────────
+
 
 def create_marketplace_app() -> FastAPI:
     init_db()
@@ -331,37 +401,48 @@ def create_marketplace_app() -> FastAPI:
     # ── Auth Endpoints ──
 
     @app.post("/api/auth/register")
-    async def register(username: str = Form(...), email: str = Form(...),
-                       password: str = Form(...), display_name: str = Form("")):
+    async def register(
+        username: str = Form(...),
+        email: str = Form(...),
+        password: str = Form(...),
+        display_name: str = Form(""),
+    ):
         if len(password) < 6:
             raise HTTPException(400, "Password must be at least 6 characters")
-        if not re.match(r'^[a-zA-Z0-9_]{3,30}$', username):
+        if not re.match(r"^[a-zA-Z0-9_]{3,30}$", username):
             raise HTTPException(400, "Username: 3-30 chars, alphanumeric/underscore")
 
         db = get_db()
-        existing = db.execute("SELECT id FROM users WHERE username=? OR email=?",
-                             (username, email)).fetchone()
+        existing = db.execute(
+            "SELECT id FROM users WHERE username=? OR email=?", (username, email)
+        ).fetchone()
         if existing:
             db.close()
             raise HTTPException(409, "Username or email already exists")
 
         pw_hash = _hash_password(password)
         try:
-            db.execute("INSERT INTO users (username, email, password_hash, display_name) VALUES (?,?,?,?)",
-                      (username, email, pw_hash, display_name or username))
+            db.execute(
+                "INSERT INTO users (username, email, password_hash, display_name) VALUES (?,?,?,?)",
+                (username, email, pw_hash, display_name or username),
+            )
             db.commit()
             user_id = db.lastrowid
         finally:
             db.close()
 
         token = create_token(user_id, username, False)
-        return {"token": token, "user": {"id": user_id, "username": username, "email": email, "is_admin": False}}
+        return {
+            "token": token,
+            "user": {"id": user_id, "username": username, "email": email, "is_admin": False},
+        }
 
     @app.post("/api/auth/login")
     async def login(username: str = Form(...), password: str = Form(...)):
         db = get_db()
-        user = db.execute("SELECT * FROM users WHERE username = ? OR email = ?",
-                         (username, username)).fetchone()
+        user = db.execute(
+            "SELECT * FROM users WHERE username = ? OR email = ?", (username, username)
+        ).fetchone()
         if not user or not _verify_password(password, user["password_hash"]):
             db.close()
             raise HTTPException(401, "Invalid credentials")
@@ -371,10 +452,13 @@ def create_marketplace_app() -> FastAPI:
         return {
             "token": token,
             "user": {
-                "id": user["id"], "username": user["username"], "email": user["email"],
-                "display_name": user["display_name"], "is_admin": bool(user["is_admin"]),
+                "id": user["id"],
+                "username": user["username"],
+                "email": user["email"],
+                "display_name": user["display_name"],
+                "is_admin": bool(user["is_admin"]),
                 "github_username": user["github_username"],
-            }
+            },
         }
 
     @app.get("/api/auth/me")
@@ -399,7 +483,7 @@ def create_marketplace_app() -> FastAPI:
 
         # Save uploaded file
         ts = int(time.time())
-        safe_name = re.sub(r'[^a-zA-Z0-9_.-]', '_', file.filename)
+        safe_name = re.sub(r"[^a-zA-Z0-9_.-]", "_", file.filename)
         file_id = f"{user['id']}_{ts}_{safe_name}"
         file_path = UPLOAD_DIR / file_id
         content = await file.read()
@@ -436,9 +520,13 @@ def create_marketplace_app() -> FastAPI:
                 skill_tags = []
 
         # Validate
-        manifest_errors = SecurityScanner.validate_manifest({
-            "name": skill_name, "version": skill_version, "description": skill_desc,
-        })
+        manifest_errors = SecurityScanner.validate_manifest(
+            {
+                "name": skill_name,
+                "version": skill_version,
+                "description": skill_desc,
+            }
+        )
         if manifest_errors:
             file_path.unlink()
             raise HTTPException(400, f"Manifest validation failed: {'; '.join(manifest_errors)}")
@@ -449,8 +537,11 @@ def create_marketplace_app() -> FastAPI:
         if security["score"] <= 20:
             auto_status = "rejected"
             file_path.unlink()
-            raise HTTPException(400, f"Security scan failed (score: {security['score']}/100). "
-                                      f"Risk: {security['risk_level']}. Findings: {len(security['findings'])}")
+            raise HTTPException(
+                400,
+                f"Security scan failed (score: {security['score']}/100). "
+                f"Risk: {security['risk_level']}. Findings: {len(security['findings'])}",
+            )
 
         # Compute hash
         file_hash = hashlib.sha256(content).hexdigest()
@@ -462,11 +553,23 @@ def create_marketplace_app() -> FastAPI:
                    format, entrypoint, manifest_json, file_path, file_size, file_hash,
                    status, security_score, security_report)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (user["id"], skill_name, skill_version, skill_desc, skill_category,
-                 json.dumps(skill_tags), manifest.get("format", "agentos"),
-                 manifest.get("entrypoint", ""), json.dumps(manifest, ensure_ascii=False),
-                 str(file_path.absolute()), os.path.getsize(str(file_path)), file_hash,
-                 auto_status, security["score"], json.dumps(security, ensure_ascii=False)),
+                (
+                    user["id"],
+                    skill_name,
+                    skill_version,
+                    skill_desc,
+                    skill_category,
+                    json.dumps(skill_tags),
+                    manifest.get("format", "agentos"),
+                    manifest.get("entrypoint", ""),
+                    json.dumps(manifest, ensure_ascii=False),
+                    str(file_path.absolute()),
+                    os.path.getsize(str(file_path)),
+                    file_hash,
+                    auto_status,
+                    security["score"],
+                    json.dumps(security, ensure_ascii=False),
+                ),
             )
             db.commit()
             skill_id = db.lastrowid
@@ -477,8 +580,11 @@ def create_marketplace_app() -> FastAPI:
         db.close()
 
         return {
-            "id": skill_id, "name": skill_name, "version": skill_version,
-            "status": auto_status, "security_score": security["score"],
+            "id": skill_id,
+            "name": skill_name,
+            "version": skill_version,
+            "status": auto_status,
+            "security_score": security["score"],
             "risk_level": security["risk_level"],
             "findings_count": len(security["findings"]),
         }
@@ -523,15 +629,24 @@ def create_marketplace_app() -> FastAPI:
         db.close()
 
         return {
-            "total": total, "page": page, "limit": limit,
+            "total": total,
+            "page": page,
+            "limit": limit,
             "skills": [
-                {"id": s["id"], "name": s["name"], "version": s["version"],
-                 "description": s["description"], "category": s["category"],
-                 "tags": json.loads(s["tags"]), "format": s["format"],
-                 "download_count": s["download_count"], "status": s["status"],
-                 "security_score": s["security_score"],
-                 "author": {"username": s["author_name"], "display_name": s["author_display"]},
-                 "created_at": s["created_at"]}
+                {
+                    "id": s["id"],
+                    "name": s["name"],
+                    "version": s["version"],
+                    "description": s["description"],
+                    "category": s["category"],
+                    "tags": json.loads(s["tags"]),
+                    "format": s["format"],
+                    "download_count": s["download_count"],
+                    "status": s["status"],
+                    "security_score": s["security_score"],
+                    "author": {"username": s["author_name"], "display_name": s["author_display"]},
+                    "created_at": s["created_at"],
+                }
                 for s in skills
             ],
         }
@@ -557,16 +672,24 @@ def create_marketplace_app() -> FastAPI:
         db.close()
 
         return {
-            "id": skill["id"], "name": skill["name"], "version": skill["version"],
-            "description": skill["description"], "category": skill["category"],
-            "tags": json.loads(skill["tags"]), "format": skill["format"],
-            "entrypoint": skill["entrypoint"], "manifest": json.loads(skill["manifest_json"] or "{}"),
-            "download_count": skill["download_count"], "status": skill["status"],
+            "id": skill["id"],
+            "name": skill["name"],
+            "version": skill["version"],
+            "description": skill["description"],
+            "category": skill["category"],
+            "tags": json.loads(skill["tags"]),
+            "format": skill["format"],
+            "entrypoint": skill["entrypoint"],
+            "manifest": json.loads(skill["manifest_json"] or "{}"),
+            "download_count": skill["download_count"],
+            "status": skill["status"],
             "security_score": skill["security_score"],
             "author": {"username": skill["author_name"], "display_name": skill["author_display"]},
             "created_at": skill["created_at"],
-            "reviews": {"count": review_stats["count"] or 0,
-                       "avg_rating": round(review_stats["avg_rating"] or 0, 1)},
+            "reviews": {
+                "count": review_stats["count"] or 0,
+                "avg_rating": round(review_stats["avg_rating"] or 0, 1),
+            },
         }
 
     # ── Download ──
@@ -581,7 +704,9 @@ def create_marketplace_app() -> FastAPI:
             db.close()
             raise HTTPException(404, "Skill not found")
 
-        db.execute("UPDATE skills SET download_count = download_count + 1 WHERE id = ?", (skill_id,))
+        db.execute(
+            "UPDATE skills SET download_count = download_count + 1 WHERE id = ?", (skill_id,)
+        )
         db.commit()
         db.close()
 
@@ -600,21 +725,26 @@ def create_marketplace_app() -> FastAPI:
     @app.get("/api/admin/review-queue")
     async def review_queue(user: dict = Depends(get_admin_user)):
         db = get_db()
-        skills = db.execute(
-            """SELECT s.*, u.username as author_name
+        skills = db.execute("""SELECT s.*, u.username as author_name
                FROM skills s JOIN users u ON s.author_id = u.id
                WHERE s.status IN ('pending', 'flagged')
-               ORDER BY s.created_at DESC"""
-        ).fetchall()
+               ORDER BY s.created_at DESC""").fetchall()
         db.close()
         return {
             "count": len(skills),
             "skills": [
-                {"id": s["id"], "name": s["name"], "version": s["version"],
-                 "description": s["description"], "category": s["category"],
-                 "status": s["status"], "security_score": s["security_score"],
-                 "security_report": json.loads(s["security_report"] or "{}"),
-                 "author": s["author_name"], "created_at": s["created_at"]}
+                {
+                    "id": s["id"],
+                    "name": s["name"],
+                    "version": s["version"],
+                    "description": s["description"],
+                    "category": s["category"],
+                    "status": s["status"],
+                    "security_score": s["security_score"],
+                    "security_report": json.loads(s["security_report"] or "{}"),
+                    "author": s["author_name"],
+                    "created_at": s["created_at"],
+                }
                 for s in skills
             ],
         }
@@ -651,7 +781,7 @@ def create_marketplace_app() -> FastAPI:
     async def list_categories():
         db = get_db()
         cats = db.execute(
-            "SELECT category, COUNT(*) as count FROM skills WHERE status='published' GROUP BY category ORDER BY count DESC"
+            "SELECT category, COUNT(*) as count FROM skills WHERE status='published' GROUP BY category ORDER BY count DESC"  # noqa: E501
         ).fetchall()
         db.close()
         return {"categories": [{"name": c["category"], "count": c["count"]} for c in cats]}
@@ -661,13 +791,16 @@ def create_marketplace_app() -> FastAPI:
     @app.get("/api/developers/{username}")
     async def developer_profile(username: str):
         db = get_db()
-        user = db.execute("SELECT id, username, display_name, avatar_url, github_username, created_at FROM users WHERE username = ?", (username,)).fetchone()
+        user = db.execute(
+            "SELECT id, username, display_name, avatar_url, github_username, created_at FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
         if not user:
             db.close()
             raise HTTPException(404, "Developer not found")
 
         skills = db.execute(
-            "SELECT id, name, version, description, category, tags, download_count, status, created_at FROM skills WHERE author_id = ? AND status = 'published' ORDER BY download_count DESC",
+            "SELECT id, name, version, description, category, tags, download_count, status, created_at FROM skills WHERE author_id = ? AND status = 'published' ORDER BY download_count DESC",  # noqa: E501
             (user["id"],),
         ).fetchall()
         db.close()
@@ -696,7 +829,9 @@ def create_marketplace_app() -> FastAPI:
     @app.get("/api/health")
     async def health_check():
         db = get_db()
-        skill_count = db.execute("SELECT COUNT(*) FROM skills WHERE status='published'").fetchone()[0]
+        skill_count = db.execute("SELECT COUNT(*) FROM skills WHERE status='published'").fetchone()[
+            0
+        ]
         user_count = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         db.close()
         return {
@@ -709,9 +844,9 @@ def create_marketplace_app() -> FastAPI:
     return app
 
 
-def _parse_yaml_simple(text: str) -> Dict[str, Any]:
+def _parse_yaml_simple(text: str) -> dict[str, Any]:
     """Simple YAML parser for skill manifests. Handles basic key: value + lists."""
-    result: Dict[str, Any] = {}
+    result: dict[str, Any] = {}
     current_key = None
     for line in text.split("\n"):
         stripped = line.strip()
@@ -735,10 +870,11 @@ def _parse_yaml_simple(text: str) -> Dict[str, Any]:
 def start_marketplace_platform(host: str = "0.0.0.0", port: int = 8911) -> None:
     """Start the marketplace platform server (blocking)."""
     import uvicorn
+
     app = create_marketplace_app()
-    print(f"\n  AgentOS Skill Marketplace Platform v1.8.1")
+    print("\n  AgentOS Skill Marketplace Platform v1.8.1")
     print(f"  Local:  http://{host}:{port}")
-    print(f"  Admin:  admin / admin123")
-    print(f"  Upload: POST /api/skills/upload  |  Browse: GET /api/skills")
+    print("  Admin:  admin / admin123")
+    print("  Upload: POST /api/skills/upload  |  Browse: GET /api/skills")
     print()
     uvicorn.run(app, host=host, port=port, log_level="info")

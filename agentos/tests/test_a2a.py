@@ -1,18 +1,24 @@
 """测试 A2A 协议 — Task, Message, Handoff, Client, Server。"""
 
 import time
+
 import pytest
+
 from agentos.protocols.a2a import (
-    TaskState, PartType, MessageRole,
-    TextPart, FilePart, DataPart, part_from_dict,
     A2AArtifact,
-    A2AMessage,
-    A2ATask,
     A2AHandoff,
-    A2ASession,
-    A2AClient,
+    A2AMessage,
     A2AServer,
-    new_task, new_handoff,
+    A2ASession,
+    A2ATask,
+    DataPart,
+    FilePart,
+    MessageRole,
+    TaskState,
+    TextPart,
+    new_handoff,
+    new_task,
+    part_from_dict,
 )
 
 
@@ -26,7 +32,12 @@ class TestA2AParts:
         assert tp2.meta == {"lang": "en"}
 
     def test_file_part_roundtrip(self):
-        fp = FilePart(url="https://ex.com/f.pdf", filename="report.pdf", mime_type="application/pdf", size=1024)
+        fp = FilePart(
+            url="https://ex.com/f.pdf",
+            filename="report.pdf",
+            mime_type="application/pdf",
+            size=1024,
+        )
         d = fp.to_dict()
         fp2 = FilePart.from_dict(d)
         assert fp2.filename == "report.pdf"
@@ -220,6 +231,7 @@ class TestA2Server:
     @pytest.mark.asyncio
     async def test_process_task_success(self):
         server = A2AServer()
+
         async def handler(task: A2ATask):
             return A2AMessage.agent_text(f"processed: {task.input.get_text()}")
 
@@ -240,6 +252,7 @@ class TestA2Server:
     @pytest.mark.asyncio
     async def test_process_task_handler_error(self):
         server = A2AServer()
+
         async def bad_handler(task):
             raise ValueError("simulated error")
 
@@ -259,8 +272,11 @@ class TestA2Server:
     def test_list_tasks_by_state(self):
         server = A2AServer()
         t1 = A2ATask(task_id="t1")
-        t2 = A2ATask(task_id="t2"); t2.start_working(); t2.complete()
-        t3 = A2ATask(task_id="t3"); t3.fail("err")
+        t2 = A2ATask(task_id="t2")
+        t2.start_working()
+        t2.complete()
+        t3 = A2ATask(task_id="t3")
+        t3.fail("err")
         server._tasks = {"t1": t1, "t2": t2, "t3": t3}
         assert len(server.list_tasks()) == 3
         assert len(server.list_tasks(TaskState.COMPLETED)) == 1
@@ -269,7 +285,8 @@ class TestA2Server:
     def test_cleanup(self):
         server = A2AServer()
         old = A2ATask(task_id="old")
-        old.start_working(); old.complete()
+        old.start_working()
+        old.complete()
         old._updated = time.time() - 4000  # fake old
         fresh = A2ATask(task_id="fresh")
         server._tasks = {"old": old, "fresh": fresh}

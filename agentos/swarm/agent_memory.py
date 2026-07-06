@@ -11,13 +11,12 @@ ContextWindowManager: auto-trim/compress context to fit token budgets.
 
 from __future__ import annotations
 
-import heapq
 import json
 import time
 import uuid
 from collections import OrderedDict, deque
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass
@@ -26,16 +25,17 @@ class MemoryEntry:
 
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
     content: str = ""
-    role: str = "system"    # system, user, assistant, tool
+    role: str = "system"  # system, user, assistant, tool
     timestamp: float = field(default_factory=time.time)
     importance: float = 0.5  # 0.0-1.0
-    ttl: float = 0.0        # Time-to-live in seconds, 0 = never expire
+    ttl: float = 0.0  # Time-to-live in seconds, 0 = never expire
     metadata: dict[str, Any] = field(default_factory=dict)
     embedding: list[float] | None = None  # For long-term vector search
-    summary: str = ""       # Compressed version for context window
+    summary: str = ""  # Compressed version for context window
 
 
 # ── Working Memory ────────────────────────────────────────────────
+
 
 class WorkingMemory:
     """Ultra-fast, small-capacity memory for the current task.
@@ -98,6 +98,7 @@ class WorkingMemory:
 
 # ── Short-Term Memory ─────────────────────────────────────────────
 
+
 class ShortTermMemory:
     """Sliding window of recent conversation rounds.
 
@@ -110,7 +111,7 @@ class ShortTermMemory:
         max_rounds: int = 50,
         auto_summarize: bool = True,
         summarize_threshold: int = 20,  # Summarize when rounds > threshold
-        keep_recent: int = 10,          # Keep N most recent rounds raw
+        keep_recent: int = 10,  # Keep N most recent rounds raw
     ):
         self.max_rounds = max_rounds
         self.auto_summarize = auto_summarize
@@ -186,11 +187,13 @@ class ShortTermMemory:
         # Add summaries as system entries
         if include_summaries:
             for summary in self._summaries[-3:]:  # Keep last 3 summaries
-                flat.append(MemoryEntry(
-                    content=f"[History Summary] {summary}",
-                    role="system",
-                    importance=0.3,
-                ))
+                flat.append(
+                    MemoryEntry(
+                        content=f"[History Summary] {summary}",
+                        role="system",
+                        importance=0.3,
+                    )
+                )
 
         # Add recent rounds
         recent_rounds = list(self._rounds)[-max_rounds:]
@@ -206,6 +209,7 @@ class ShortTermMemory:
 
 
 # ── Long-Term Memory ──────────────────────────────────────────────
+
 
 class LongTermMemory:
     """Vector-based semantic memory for historical knowledge retrieval.
@@ -284,10 +288,7 @@ class LongTermMemory:
     ) -> list[MemoryEntry]:
         """Search memories by time range."""
         end = end or time.time()
-        results = [
-            entry for entry in self._entries.values()
-            if start <= entry.timestamp <= end
-        ]
+        results = [entry for entry in self._entries.values() if start <= entry.timestamp <= end]
         results.sort(key=lambda e: e.timestamp, reverse=True)
         return results[:top_k]
 
@@ -343,14 +344,16 @@ class LongTermMemory:
 
         data = []
         for entry in self._entries.values():
-            data.append({
-                "id": entry.id,
-                "content": entry.content,
-                "role": entry.role,
-                "timestamp": entry.timestamp,
-                "importance": entry.importance,
-                "metadata": entry.metadata,
-            })
+            data.append(
+                {
+                    "id": entry.id,
+                    "content": entry.content,
+                    "role": entry.role,
+                    "timestamp": entry.timestamp,
+                    "importance": entry.importance,
+                    "metadata": entry.metadata,
+                }
+            )
 
         with open(save_path, "w") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -385,17 +388,18 @@ class LongTermMemory:
 
 # ── Context Window Manager ────────────────────────────────────────
 
+
 @dataclass
 class ContextBudget:
     """Token budget for context window management."""
 
-    total_tokens: int = 4096           # Max total tokens
-    system_reserved: int = 512         # Reserved for system prompt
-    working_memory_budget: int = 640   # Budget for working memory
-    short_term_budget: int = 1536      # Budget for short-term memory
-    long_term_budget: int = 512        # Budget for injected long-term memories
-    query_budget: int = 896            # Budget for current query
-    safety_margin: int = 128           # Safety margin
+    total_tokens: int = 4096  # Max total tokens
+    system_reserved: int = 512  # Reserved for system prompt
+    working_memory_budget: int = 640  # Budget for working memory
+    short_term_budget: int = 1536  # Budget for short-term memory
+    long_term_budget: int = 512  # Budget for injected long-term memories
+    query_budget: int = 896  # Budget for current query
+    safety_margin: int = 128  # Safety margin
 
 
 class ContextWindowManager:
@@ -483,7 +487,7 @@ class ContextWindowManager:
                 # Try truncated version
                 available = max_tokens - token_count - 10
                 if available > 20:
-                    truncated = content[:available * 4]
+                    truncated = content[: available * 4]
                     line = f"[{entry.role}] {truncated}..."
                     token_count += self._estimate_tokens(line)
                 break
@@ -509,6 +513,7 @@ class ContextWindowManager:
 
 
 # ── Unified Agent Memory ──────────────────────────────────────────
+
 
 class AgentMemory:
     """Unified memory system combining all three tiers + context management.

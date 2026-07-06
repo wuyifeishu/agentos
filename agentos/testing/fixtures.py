@@ -5,39 +5,38 @@ AgentOS v0.95 Testing Fixtures — 可复用测试基础设施。
 供单元测试和集成测试共用。
 """
 
-import json
-import os
 import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch
-
+from typing import Any
+from unittest.mock import MagicMock
 
 # ─── Mock LLM ───────────────────────────────────────────────
+
 
 @dataclass
 class MockLLMResponse:
     """Mock LLM 响应。"""
+
     content: str = "This is a mock LLM response."
     model: str = "mock-gpt-4"
-    usage: Dict[str, int] = field(default_factory=lambda: {
-        "prompt_tokens": 50, "completion_tokens": 30, "total_tokens": 80
-    })
+    usage: dict[str, int] = field(
+        default_factory=lambda: {"prompt_tokens": 50, "completion_tokens": 30, "total_tokens": 80}
+    )
     finish_reason: str = "stop"
-    tool_calls: Optional[List[Dict]] = None
+    tool_calls: list[dict] | None = None
 
 
 class MockLLMClient:
     """可配置的 Mock LLM 客户端，支持预设响应序列和工具调用。"""
 
-    def __init__(self, responses: Optional[List[MockLLMResponse]] = None):
+    def __init__(self, responses: list[MockLLMResponse] | None = None):
         self.responses = responses or [MockLLMResponse()]
         self._idx = 0
-        self.calls: List[Dict] = []
+        self.calls: list[dict] = []
 
-    async def chat(self, messages: List[Dict], **kwargs) -> MockLLMResponse:
+    async def chat(self, messages: list[dict], **kwargs) -> MockLLMResponse:
         self.calls.append({"messages": messages, "kwargs": kwargs})
         resp = self.responses[min(self._idx, len(self.responses) - 1)]
         self._idx += 1
@@ -49,6 +48,7 @@ class MockLLMClient:
 
 
 # ─── Fixture 工厂 ────────────────────────────────────────────
+
 
 def mock_openai_client():
     """创建一个完整的 mock OpenAI client。"""
@@ -65,7 +65,7 @@ def mock_model_response(content: str = "ok", model: str = "mock-model"):
     return MockLLMResponse(content=content, model=model)
 
 
-def sample_config(overrides: Optional[Dict] = None) -> Dict[str, Any]:
+def sample_config(overrides: dict | None = None) -> dict[str, Any]:
     """返回一份可用于测试的完整 AgentOSConfig 字典。"""
     base = {
         "models": {
@@ -82,7 +82,7 @@ def sample_config(overrides: Optional[Dict] = None) -> Dict[str, Any]:
     return base
 
 
-def sample_loop_config(overrides: Optional[Dict] = None) -> Dict[str, Any]:
+def sample_loop_config(overrides: dict | None = None) -> dict[str, Any]:
     """返回 LoopConfig 字典。"""
     base = {"max_iterations": 5, "timeout_seconds": 15, "reflection_enabled": True}
     if overrides:
@@ -98,6 +98,7 @@ def temp_workspace(suffix: str = ""):
         yield Path(d)
     finally:
         import shutil
+
         shutil.rmtree(d, ignore_errors=True)
 
 
@@ -107,7 +108,7 @@ def mock_memory_store():
     return store
 
 
-def sample_agent_state(state: str = "idle", context: Optional[Dict] = None):
+def sample_agent_state(state: str = "idle", context: dict | None = None):
     """返回一份预设的 AgentState 字典。"""
     return {
         "state": state,
@@ -123,8 +124,18 @@ def sample_audit_report():
     """返回一份预设的 AuditReport 字典。"""
     return {
         "findings": [
-            {"severity": "low", "category": "code_injection", "description": "eval() usage detected", "location": "test.py:42"},
-            {"severity": "info", "category": "best_practice", "description": "hardcoded secret pattern", "location": "config.py:11"},
+            {
+                "severity": "low",
+                "category": "code_injection",
+                "description": "eval() usage detected",
+                "location": "test.py:42",
+            },
+            {
+                "severity": "info",
+                "category": "best_practice",
+                "description": "hardcoded secret pattern",
+                "location": "config.py:11",
+            },
         ],
         "summary": {"critical": 0, "high": 0, "medium": 0, "low": 1, "info": 1},
         "score": 85,
@@ -178,7 +189,8 @@ def sample_alert_config():
 
 # ─── 辅助 ────────────────────────────────────────────────────
 
-def _deep_merge(base: Dict, override: Dict):
+
+def _deep_merge(base: dict, override: dict):
     for k, v in override.items():
         if isinstance(v, dict) and isinstance(base.get(k), dict):
             _deep_merge(base[k], v)

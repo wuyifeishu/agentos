@@ -8,14 +8,11 @@ import pytest
 
 from agentos.agent.tool_agent import (
     AgentConfig,
-    AgentResult,
-    AgentStep,
     MockLLMProvider,
     ToolAgent,
     ToolExecutor,
 )
 from agentos.llm.base import Tool, ToolParameter
-
 
 # ── 工具 ─────────────────────────────────────────────────────────
 
@@ -39,9 +36,11 @@ class TestIntegrationFullFlow:
 
     def test_single_call_no_tools(self):
         """无工具，单步直接回答。"""
-        mock = MockLLMProvider([
-            MockLLMProvider.text_response("答案是42。"),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.text_response("答案是42。"),
+            ]
+        )
         executor = ToolExecutor()
         agent = ToolAgent(mock, executor)
         result = agent.run("1+1等于几？")
@@ -53,10 +52,12 @@ class TestIntegrationFullFlow:
 
     def test_single_tool_call_then_answer(self):
         """一步工具调用，然后给出答案。"""
-        mock = MockLLMProvider([
-            MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
-            MockLLMProvider.text_response("北京今天晴天，22°C。"),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
+                MockLLMProvider.text_response("北京今天晴天，22°C。"),
+            ]
+        )
         executor = ToolExecutor()
         executor.register(WEATHER_TOOL, lambda city: f"{city}: 晴 22°C")
         agent = ToolAgent(mock, executor)
@@ -72,11 +73,13 @@ class TestIntegrationFullFlow:
 
     def test_two_tool_calls(self):
         """两步工具调用。"""
-        mock = MockLLMProvider([
-            MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
-            MockLLMProvider.tool_response("get_weather", {"city": "上海"}),
-            MockLLMProvider.text_response("北京22°C，上海28°C，都适合出行。"),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
+                MockLLMProvider.tool_response("get_weather", {"city": "上海"}),
+                MockLLMProvider.text_response("北京22°C，上海28°C，都适合出行。"),
+            ]
+        )
         executor = ToolExecutor()
         executor.register(WEATHER_TOOL, lambda city: f"{city}: 晴")
         agent = ToolAgent(mock, executor)
@@ -88,11 +91,13 @@ class TestIntegrationFullFlow:
 
     def test_max_steps_exceeds(self):
         """超过 max_steps 限制。"""
-        mock = MockLLMProvider([
-            MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
-            MockLLMProvider.tool_response("get_weather", {"city": "上海"}),
-            MockLLMProvider.tool_response("get_weather", {"city": "深圳"}),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
+                MockLLMProvider.tool_response("get_weather", {"city": "上海"}),
+                MockLLMProvider.tool_response("get_weather", {"city": "深圳"}),
+            ]
+        )
         executor = ToolExecutor()
         executor.register(WEATHER_TOOL, lambda city: f"{city}: OK")
         agent = ToolAgent(mock, executor, config=AgentConfig(max_steps=2))
@@ -104,11 +109,13 @@ class TestIntegrationFullFlow:
 
     def test_tool_execution_error_stops(self):
         """工具执行出错且 stop_on_error=True。"""
-        mock = MockLLMProvider([
-            MockLLMProvider.tool_response("get_weather", {"city": "火星"}),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response("get_weather", {"city": "火星"}),
+            ]
+        )
         executor = ToolExecutor()
-        executor.register(WEATHER_TOOL, lambda city: 1/0)  # 必定失败
+        executor.register(WEATHER_TOOL, lambda city: 1 / 0)  # 必定失败
         agent = ToolAgent(mock, executor, config=AgentConfig(stop_on_error=True))
         result = agent.run("火星天气？")
 
@@ -117,12 +124,14 @@ class TestIntegrationFullFlow:
 
     def test_tool_error_continues(self):
         """工具出错但 stop_on_error=False，Agent 继续执行。"""
-        mock = MockLLMProvider([
-            MockLLMProvider.tool_response("get_weather", {"city": "火星"}),
-            MockLLMProvider.text_response("抱歉，无法获取火星天气。"),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response("get_weather", {"city": "火星"}),
+                MockLLMProvider.text_response("抱歉，无法获取火星天气。"),
+            ]
+        )
         executor = ToolExecutor()
-        executor.register(WEATHER_TOOL, lambda city: 1/0)  # 必定失败
+        executor.register(WEATHER_TOOL, lambda city: 1 / 0)  # 必定失败
         agent = ToolAgent(mock, executor, config=AgentConfig(stop_on_error=False, max_steps=3))
         result = agent.run("火星天气？")
 
@@ -131,10 +140,12 @@ class TestIntegrationFullFlow:
 
     def test_streaming_yields_steps(self):
         """run_stream 逐步产出。"""
-        mock = MockLLMProvider([
-            MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
-            MockLLMProvider.text_response("北京晴天22°C。"),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
+                MockLLMProvider.text_response("北京晴天22°C。"),
+            ]
+        )
         executor = ToolExecutor()
         executor.register(WEATHER_TOOL, lambda city: f"{city}: 22°C")
         agent = ToolAgent(mock, executor)
@@ -155,10 +166,12 @@ class TestIntegrationFullFlow:
 
     def test_multiple_tools_registered(self):
         """多工具注册，Agent 只调用需要的。"""
-        mock = MockLLMProvider([
-            MockLLMProvider.tool_response("calculate", {"expression": "3*4+5"}),
-            MockLLMProvider.text_response("结果是17。"),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response("calculate", {"expression": "3*4+5"}),
+                MockLLMProvider.text_response("结果是17。"),
+            ]
+        )
         executor = ToolExecutor()
         executor.register(CALC_TOOL, lambda expression: str(eval(expression)))
         executor.register(WEATHER_TOOL, lambda city: "sunny")
@@ -179,10 +192,12 @@ class TestCheckpointResume:
     def test_checkpoint_saved_and_resumed(self):
         """完整流程：中断 → checkpoint → 从断点恢复。"""
         # Step 1: 只给 1 步的 LLM 响应，让 Agent 在工具调用后"中断"
-        mock = MockLLMProvider([
-            MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
-            MockLLMProvider.text_response("北京今天晴天，22°C。"),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
+                MockLLMProvider.text_response("北京今天晴天，22°C。"),
+            ]
+        )
         executor = ToolExecutor()
         executor.register(WEATHER_TOOL, lambda city: f"{city}: 晴 22°C")
 
@@ -202,9 +217,11 @@ class TestCheckpointResume:
             assert ckpt["step"] >= 0
 
             # 第二次从 checkpoint resume（需要新 mock 继续响应）
-            mock2 = MockLLMProvider([
-                MockLLMProvider.text_response("已确认，北京22°C。"),
-            ])
+            mock2 = MockLLMProvider(
+                [
+                    MockLLMProvider.text_response("已确认，北京22°C。"),
+                ]
+            )
             agent2 = ToolAgent(mock2, executor, config=config)
             result2 = agent2.resume()
             assert result2.success
@@ -243,9 +260,11 @@ class TestRetry:
                     raise RuntimeError("API timeout")
                 return super().chat(*args, **kwargs)
 
-        mock = FailingThenOK([
-            MockLLMProvider.text_response("OK after retry"),
-        ])
+        mock = FailingThenOK(
+            [
+                MockLLMProvider.text_response("OK after retry"),
+            ]
+        )
         executor = ToolExecutor()
         agent = ToolAgent(mock, executor, config=AgentConfig(max_retries=2, retry_delay=0.01))
         result = agent.run("测试重试")
@@ -273,10 +292,12 @@ class TestAgentResult:
     """AgentResult 统计正确性。"""
 
     def test_statistics_accumulate(self):
-        mock = MockLLMProvider([
-            MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
-            MockLLMProvider.text_response("北京晴天22°C。"),
-        ])
+        mock = MockLLMProvider(
+            [
+                MockLLMProvider.tool_response("get_weather", {"city": "北京"}),
+                MockLLMProvider.text_response("北京晴天22°C。"),
+            ]
+        )
         executor = ToolExecutor()
         executor.register(WEATHER_TOOL, lambda city: "22°C")
         agent = ToolAgent(mock, executor)

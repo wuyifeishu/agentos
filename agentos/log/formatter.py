@@ -6,12 +6,10 @@ import importlib
 import json
 
 _stdlib_logging = importlib.import_module("logging")
-import os
-import sys
-import time
-import uuid
-from typing import IO, Optional
-
+import os  # noqa: E402
+import sys  # noqa: E402
+import uuid  # noqa: E402
+from typing import IO  # noqa: E402
 
 # ── Trace context ─────────────────────────────────────────────────────────────
 
@@ -19,7 +17,7 @@ from typing import IO, Optional
 class TraceContext:
     """Carries trace_id and span_id through a request lifecycle."""
 
-    def __init__(self, trace_id: Optional[str] = None, span_id: Optional[str] = None):
+    def __init__(self, trace_id: str | None = None, span_id: str | None = None):
         self.trace_id = trace_id or uuid.uuid4().hex[:16]
         self.span_id = span_id or uuid.uuid4().hex[:8]
 
@@ -30,7 +28,7 @@ class TraceContext:
 class JSONFormatter(_stdlib_logging.Formatter):
     """Emits log records as JSON with trace context fields."""
 
-    def __init__(self, fmt=None, datefmt=None, style="%", trace_ctx: Optional[TraceContext] = None):
+    def __init__(self, fmt=None, datefmt=None, style="%", trace_ctx: TraceContext | None = None):
         super().__init__(fmt, datefmt, style)
         self.trace_ctx = trace_ctx or TraceContext()
 
@@ -65,7 +63,13 @@ class _ExtraAdapter(_stdlib_logging.LoggerAdapter):
 # ── Audit log ─────────────────────────────────────────────────────────────────
 
 
-def audit_log(logger: _stdlib_logging.Logger, action: str, user_id: str, result: str, details: Optional[dict] = None):
+def audit_log(
+    logger: _stdlib_logging.Logger,
+    action: str,
+    user_id: str,
+    result: str,
+    details: dict | None = None,
+):
     """Emit a structured audit log entry."""
     extra = {
         "category": "AUDIT",
@@ -83,8 +87,8 @@ def audit_log(logger: _stdlib_logging.Logger, action: str, user_id: str, result:
 def setup_structured_logging(
     name: str,
     level: int = _stdlib_logging.INFO,
-    stream: Optional[IO] = None,
-    trace_ctx: Optional[TraceContext] = None,
+    stream: IO | None = None,
+    trace_ctx: TraceContext | None = None,
 ) -> _stdlib_logging.Logger:
     """Create a logger with JSONFormatter attached.
 
@@ -100,7 +104,10 @@ def setup_structured_logging(
     logger = _stdlib_logging.getLogger(name)
     logger.setLevel(level)
     logger.propagate = False
-    if not any(isinstance(h, _stdlib_logging.StreamHandler) and isinstance(h.formatter, JSONFormatter) for h in logger.handlers):
+    if not any(
+        isinstance(h, _stdlib_logging.StreamHandler) and isinstance(h.formatter, JSONFormatter)
+        for h in logger.handlers
+    ):
         handler = _stdlib_logging.StreamHandler(stream or sys.stderr)
         handler.setFormatter(JSONFormatter(trace_ctx=trace_ctx or TraceContext()))
         logger.addHandler(handler)

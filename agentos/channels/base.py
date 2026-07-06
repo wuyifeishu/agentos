@@ -8,26 +8,25 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
-import time
 from abc import ABC, abstractmethod
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Awaitable
 
-from agentos.channels.message import ChannelMessage, ChannelType, ConversationContext
+from agentos.channels.message import ChannelMessage, ChannelType
 
 
 @dataclass
 class ChannelConfig:
     """渠道配置。"""
+
     channel: ChannelType
     enabled: bool = False
-    webhook_path: str = ""           # 接收 webhook 的 URL 路径
+    webhook_path: str = ""  # 接收 webhook 的 URL 路径
     webhook_port: int = 8080
-    verify_token: str = ""           # 签名校验 token
+    verify_token: str = ""  # 签名校验 token
     app_id: str = ""
     app_secret: str = ""
-    encoding_aes_key: str = ""       # 加解密 key（微信系）
+    encoding_aes_key: str = ""  # 加解密 key（微信系）
     corp_id: str = ""
     agent_id: str = ""
     bot_app_id: str = ""
@@ -48,12 +47,13 @@ class ChannelConfig:
 @dataclass
 class ReplyResult:
     """回复结果。"""
+
     success: bool
     msg_id: str = ""
     error: str = ""
 
 
-CallbackType = Callable[[ChannelMessage], Awaitable[Optional[str]]]
+CallbackType = Callable[[ChannelMessage], Awaitable[str | None]]
 """消息回调: 接收 ChannelMessage，返回可选的同步回复文本。"""
 
 
@@ -68,7 +68,7 @@ class BaseChannelAdapter(ABC):
 
     channel_type: ChannelType
     config: ChannelConfig
-    _on_message: Optional[CallbackType] = None
+    _on_message: CallbackType | None = None
 
     def __init__(self, config: ChannelConfig):
         self.config = config
@@ -85,7 +85,9 @@ class BaseChannelAdapter(ABC):
         ...
 
     @abstractmethod
-    def parse_webhook(self, raw_body: bytes, headers: dict) -> ChannelMessage | list[ChannelMessage]:
+    def parse_webhook(
+        self, raw_body: bytes, headers: dict
+    ) -> ChannelMessage | list[ChannelMessage]:
         """解析 webhook 原始报文为 ChannelMessage(s)。"""
         ...
 

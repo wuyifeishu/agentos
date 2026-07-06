@@ -16,10 +16,10 @@ import math
 import re
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Callable
-
+from typing import Any
 
 # ── ROUGE-L ─────────────────────────────────────
+
 
 def _lcs_length(x: list, y: list) -> int:
     """最长公共子序列长度（DP优化版）。"""
@@ -59,8 +59,9 @@ def rouge_l(reference: str, candidate: str) -> float:
 
 # ── BLEU ────────────────────────────────────────
 
+
 def _ngrams(tokens: list[str], n: int) -> Counter:
-    return Counter(tuple(tokens[i:i + n]) for i in range(len(tokens) - n + 1))
+    return Counter(tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1))
 
 
 def bleu(reference: str, candidate: str, max_n: int = 4, smoothing: bool = True) -> float:
@@ -78,7 +79,7 @@ def bleu(reference: str, candidate: str, max_n: int = 4, smoothing: bool = True)
 
         if not cand_ngrams:
             if smoothing:
-                precisions.append(1.0 / (2 ** n))  # Laplace-like decay
+                precisions.append(1.0 / (2**n))  # Laplace-like decay
             else:
                 precisions.append(0.0)
             continue
@@ -90,7 +91,7 @@ def bleu(reference: str, candidate: str, max_n: int = 4, smoothing: bool = True)
     if any(p == 0 for p in precisions):
         if smoothing:
             # Method 1 smoothing: replace zeros with small epsilon
-            precisions = [p if p > 0 else 1.0 / (2 ** i) for i, p in enumerate(precisions)]
+            precisions = [p if p > 0 else 1.0 / (2**i) for i, p in enumerate(precisions)]
         else:
             return 0.0
 
@@ -107,17 +108,18 @@ def _tokenize(text: str) -> list[str]:
     # Split on whitespace, keep punctuation as separate tokens for Chinese
     text = text.lower()
     # For Chinese: character-level
-    if re.search(r'[\u4e00-\u9fff]', text):
+    if re.search(r"[\u4e00-\u9fff]", text):
         tokens = []
         for ch in text:
             if ch.strip():
                 tokens.append(ch)
         return tokens
     # English
-    return re.findall(r'\w+|[^\w\s]', text)
+    return re.findall(r"\w+|[^\w\s]", text)
 
 
 # ── Semantic Similarity ─────────────────────────
+
 
 def semantic_similarity(candidate: str, reference: str, embedder: Any = None) -> float:
     """
@@ -130,12 +132,14 @@ def semantic_similarity(candidate: str, reference: str, embedder: Any = None) ->
 
     if embedder is None:
         from agentos.cache.embedder import LocalEmbedder
+
         embedder = LocalEmbedder()
 
     try:
         emb_cand = embedder.embed(candidate)
         emb_ref = embedder.embed(reference)
         from agentos.cache.embedder import cosine_similarity as cos_sim
+
         return float(cos_sim(emb_cand, emb_ref))
     except Exception:
         # Fallback: character-level Jaccard similarity
@@ -150,6 +154,7 @@ def semantic_similarity(candidate: str, reference: str, embedder: Any = None) ->
 
 # ── Exact / Contains ────────────────────────────
 
+
 def exact_match(reference: str, candidate: str) -> float:
     """精确匹配：返回 0.0 或 1.0。"""
     return 1.0 if reference.strip() == candidate.strip() else 0.0
@@ -162,17 +167,20 @@ def contains_match(reference: str, candidate: str) -> float:
 
 # ── Composite Scorer ────────────────────────────
 
+
 @dataclass
 class ScoringStrategy:
     """评分配置策略。"""
 
     name: str = "composite"
-    weights: dict[str, float] = field(default_factory=lambda: {
-        "rouge_l": 0.3,
-        "bleu": 0.2,
-        "exact": 0.2,
-        "contains": 0.3,
-    })
+    weights: dict[str, float] = field(
+        default_factory=lambda: {
+            "rouge_l": 0.3,
+            "bleu": 0.2,
+            "exact": 0.2,
+            "contains": 0.3,
+        }
+    )
     pass_threshold: float = 0.6
 
 
@@ -229,10 +237,7 @@ class CompositeScorer:
             scores["semantic"] = semantic_similarity(candidate, reference, embedder)
 
         # Weighted
-        weighted = sum(
-            scores.get(k, 0) * w
-            for k, w in self.strategy.weights.items()
-        )
+        weighted = sum(scores.get(k, 0) * w for k, w in self.strategy.weights.items())
 
         passed = weighted >= self.strategy.pass_threshold
         details = ", ".join(f"{k}={v:.3f}" for k, v in scores.items())
@@ -295,8 +300,13 @@ Score (0.0-1.0):
 Reason:"""
 
 
-def llm_judge(reference: str, candidate: str, task: str = "general",
-              model: str = "gpt-4o-mini", api_key: str = "") -> float:
+def llm_judge(
+    reference: str,
+    candidate: str,
+    task: str = "general",
+    model: str = "gpt-4o-mini",
+    api_key: str = "",
+) -> float:
     """
     LLM‑as‑Judge: 用 LLM 评估候选答案与参考答案的一致性。
     需要 OPENAI_API_KEY (或兼容 endpoint)。
@@ -304,6 +314,7 @@ def llm_judge(reference: str, candidate: str, task: str = "general",
     """
     if not api_key:
         import os
+
         api_key = os.environ.get("OPENAI_API_KEY", "")
 
     if not api_key:
@@ -313,6 +324,7 @@ def llm_judge(reference: str, candidate: str, task: str = "general",
 
     try:
         import requests
+
         resp = requests.post(
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
@@ -332,6 +344,7 @@ def llm_judge(reference: str, candidate: str, task: str = "general",
 
         # Extract first float from response
         import re as _re
+
         m = _re.search(r"(\d+\.?\d*)", text)
         if m:
             return max(0.0, min(1.0, float(m.group(1))))
@@ -365,13 +378,13 @@ STRATEGY_CODE_JUDGE = ScoringStrategy(
 class CompositeScorerV2(CompositeScorer):
     """v2 scorer with optional LLM‑as‑Judge."""
 
-    def __init__(self, strategy: ScoringStrategy | None = None,
-                 llm_model: str = "gpt-4o-mini"):
+    def __init__(self, strategy: ScoringStrategy | None = None, llm_model: str = "gpt-4o-mini"):
         super().__init__(strategy)
         self._llm_model = llm_model
 
-    def score(self, reference: str, candidate: str, embedder: Any = None,
-              task: str = "general") -> ScoreResult:
+    def score(
+        self, reference: str, candidate: str, embedder: Any = None, task: str = "general"
+    ) -> ScoreResult:
         scores: dict[str, float] = {}
 
         if "rouge_l" in self.strategy.weights:
@@ -392,7 +405,10 @@ class CompositeScorerV2(CompositeScorer):
         details = ", ".join(f"{k}={v:.3f}" for k, v in scores.items())
 
         return ScoreResult(
-            reference=reference, candidate=candidate,
-            scores=scores, weighted_score=weighted,
-            passed=passed, details=details,
+            reference=reference,
+            candidate=candidate,
+            scores=scores,
+            weighted_score=weighted,
+            passed=passed,
+            details=details,
         )

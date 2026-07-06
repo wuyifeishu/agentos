@@ -6,19 +6,18 @@ Builds on top of agentos.evaluation core (GoldenDataset, Evaluator, EvalReport).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
 import json
 import math
-import time
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass, field
 
-from agentos.evaluation import GoldenDataset, Evaluator, EvalConfig, EvalReport, ScoreDetail
+from agentos.evaluation import EvalReport, Evaluator, ScoreDetail
 
 
 @dataclass
 class RegressionCheck:
     """A single regression check result."""
+
     case_id: str
     baseline_score: float
     current_score: float
@@ -31,11 +30,12 @@ class RegressionCheck:
 @dataclass
 class RegressionReport:
     """Comparison report between baseline and current evaluation."""
+
     baseline_label: str = "baseline"
     current_label: str = "current"
     baseline: EvalReport = None
     current: EvalReport = None
-    checks: List[RegressionCheck] = field(default_factory=list)
+    checks: list[RegressionCheck] = field(default_factory=list)
     total_regressions: int = 0
     total_improvements: int = 0
     pass_delta: float = 0.0
@@ -80,7 +80,7 @@ class RegressionRunner:
     def __init__(
         self,
         evaluator: Evaluator,
-        baseline: Optional[EvalReport] = None,
+        baseline: EvalReport | None = None,
         threshold: float = 5.0,
         severe_threshold: float = 20.0,
     ):
@@ -94,7 +94,7 @@ class RegressionRunner:
         self.baseline = await self.evaluator.run()
         return self.baseline
 
-    async def check(self, current: Optional[EvalReport] = None) -> RegressionReport:
+    async def check(self, current: EvalReport | None = None) -> RegressionReport:
         """Compare current against baseline. If current not given, run it."""
         if current is None:
             current = await self.evaluator.run()
@@ -117,9 +117,7 @@ class RegressionRunner:
         )
 
         # Build lookup from baseline results
-        baseline_map: Dict[str, ScoreDetail] = {
-            r.case_id: r for r in self.baseline.results
-        }
+        baseline_map: dict[str, ScoreDetail] = {r.case_id: r for r in self.baseline.results}
 
         for current_result in current.results:
             cid = current_result.case_id
@@ -127,13 +125,15 @@ class RegressionRunner:
 
             if baseline_result is None:
                 # New case, no baseline comparison
-                report.checks.append(RegressionCheck(
-                    case_id=cid,
-                    baseline_score=0,
-                    current_score=current_result.total_score,
-                    delta=0,
-                    details="new case",
-                ))
+                report.checks.append(
+                    RegressionCheck(
+                        case_id=cid,
+                        baseline_score=0,
+                        current_score=current_result.total_score,
+                        delta=0,
+                        details="new case",
+                    )
+                )
                 continue
 
             delta = current_result.total_score - baseline_result.total_score
@@ -152,14 +152,16 @@ class RegressionRunner:
             elif delta > self.threshold:
                 report.total_improvements += 1
 
-            report.checks.append(RegressionCheck(
-                case_id=cid,
-                baseline_score=baseline_result.total_score,
-                current_score=current_result.total_score,
-                delta=round(delta, 1),
-                regression=regression,
-                severity=severity,
-            ))
+            report.checks.append(
+                RegressionCheck(
+                    case_id=cid,
+                    baseline_score=baseline_result.total_score,
+                    current_score=current_result.total_score,
+                    delta=round(delta, 1),
+                    regression=regression,
+                    severity=severity,
+                )
+            )
 
         # Verdict
         if report.total_regressions > 0:
@@ -175,15 +177,16 @@ class RegressionRunner:
 @dataclass
 class StatResult:
     """Statistical summary of N evaluation runs."""
+
     trials: int = 0
-    pass_rates: List[float] = field(default_factory=list)
-    avg_scores: List[float] = field(default_factory=list)
+    pass_rates: list[float] = field(default_factory=list)
+    avg_scores: list[float] = field(default_factory=list)
     mean_pass_rate: float = 0.0
     std_pass_rate: float = 0.0
     mean_score: float = 0.0
     std_score: float = 0.0
-    ci95_pass_rate: Tuple[float, float] = (0.0, 0.0)
-    ci95_score: Tuple[float, float] = (0.0, 0.0)
+    ci95_pass_rate: tuple[float, float] = (0.0, 0.0)
+    ci95_score: tuple[float, float] = (0.0, 0.0)
 
     def to_dict(self) -> dict:
         return {
@@ -220,7 +223,7 @@ class StatisticalRunner:
 
         return self._compute(pass_rates, avg_scores)
 
-    def _compute(self, pass_rates: List[float], avg_scores: List[float]) -> StatResult:
+    def _compute(self, pass_rates: list[float], avg_scores: list[float]) -> StatResult:
         n = len(pass_rates)
         mean_pr = sum(pass_rates) / n
         var_pr = sum((x - mean_pr) ** 2 for x in pass_rates) / (n - 1)
@@ -263,38 +266,45 @@ def to_junit_xml(report: EvalReport, suite_name: str = "AgentOS Eval") -> str:
     failed_count = sum(1 for r in report.results if not r.passed)
     total_time = sum(r.duration_ms for r in report.results) / 1000
 
-    suite = ET.Element("testsuite", {
-        "name": suite_name,
-        "tests": str(total),
-        "failures": str(failed_count),
-        "errors": "0",
-        "skipped": "0",
-        "time": f"{total_time:.3f}",
-        "timestamp": report.timestamp or "",
-    })
+    suite = ET.Element(
+        "testsuite",
+        {
+            "name": suite_name,
+            "tests": str(total),
+            "failures": str(failed_count),
+            "errors": "0",
+            "skipped": "0",
+            "time": f"{total_time:.3f}",
+            "timestamp": report.timestamp or "",
+        },
+    )
 
     for result in report.results:
-        testcase = ET.SubElement(suite, "testcase", {
-            "classname": f"AgentOS.{report.dataset_name}",
-            "name": result.case_id,
-            "time": f"{result.duration_ms / 1000:.3f}",
-        })
+        testcase = ET.SubElement(
+            suite,
+            "testcase",
+            {
+                "classname": f"AgentOS.{report.dataset_name}",
+                "name": result.case_id,
+                "time": f"{result.duration_ms / 1000:.3f}",
+            },
+        )
 
         if not result.passed:
-            failure = ET.SubElement(testcase, "failure", {
-                "type": "ScoreBelowThreshold",
-                "message": f"Score {result.total_score:.1f}: {result.details}",
-            })
+            failure = ET.SubElement(
+                testcase,
+                "failure",
+                {
+                    "type": "ScoreBelowThreshold",
+                    "message": f"Score {result.total_score:.1f}: {result.details}",
+                },
+            )
             failure.text = f"Actual: {result.actual_output[:500]}\nErrors: {result.errors}"
 
         # Add score as property
         props = ET.SubElement(testcase, "properties")
-        ET.SubElement(props, "property", {
-            "name": "score", "value": f"{result.total_score:.1f}"
-        })
-        ET.SubElement(props, "property", {
-            "name": "metrics", "value": json.dumps(result.metrics)
-        })
+        ET.SubElement(props, "property", {"name": "score", "value": f"{result.total_score:.1f}"})
+        ET.SubElement(props, "property", {"name": "metrics", "value": json.dumps(result.metrics)})
 
     return ET.tostring(suite, encoding="unicode")
 

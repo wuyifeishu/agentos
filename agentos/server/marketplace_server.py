@@ -13,17 +13,14 @@ Also serves built-in MCP info: /api/mcp/servers, /api/mcp/tools
 
 from __future__ import annotations
 
-import json
-import sys
 from pathlib import Path
-from typing import Optional
 
 # ── FastAPI app ──
 try:
-    from fastapi import FastAPI, Query, HTTPException
-    from fastapi.responses import HTMLResponse, JSONResponse
-    from fastapi.staticfiles import StaticFiles
+    from fastapi import FastAPI, HTTPException, Query
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import HTMLResponse
+    from fastapi.staticfiles import StaticFiles
 except ImportError:
     FastAPI = object  # type: ignore
 
@@ -32,7 +29,7 @@ from agentos.marketplace.registry import SkillRegistry
 STATIC_DIR = Path(__file__).parent / "static"
 
 
-def create_marketplace_app() -> "FastAPI":
+def create_marketplace_app() -> FastAPI:
     """Create and configure the marketplace FastAPI application."""
 
     if FastAPI is object:
@@ -100,13 +97,20 @@ def create_marketplace_app() -> "FastAPI":
         q_lower = q.lower()
         results = []
         for s in skills:
-            if (q_lower in (s.name or "").lower() or
-                q_lower in (s.description or "").lower() or
-                any(q_lower in (t or "").lower() for t in (s.tags or []))):
-                results.append({
-                    "name": s.name, "version": s.version, "description": s.description,
-                    "tags": s.tags, "category": s.category,
-                })
+            if (
+                q_lower in (s.name or "").lower()
+                or q_lower in (s.description or "").lower()
+                or any(q_lower in (t or "").lower() for t in (s.tags or []))
+            ):
+                results.append(
+                    {
+                        "name": s.name,
+                        "version": s.version,
+                        "description": s.description,
+                        "tags": s.tags,
+                        "category": s.category,
+                    }
+                )
                 if len(results) >= limit:
                     break
         return {"query": q, "count": len(results), "results": results}
@@ -192,6 +196,7 @@ def create_marketplace_app() -> "FastAPI":
         """List built-in MCP servers and their tools."""
         try:
             from agentos.mcp.builtin_servers import create_default_registry
+
             reg = create_default_registry()
             return {
                 "servers": [
@@ -216,8 +221,9 @@ def create_marketplace_app() -> "FastAPI":
 def start_marketplace_server(host: str = "0.0.0.0", port: int = 8910) -> None:
     """Start the marketplace server (blocking)."""
     import uvicorn
+
     app = create_marketplace_app()
-    print(f"\n  AgentOS Skill Marketplace")
+    print("\n  AgentOS Skill Marketplace")
     print(f"  Local:  http://{host}:{port}")
     print(f"  Skills: {len(SkillRegistry().list_installed())} installed")
     print()

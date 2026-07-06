@@ -3,16 +3,14 @@ AgentOS v0.30 反馈学习系统 — Human-in-the-loop + RLHF hooks。
 支持人工评分、偏好学习、持续改进。
 """
 
-from dataclasses import dataclass, field
-from datetime import datetime
-from enum import Enum
-from typing import Optional
 import json
 import os
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import StrEnum
 
 
-class FeedbackType(str, Enum):
-
+class FeedbackType(StrEnum):
     """反馈类型枚举。"""
 
     THUMB = "thumb"  # 点赞/踩
@@ -25,6 +23,7 @@ class FeedbackType(str, Enum):
 @dataclass
 class FeedbackRecord:
     """反馈记录。"""
+
     session_id: str
     iteration: int
     feedback_type: FeedbackType
@@ -52,30 +51,38 @@ class FeedbackCollector:
             cb(record)
 
     def collect_thumbs(self, session_id: str, iteration: int, up: bool):
-        self.collect(FeedbackRecord(
-            session_id=session_id,
-            iteration=iteration,
-            feedback_type=FeedbackType.THUMB,
-            content="up" if up else "down",
-        ))
+        self.collect(
+            FeedbackRecord(
+                session_id=session_id,
+                iteration=iteration,
+                feedback_type=FeedbackType.THUMB,
+                content="up" if up else "down",
+            )
+        )
 
     def collect_rating(self, session_id: str, iteration: int, rating: int, comment: str = ""):
-        self.collect(FeedbackRecord(
-            session_id=session_id,
-            iteration=iteration,
-            feedback_type=FeedbackType.RATING,
-            content=str(rating),
-            metadata={"comment": comment},
-        ))
+        self.collect(
+            FeedbackRecord(
+                session_id=session_id,
+                iteration=iteration,
+                feedback_type=FeedbackType.RATING,
+                content=str(rating),
+                metadata={"comment": comment},
+            )
+        )
 
-    def collect_corrective(self, session_id: str, iteration: int, correction: str, original: str = ""):
-        self.collect(FeedbackRecord(
-            session_id=session_id,
-            iteration=iteration,
-            feedback_type=FeedbackType.CORRECTIVE,
-            content=correction,
-            original_output=original,
-        ))
+    def collect_corrective(
+        self, session_id: str, iteration: int, correction: str, original: str = ""
+    ):
+        self.collect(
+            FeedbackRecord(
+                session_id=session_id,
+                iteration=iteration,
+                feedback_type=FeedbackType.CORRECTIVE,
+                content=correction,
+                original_output=original,
+            )
+        )
 
     def on_feedback(self, callback):
         self._callbacks.append(callback)
@@ -109,16 +116,22 @@ class FeedbackCollector:
         os.makedirs(os.path.dirname(self.storage_path) or ".", exist_ok=True)
         with open(self.storage_path, "a") as f:
             for r in self._records[-1:]:
-                f.write(json.dumps({
-                    "session_id": r.session_id,
-                    "iteration": r.iteration,
-                    "feedback_type": r.feedback_type.value,
-                    "content": r.content,
-                    "original_output": r.original_output,
-                    "corrected_output": r.corrected_output,
-                    "timestamp": r.timestamp,
-                    "metadata": r.metadata,
-                }, ensure_ascii=False) + "\n")
+                f.write(
+                    json.dumps(
+                        {
+                            "session_id": r.session_id,
+                            "iteration": r.iteration,
+                            "feedback_type": r.feedback_type.value,
+                            "content": r.content,
+                            "original_output": r.original_output,
+                            "corrected_output": r.corrected_output,
+                            "timestamp": r.timestamp,
+                            "metadata": r.metadata,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
 
     def _load(self):
         with open(self.storage_path) as f:
@@ -127,16 +140,18 @@ class FeedbackCollector:
                 if not line:
                     continue
                 d = json.loads(line)
-                self._records.append(FeedbackRecord(
-                    session_id=d["session_id"],
-                    iteration=d["iteration"],
-                    feedback_type=FeedbackType(d["feedback_type"]),
-                    content=d["content"],
-                    original_output=d.get("original_output", ""),
-                    corrected_output=d.get("corrected_output", ""),
-                    timestamp=d.get("timestamp", ""),
-                    metadata=d.get("metadata", {}),
-                ))
+                self._records.append(
+                    FeedbackRecord(
+                        session_id=d["session_id"],
+                        iteration=d["iteration"],
+                        feedback_type=FeedbackType(d["feedback_type"]),
+                        content=d["content"],
+                        original_output=d.get("original_output", ""),
+                        corrected_output=d.get("corrected_output", ""),
+                        timestamp=d.get("timestamp", ""),
+                        metadata=d.get("metadata", {}),
+                    )
+                )
 
 
 class PreferenceLearner:
@@ -155,7 +170,7 @@ class PreferenceLearner:
         }
         self._recent_patterns.append(pattern)
         if len(self._recent_patterns) > self.window_size:
-            self._recent_patterns = self._recent_patterns[-self.window_size:]
+            self._recent_patterns = self._recent_patterns[-self.window_size :]
 
     def get_improvement_hints(self) -> list[str]:
         """获取改进建议。"""
@@ -163,8 +178,12 @@ class PreferenceLearner:
         corrections = [r for r in self._recent_patterns if r["type"] == "corrective"]
         if corrections:
             hints.append(f"最近 {len(corrections)} 条纠正反馈，建议调整输出风格")
-        thumbs_down = sum(1 for r in self._recent_patterns if r["type"] == "thumb" and r["content"] == "down")
-        thumbs_up = sum(1 for r in self._recent_patterns if r["type"] == "thumb" and r["content"] == "up")
+        thumbs_down = sum(
+            1 for r in self._recent_patterns if r["type"] == "thumb" and r["content"] == "down"
+        )
+        thumbs_up = sum(
+            1 for r in self._recent_patterns if r["type"] == "thumb" and r["content"] == "up"
+        )
         if thumbs_down > thumbs_up:
             hints.append("近期满意度下降，建议优化响应质量")
         return hints

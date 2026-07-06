@@ -28,19 +28,15 @@ Inspired by: E2B, Open Interpreter sandbox, Modal
 from __future__ import annotations
 
 import hashlib
-import json
-import os
+import logging
 import re
 import subprocess
 import tempfile
 import time
 import uuid
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
-from typing import (
-    Any, Dict, List, Optional, Tuple,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +44,7 @@ logger = logging.getLogger(__name__)
 # ── Types ───────────────────────────────────
 
 
-class SandboxStatus(str, Enum):
+class SandboxStatus(StrEnum):
     CREATED = "created"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -57,7 +53,7 @@ class SandboxStatus(str, Enum):
     KILLED = "killed"
 
 
-class Language(str, Enum):
+class Language(StrEnum):
     PYTHON = "python"
     BASH = "bash"
     NODE = "node"
@@ -67,36 +63,55 @@ class Language(str, Enum):
 class SandboxConfig:
     """沙箱配置。"""
 
-    image: str = "python:3.11-slim"       # Docker 镜像
+    image: str = "python:3.11-slim"  # Docker 镜像
     language: Language = Language.PYTHON
-    timeout_s: float = 30.0               # 执行超时
-    max_memory_mb: int = 512              # 内存限制
-    max_cpu_cores: float = 1.0            # CPU 限制
-    max_disk_mb: int = 100                # 磁盘限制
-    network_enabled: bool = False         # 网络访问（默认关闭）
-    read_only_rootfs: bool = True         # 只读根文件系统
-    allow_write: bool = True              # 是否允许写入 scratch 空间
+    timeout_s: float = 30.0  # 执行超时
+    memory_mb: int = 512  # 内存限制 (兼容测试)
+    max_cpu_cores: float = 1.0  # CPU 限制
+    max_disk_mb: int = 100  # 磁盘限制
+    network_enabled: bool = False  # 网络访问（默认关闭）
+    read_only_rootfs: bool = True  # 只读根文件系统
+    allow_write: bool = True  # 是否允许写入 scratch 空间
+
+    max_memory_mb = memory_mb  # 别名，指向同一默认值
+
+    def __post_init__(self):
+        self.max_memory_mb = self.memory_mb
 
     # Paths
-    work_dir: str = "/sandbox"            # 工作目录
-    scratch_dir: str = "/tmp/scratch"     # 可写临时空间
+    work_dir: str = "/sandbox"  # 工作目录
+    scratch_dir: str = "/tmp/scratch"  # 可写临时空间
 
     # Safety
-    dangerous_imports: List[str] = field(default_factory=lambda: [
-        "os.system", "subprocess", "shutil.rmtree", "__import__('os')",
-        "eval(", "exec(", "compile(", "pty", "ctypes",
-    ])
+    dangerous_imports: list[str] = field(
+        default_factory=lambda: [
+            "os.system",
+            "subprocess",
+            "shutil.rmtree",
+            "__import__('os')",
+            "eval(",
+            "exec(",
+            "compile(",
+            "pty",
+            "ctypes",
+        ]
+    )
 
-    def to_docker_args(self, container_name: str) -> List[str]:
+    def to_docker_args(self, container_name: str) -> list[str]:
         """生成 docker run 参数。"""
         args = [
-            "docker", "run",
+            "docker",
+            "run",
             "--rm",
-            "--name", container_name,
-            "--cpus", str(self.max_cpu_cores),
-            "--memory", f"{self.max_memory_mb}m",
-            "--storage-opt", f"size={self.max_disk_mb}m",
-            "--workdir", self.work_dir,
+            "--name",
+            container_name,
+            "--cpus",
+            str(self.max_cpu_cores),
+            "--memory=" f"{self.max_memory_mb}m",
+            "--storage-opt",
+            f"size={self.max_disk_mb}m",
+            "--workdir",
+            self.work_dir,
         ]
 
         if not self.network_enabled:
@@ -105,10 +120,14 @@ class SandboxConfig:
         if self.read_only_rootfs:
             args.extend(["--read-only"])
             # tmpfs for writable scratch
-            args.extend([
-                "--tmpfs", "/tmp:exec,size=200m",
-                "--tmpfs", f"{self.scratch_dir}:exec,size=100m",
-            ])
+            args.extend(
+                [
+                    "--tmpfs",
+                    "/tmp:exec,size=200m",
+                    "--tmpfs",
+                    f"{self.scratch_dir}:exec,size=100m",
+                ]
+            )
 
         return args
 
@@ -182,7 +201,7 @@ class CodeValidator:
     ]
 
     @classmethod
-    def validate_python(cls, code: str) -> Tuple[bool, List[str]]:
+    def validate_python(cls, code: str) -> tuple[bool, list[str]]:
         """校验 Python 代码安全性。"""
         violations = []
         for pattern in cls.PY_DANGEROUS_PATTERNS:
@@ -191,7 +210,7 @@ class CodeValidator:
         return len(violations) == 0, violations
 
     @classmethod
-    def validate_bash(cls, code: str) -> Tuple[bool, List[str]]:
+    def validate_bash(cls, code: str) -> tuple[bool, list[str]]:
         """校验 Bash 代码安全性。"""
         violations = []
         for pattern in cls.SH_DANGEROUS_PATTERNS:
@@ -200,7 +219,7 @@ class CodeValidator:
         return len(violations) == 0, violations
 
     @classmethod
-    def validate(cls, code: str, language: Language) -> Tuple[bool, List[str]]:
+    def validate(cls, code: str, language: Language) -> tuple[bool, list[str]]:
         if language == Language.PYTHON:
             return cls.validate_python(code)
         elif language == Language.BASH:
@@ -220,15 +239,15 @@ class DockerSandbox:
         print(result.stdout)  # "hello world"
     """
 
-    def __init__(self, config: Optional[SandboxConfig] = None):
+    def __init__(self, config: SandboxConfig | None = None):
         self._config = config or SandboxConfig()
         self._validator = CodeValidator()
         self._execution_count: int = 0
         self._rate_limit_window: float = 60.0  # 1 minute
         self._max_executions_per_window: int = 100
-        self._execution_timestamps: List[float] = []
+        self._execution_timestamps: list[float] = []
 
-    def run(self, code: str, language: Optional[Language] = None) -> SandboxResult:
+    def run(self, code: str, language: Language | None = None) -> SandboxResult:
         """在沙箱中执行代码。"""
         lang = language or self._config.language
         result = SandboxResult()
@@ -279,9 +298,9 @@ class DockerSandbox:
 
     def run_batch(
         self,
-        code_blocks: List[str],
-        language: Optional[Language] = None,
-    ) -> List[SandboxResult]:
+        code_blocks: list[str],
+        language: Language | None = None,
+    ) -> list[SandboxResult]:
         """批量执行代码块。"""
         return [self.run(code, language) for code in code_blocks]
 
@@ -293,12 +312,18 @@ class DockerSandbox:
         tmp_path.write_text(code, encoding="utf-8")
 
         args = self._config.to_docker_args(container_name)
-        args.extend([
-            "-v", f"{tmp_path}:/sandbox/script.py:ro",
-            self._config.image,
-            "timeout", str(int(self._config.timeout_s)),
-            "python", "-u", "/sandbox/script.py",
-        ])
+        args.extend(
+            [
+                "-v",
+                f"{tmp_path}:/sandbox/script.py:ro",
+                self._config.image,
+                "timeout",
+                str(int(self._config.timeout_s)),
+                "python",
+                "-u",
+                "/sandbox/script.py",
+            ]
+        )
 
         try:
             proc = subprocess.run(
@@ -309,8 +334,8 @@ class DockerSandbox:
             )
 
             result.exit_code = proc.returncode
-            result.stdout = proc.stdout[:result.max_output_bytes]
-            result.stderr = proc.stderr[:result.max_output_bytes]
+            result.stdout = proc.stdout[: result.max_output_bytes]
+            result.stderr = proc.stderr[: result.max_output_bytes]
 
             if len(proc.stdout) > result.max_output_bytes:
                 result.truncated = True
@@ -341,11 +366,16 @@ class DockerSandbox:
     def _run_bash(self, code: str, container_name: str, result: SandboxResult) -> SandboxResult:
         """执行 Bash 脚本。"""
         args = self._config.to_docker_args(container_name)
-        args.extend([
-            self._config.image,
-            "timeout", str(int(self._config.timeout_s)),
-            "bash", "-c", code,
-        ])
+        args.extend(
+            [
+                self._config.image,
+                "timeout",
+                str(int(self._config.timeout_s)),
+                "bash",
+                "-c",
+                code,
+            ]
+        )
 
         try:
             proc = subprocess.run(
@@ -355,9 +385,11 @@ class DockerSandbox:
                 text=True,
             )
             result.exit_code = proc.returncode
-            result.stdout = proc.stdout[:result.max_output_bytes]
-            result.stderr = proc.stderr[:result.max_output_bytes]
-            result.status = SandboxStatus.COMPLETED if proc.returncode == 0 else SandboxStatus.COMPLETED
+            result.stdout = proc.stdout[: result.max_output_bytes]
+            result.stderr = proc.stderr[: result.max_output_bytes]
+            result.status = (
+                SandboxStatus.COMPLETED if proc.returncode == 0 else SandboxStatus.COMPLETED
+            )
 
         except subprocess.TimeoutExpired:
             result.status = SandboxStatus.TIMEOUT
@@ -375,6 +407,7 @@ class DockerSandbox:
             )
             return True
         except Exception:
+            logger.warning("Docker is not available")
             return False
 
     def _cleanup(self, container_name: str) -> None:
@@ -392,9 +425,7 @@ class DockerSandbox:
         """检查速率限制。"""
         now = time.time()
         cutoff = now - self._rate_limit_window
-        self._execution_timestamps = [
-            t for t in self._execution_timestamps if t > cutoff
-        ]
+        self._execution_timestamps = [t for t in self._execution_timestamps if t > cutoff]
         return len(self._execution_timestamps) < self._max_executions_per_window
 
 
@@ -407,11 +438,11 @@ class EvolutionStep:
 
     step_id: str = field(default_factory=lambda: f"ev-{uuid.uuid4().hex[:8]}")
     iteration: int = 0
-    prompt: str = ""                # 指导 Agent 生成代码的 prompt
+    prompt: str = ""  # 指导 Agent 生成代码的 prompt
     generated_code: str = ""
     test_code: str = ""
-    result: Optional[SandboxResult] = None
-    test_result: Optional[SandboxResult] = None
+    result: SandboxResult | None = None
+    test_result: SandboxResult | None = None
     score: float = 0.0
     accepted: bool = False
     error: str = ""
@@ -432,15 +463,15 @@ class SelfEvolutionRunner:
         )
     """
 
-    def __init__(self, sandbox: Optional[DockerSandbox] = None):
+    def __init__(self, sandbox: DockerSandbox | None = None):
         self._sandbox = sandbox or DockerSandbox()
-        self._evolution_history: List[EvolutionStep] = []
-        self._best_step: Optional[EvolutionStep] = None
+        self._evolution_history: list[EvolutionStep] = []
+        self._best_step: EvolutionStep | None = None
 
     def evolve(
         self,
         prompt: str,
-        test_cases: List[str],
+        test_cases: list[str],
         max_iterations: int = 5,
         target_score: float = 1.0,
     ) -> EvolutionStep:
@@ -516,7 +547,7 @@ def quicksort(arr):
 print(quicksort([3, 6, 8, 10, 1, 2, 1]))
 """
 
-    def _build_test_code(self, code: str, test_cases: List[str]) -> str:
+    def _build_test_code(self, code: str, test_cases: list[str]) -> str:
         """构建测试代码。"""
         test_code = code + "\n\n# Auto-generated tests\n"
         test_code += "test_results = []\n"
@@ -527,7 +558,7 @@ print(quicksort([3, 6, 8, 10, 1, 2, 1]))
         test_code += f"\nprint(f'\\n{{sum(1 for s,_ in test_results if s==\"PASS\")}}/{len(test_cases)} tests passed')"
         return test_code
 
-    def _score(self, step: EvolutionStep, test_cases: List[str]) -> float:
+    def _score(self, step: EvolutionStep, test_cases: list[str]) -> float:
         """根据测试结果计算分数。"""
         if not step.test_result or step.test_result.status != SandboxStatus.COMPLETED:
             return 0.0
@@ -540,7 +571,7 @@ print(quicksort([3, 6, 8, 10, 1, 2, 1]))
         return passed / total
 
     @property
-    def history(self) -> List[EvolutionStep]:
+    def history(self) -> list[EvolutionStep]:
         return list(self._evolution_history)
 
 

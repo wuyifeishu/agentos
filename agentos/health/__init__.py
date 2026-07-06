@@ -6,13 +6,12 @@ Provides standard health-check endpoints for Kubernetes, Docker, and load balanc
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Optional
 
 
 class HealthStatus(Enum):
-
     """健康状态枚举。"""
 
     HEALTHY = "healthy"
@@ -23,6 +22,7 @@ class HealthStatus(Enum):
 @dataclass
 class HealthCheck:
     """健康检查定义。"""
+
     name: str
     check_fn: Callable[[], bool]
     timeout_seconds: float = 5.0
@@ -32,6 +32,7 @@ class HealthCheck:
 @dataclass
 class CheckResult:
     """检查结果。"""
+
     name: str
     status: HealthStatus
     latency_ms: float
@@ -77,7 +78,9 @@ class HealthChecker:
                 overall = HealthStatus.DEGRADED
             if status == HealthStatus.UNHEALTHY:
                 overall = HealthStatus.UNHEALTHY
-            results.append(CheckResult(name=chk.name, status=status, latency_ms=latency, message=msg))
+            results.append(
+                CheckResult(name=chk.name, status=status, latency_ms=latency, message=msg)
+            )
         return (overall, results)
 
     def readiness(self) -> dict:
@@ -101,9 +104,9 @@ class HealthChecker:
     def all(self) -> dict:
         """Combined readiness + liveness report, suitable for /health."""
         r = self.readiness()
-        l = self.liveness()
+        lv = self.liveness()
         combined_status = HealthStatus.HEALTHY
-        for s in (r["status"], l["status"]):
+        for s in (r["status"], lv["status"]):
             if s == HealthStatus.UNHEALTHY.value:
                 combined_status = HealthStatus.UNHEALTHY
                 break
@@ -113,18 +116,20 @@ class HealthChecker:
             "status": combined_status.value,
             "timestamp": time.time(),
             "readiness": r,
-            "liveness": l,
+            "liveness": lv,
         }
 
 
 # ── Built-in checks ───────────────────────────────────────────────────────────
 
 
-def check_openai_connectivity(api_key: Optional[str] = None) -> HealthCheck:
+def check_openai_connectivity(api_key: str | None = None) -> HealthCheck:
     """Verify connectivity to the OpenAI API."""
+
     def _check() -> bool:
         try:
             import urllib.request
+
             req = urllib.request.Request("https://api.openai.com/v1/models", method="HEAD")
             if api_key:
                 req.add_header("Authorization", f"Bearer {api_key}")
@@ -132,12 +137,18 @@ def check_openai_connectivity(api_key: Optional[str] = None) -> HealthCheck:
             return True
         except Exception:
             return False
-    return HealthCheck(name="openai-connectivity", check_fn=_check, timeout_seconds=5.0,
-                       description="Check OpenAI API reachability")
+
+    return HealthCheck(
+        name="openai-connectivity",
+        check_fn=_check,
+        timeout_seconds=5.0,
+        description="Check OpenAI API reachability",
+    )
 
 
 def check_vectorstore_health(db_instance=None) -> HealthCheck:
     """Check vector store connection health."""
+
     def _check() -> bool:
         if db_instance is None:
             return False
@@ -145,22 +156,35 @@ def check_vectorstore_health(db_instance=None) -> HealthCheck:
             return hasattr(db_instance, "is_healthy") and db_instance.is_healthy()
         except Exception:
             return False
-    return HealthCheck(name="vectorstore-health", check_fn=_check, timeout_seconds=5.0,
-                       description="Check vector store connection")
+
+    return HealthCheck(
+        name="vectorstore-health",
+        check_fn=_check,
+        timeout_seconds=5.0,
+        description="Check vector store connection",
+    )
 
 
 def check_disk_space(threshold_bytes: int = 100 * 1024 * 1024) -> HealthCheck:
     """Check available disk space exceeds threshold (default 100MB)."""
+
     def _check() -> bool:
         import shutil
+
         usage = shutil.disk_usage("/")
         return usage.free >= threshold_bytes
-    return HealthCheck(name="disk-space", check_fn=_check, timeout_seconds=1.0,
-                       description=f"Free disk space >= {threshold_bytes/1024/1024:.0f}MB")
+
+    return HealthCheck(
+        name="disk-space",
+        check_fn=_check,
+        timeout_seconds=1.0,
+        description=f"Free disk space >= {threshold_bytes/1024/1024:.0f}MB",
+    )
 
 
 def check_memory(threshold_bytes: int = 50 * 1024 * 1024) -> HealthCheck:
     """Check available system memory exceeds threshold (default 50MB)."""
+
     def _check() -> bool:
         try:
             with open("/proc/meminfo") as f:
@@ -171,8 +195,13 @@ def check_memory(threshold_bytes: int = 50 * 1024 * 1024) -> HealthCheck:
         except Exception:
             return True  # can't check, assume OK
         return True
-    return HealthCheck(name="memory", check_fn=_check, timeout_seconds=1.0,
-                       description=f"Available memory >= {threshold_bytes/1024/1024:.0f}MB")
+
+    return HealthCheck(
+        name="memory",
+        check_fn=_check,
+        timeout_seconds=1.0,
+        description=f"Available memory >= {threshold_bytes/1024/1024:.0f}MB",
+    )
 
 
 # ── Default health checker factory ────────────────────────────────────────────

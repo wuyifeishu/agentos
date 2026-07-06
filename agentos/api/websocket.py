@@ -44,24 +44,25 @@ import asyncio
 import json
 import time
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Callable, Awaitable
+from enum import StrEnum
+from typing import Any
 
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-from agentos.subagent.manager import SubAgentManager, SubAgentSpec, SubAgentResult
+from agentos.subagent.manager import SubAgentManager, SubAgentSpec
 from agentos.subagent.parent_child import ChildContext, ChildHandle, ChildStatus
-
 
 # ──────────────────────────────────────────────
 # 消息协议
 # ──────────────────────────────────────────────
 
 
-class WSMsgType(str, Enum):
+class WSMsgType(StrEnum):
     """WebSocket 消息类型。"""
+
     # Client → Server
     RUN = "run"
     CANCEL = "cancel"
@@ -84,11 +85,12 @@ class WSMsgType(str, Enum):
 @dataclass
 class WSMessage:
     """WebSocket 消息体。"""
+
     type: str
     data: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def parse(cls, raw: str | bytes) -> "WSMessage":
+    def parse(cls, raw: str | bytes) -> WSMessage:
         payload = json.loads(raw if isinstance(raw, str) else raw.decode())
         return cls(
             type=payload.get("type", ""),
@@ -101,45 +103,52 @@ class WSMessage:
     # ── 工厂方法 ──────────────────────────
 
     @classmethod
-    def token(cls, text: str, seq: int = 0) -> "WSMessage":
+    def token(cls, text: str, seq: int = 0) -> WSMessage:
         return cls(WSMsgType.TOKEN, {"text": text, "seq": seq})
 
     @classmethod
-    def progress(cls, value: float, step: str = "", agent_id: str = "") -> "WSMessage":
+    def progress(cls, value: float, step: str = "", agent_id: str = "") -> WSMessage:
         return cls(WSMsgType.PROGRESS, {"value": value, "step": step, "agent_id": agent_id})
 
     @classmethod
-    def tool_call(cls, name: str, args: dict) -> "WSMessage":
+    def tool_call(cls, name: str, args: dict) -> WSMessage:
         return cls(WSMsgType.TOOL_CALL, {"name": name, "args": args})
 
     @classmethod
-    def tool_result(cls, name: str, result: Any) -> "WSMessage":
+    def tool_result(cls, name: str, result: Any) -> WSMessage:
         return cls(WSMsgType.TOOL_RESULT, {"name": name, "result": result})
 
     @classmethod
-    def status(cls, status: str, agent_id: str = "") -> "WSMessage":
+    def status(cls, status: str, agent_id: str = "") -> WSMessage:
         return cls(WSMsgType.STATUS, {"status": status, "agent_id": agent_id})
 
     @classmethod
-    def done(cls, output: str, iterations: int = 0, agent_id: str = "") -> "WSMessage":
-        return cls(WSMsgType.DONE, {"output": output, "iterations": iterations, "agent_id": agent_id})
+    def done(cls, output: str, iterations: int = 0, agent_id: str = "") -> WSMessage:
+        return cls(
+            WSMsgType.DONE, {"output": output, "iterations": iterations, "agent_id": agent_id}
+        )
 
     @classmethod
-    def error(cls, message: str, code: str = "UNKNOWN") -> "WSMessage":
+    def error(cls, message: str, code: str = "UNKNOWN") -> WSMessage:
         return cls(WSMsgType.ERROR, {"message": message, "code": code})
 
     @classmethod
-    def heartbeat(cls) -> "WSMessage":
+    def heartbeat(cls) -> WSMessage:
         return cls(WSMsgType.HEARTBEAT, {"ts": time.time()})
 
     @classmethod
-    def child_update(cls, agent_id: str, status: str, progress: float = 0, step: str = "") -> "WSMessage":
-        return cls(WSMsgType.CHILD_UPDATE, {
-            "agent_id": agent_id,
-            "status": status,
-            "progress": progress,
-            "step": step,
-        })
+    def child_update(
+        cls, agent_id: str, status: str, progress: float = 0, step: str = ""
+    ) -> WSMessage:
+        return cls(
+            WSMsgType.CHILD_UPDATE,
+            {
+                "agent_id": agent_id,
+                "status": status,
+                "progress": progress,
+                "step": step,
+            },
+        )
 
 
 # ──────────────────────────────────────────────
@@ -150,6 +159,7 @@ class WSMessage:
 @dataclass
 class WSSession:
     """单个 WebSocket 连接的会话。"""
+
     session_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     connected_at: float = field(default_factory=time.time)
     last_active: float = field(default_factory=time.time)
@@ -188,7 +198,7 @@ class AgentWebSocket:
         run_func: Callable[[SubAgentSpec, ChildContext], Awaitable[tuple[str, int]]] | None = None,
         heartbeat_interval: float = 15.0,
         poll_interval: float = 0.5,
-        max_message_size: int = 2 ** 20,
+        max_message_size: int = 2**20,
     ):
         self._mgr = manager or SubAgentManager()
         self._run = run_func
@@ -272,12 +282,8 @@ class AgentWebSocket:
 
         await self._send(ws, WSMessage.status("running", session.session_id))
 
-        session.running_task = asyncio.create_task(
-            self._run_agent(session, task)
-        )
-        session.poll_task = asyncio.create_task(
-            self._poll_agent(ws, session)
-        )
+        session.running_task = asyncio.create_task(self._run_agent(session, task))
+        session.poll_task = asyncio.create_task(self._poll_agent(ws, session))
 
         try:
             await session.running_task
@@ -287,6 +293,7 @@ class AgentWebSocket:
 
     async def _run_agent(self, session: WSSession, task: str) -> None:
         """启动 Agent 并在完成后推送结果。"""
+
         async def capturing_run(spec: SubAgentSpec, ctx: ChildContext) -> tuple[str, int]:
             if self._run:
                 return await self._run(spec, ctx)
@@ -307,11 +314,14 @@ class AgentWebSocket:
             await self.broadcast_to_session(session, WSMessage.error(result.error))
             await self.broadcast_to_session(session, WSMessage.status("failed", result.agent_id))
         else:
-            await self.broadcast_to_session(session, WSMessage.done(
-                output=result.output,
-                iterations=result.iterations,
-                agent_id=result.agent_id,
-            ))
+            await self.broadcast_to_session(
+                session,
+                WSMessage.done(
+                    output=result.output,
+                    iterations=result.iterations,
+                    agent_id=result.agent_id,
+                ),
+            )
             await self.broadcast_to_session(session, WSMessage.status("completed", result.agent_id))
 
     async def _poll_agent(
@@ -339,19 +349,25 @@ class AgentWebSocket:
                     cur_progress = handle.info.progress
                     cur_step = handle.info.current_step
                     if cur_progress != last_progress or cur_step != last_step:
-                        await self._send(ws, WSMessage.progress(
-                            value=cur_progress,
-                            step=cur_step,
-                            agent_id=handle.agent_id,
-                        ))
+                        await self._send(
+                            ws,
+                            WSMessage.progress(
+                                value=cur_progress,
+                                step=cur_step,
+                                agent_id=handle.agent_id,
+                            ),
+                        )
                         last_progress = cur_progress
                         last_step = cur_step
 
                     # 推送状态变化
                     if handle.status == ChildStatus.FAILED:
-                        await self._send(ws, WSMessage.error(
-                            handle.info.error or "Agent failed",
-                        ))
+                        await self._send(
+                            ws,
+                            WSMessage.error(
+                                handle.info.error or "Agent failed",
+                            ),
+                        )
                         break
                     elif handle.status == ChildStatus.CANCELLED:
                         break
@@ -449,12 +465,14 @@ class AgentWebSocket:
         """广播所有子 Agent 状态。"""
         children = self._mgr.list_children()
         for child in children:
-            await self.broadcast(WSMessage.child_update(
-                agent_id=child.get("agent_id", ""),
-                status=child.get("status", "unknown"),
-                progress=child.get("progress", 0),
-                step=child.get("current_step", ""),
-            ))
+            await self.broadcast(
+                WSMessage.child_update(
+                    agent_id=child.get("agent_id", ""),
+                    status=child.get("status", "unknown"),
+                    progress=child.get("progress", 0),
+                    step=child.get("current_step", ""),
+                )
+            )
 
     # ── 辅助 ──────────────────────────────
 
@@ -464,9 +482,7 @@ class AgentWebSocket:
         except websockets.exceptions.ConnectionClosed:
             pass
 
-    async def _cleanup_session(
-        self, ws: WebSocketServerProtocol, session: WSSession
-    ) -> None:
+    async def _cleanup_session(self, ws: WebSocketServerProtocol, session: WSSession) -> None:
         if session.running_task and not session.running_task.done():
             session.running_task.cancel()
         if session.poll_task and not session.poll_task.done():
@@ -527,7 +543,7 @@ async def serve_ws(
         ws_handler,
         host=host,
         port=port,
-        max_size=kwargs.pop("max_size", 2 ** 20),
+        max_size=kwargs.pop("max_size", 2**20),
         ping_interval=kwargs.pop("ping_interval", 20),
         **kwargs,
     ):

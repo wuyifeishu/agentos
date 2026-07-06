@@ -5,11 +5,9 @@ v0.50: 新增模块。为语义缓存/向量数据库提供embedding实现。
 
 from __future__ import annotations
 
-import asyncio
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 
 import httpx
 
@@ -17,6 +15,7 @@ import httpx
 @dataclass
 class EmbeddingResult:
     """Result of an embedding generation request."""
+
     vector: list[float]
     tokens: int = 0
     model: str = ""
@@ -35,16 +34,13 @@ class BaseEmbedder(ABC):
     """Embedding提供者抽象基类。"""
 
     @abstractmethod
-    async def embed(self, text: str) -> EmbeddingResult:
-        ...
+    async def embed(self, text: str) -> EmbeddingResult: ...
 
     @abstractmethod
-    async def embed_batch(self, texts: list[str]) -> list[EmbeddingResult]:
-        ...
+    async def embed_batch(self, texts: list[str]) -> list[EmbeddingResult]: ...
 
     @abstractmethod
-    def dimension(self) -> int:
-        ...
+    def dimension(self) -> int: ...
 
 
 class OpenAIEmbedder(BaseEmbedder):
@@ -56,18 +52,22 @@ class OpenAIEmbedder(BaseEmbedder):
         "ada": ("text-embedding-ada-002", 1536),
     }
 
-    def __init__(self, model: str = "small", api_key: str = "",
-                 base_url: str = "https://api.openai.com/v1"):
+    def __init__(
+        self, model: str = "small", api_key: str = "", base_url: str = "https://api.openai.com/v1"
+    ):
         info = self.MODELS.get(model)
         if not info:
             raise ValueError(f"Unknown model key: {model}. Use: {list(self.MODELS.keys())}")
         self.model_id, self._dim = info
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
         self.base_url = base_url
-        self._http = httpx.AsyncClient(timeout=60, headers={
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        })
+        self._http = httpx.AsyncClient(
+            timeout=60,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
 
     def dimension(self) -> int:
         return self._dim
@@ -83,10 +83,12 @@ class OpenAIEmbedder(BaseEmbedder):
         data = resp.json()
         results = []
         for item in data["data"]:
-            results.append(EmbeddingResult(
-                vector=item["embedding"],
-                model=self.model_id,
-            ))
+            results.append(
+                EmbeddingResult(
+                    vector=item["embedding"],
+                    model=self.model_id,
+                )
+            )
         return results
 
     async def close(self):
@@ -104,6 +106,7 @@ class LocalEmbedder(BaseEmbedder):
     def _ensure_model(self):
         if self._model is None:
             from sentence_transformers import SentenceTransformer
+
             self._model = SentenceTransformer(self.model_name)
             self._dim = self._model.get_sentence_embedding_dimension()
 
@@ -125,10 +128,7 @@ class LocalEmbedder(BaseEmbedder):
     async def embed_batch(self, texts: list[str]) -> list[EmbeddingResult]:
         self._ensure_model()
         vecs = self._model.encode(texts, normalize_embeddings=True)
-        return [
-            EmbeddingResult(vector=v.tolist(), model=self.model_name)
-            for v in vecs
-        ]
+        return [EmbeddingResult(vector=v.tolist(), model=self.model_name) for v in vecs]
 
 
 class CohereEmbedder(BaseEmbedder):
@@ -137,10 +137,13 @@ class CohereEmbedder(BaseEmbedder):
     def __init__(self, model: str = "embed-english-v3.0", api_key: str = ""):
         self.model_id = model
         self.api_key = api_key or os.environ.get("COHERE_API_KEY", "")
-        self._http = httpx.AsyncClient(timeout=60, headers={
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json",
-        })
+        self._http = httpx.AsyncClient(
+            timeout=60,
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+        )
         self._dim = {"embed-english-v3.0": 1024, "embed-multilingual-v3.0": 1024}.get(model, 1024)
 
     def dimension(self) -> int:
@@ -158,10 +161,7 @@ class CohereEmbedder(BaseEmbedder):
         resp = await self._http.post("https://api.cohere.ai/v1/embed", json=body)
         resp.raise_for_status()
         data = resp.json()
-        return [
-            EmbeddingResult(vector=vec, model=self.model_id)
-            for vec in data["embeddings"]
-        ]
+        return [EmbeddingResult(vector=vec, model=self.model_id) for vec in data["embeddings"]]
 
     async def close(self):
         await self._http.aclose()

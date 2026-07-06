@@ -12,13 +12,19 @@ v1.7.1:
 - 权限模式一键切换
 """
 
-from agentos.desktop.server import DesktopServer, DesktopConfig, launch_desktop
+from agentos.desktop.server import DesktopConfig, DesktopServer, launch_desktop
+
 try:
-    from agentos.desktop.tui import launch_tui, TUIConfig, AgentOSTUI
+    from agentos.desktop.tui import AgentOSTUI, TUIConfig, launch_tui
 except ImportError:
-    class _StubApp: pass
-    launch_tui = lambda **kw: print("ERROR: textual not installed. Run: pip install textual")  # type: ignore
-    TUIConfig = type('TUIConfig', (), {})  # type: ignore
+
+    class _StubApp:
+        pass
+
+    def launch_tui(**kw):
+        return print("ERROR: textual not installed. Run: pip install textual")  # type: ignore
+
+    TUIConfig = type("TUIConfig", (), {})  # type: ignore
     AgentOSTUI = _StubApp  # type: ignore
 
 __all__ = [

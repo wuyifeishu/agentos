@@ -3,19 +3,25 @@ Agent Graph — DAG-based multi-agent execution engine.
 
 Build complex agent pipelines as directed acyclic graphs where each node
 is an agent invocation and edges define data flow dependencies.
+
+v1.16.1: Integrated MetricsCollector for per-node execution tracking.
 """
 
 from __future__ import annotations
 
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
+
+from agentos.tools.metrics import MetricsCollector
 
 
 class GraphNodeState(Enum):
     """Execution state of a graph orchestrator node."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -42,7 +48,7 @@ class GraphNode:
 
     state: GraphNodeState = GraphNodeState.PENDING
     output: Any = None
-    error: Optional[str] = None
+    error: str | None = None
     latency_ms: float = 0.0
 
     def resolve_task(self, node_outputs: dict[str, Any]) -> str:
@@ -64,7 +70,7 @@ class GraphResult:
     execution_order: list[str] = field(default_factory=list)
     total_latency_ms: float = 0.0
     success: bool = True
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class AgentGraph:
@@ -91,14 +97,20 @@ class AgentGraph:
         result = graph.execute("quantum computing advances")
     """
 
-    def __init__(self, executor: Optional[Callable[[str, str], Any]] = None):
+    def __init__(
+        self,
+        executor: Callable[[str, str], Any] | None = None,
+        metrics: MetricsCollector | None = None,
+    ):
         """
         Args:
             executor: Callable(agent_type, task) -> output. If not provided,
                       subclasses must override _execute_node.
+            metrics: Optional MetricsCollector for per-node execution tracking.
         """
         self._nodes: dict[str, GraphNode] = {}
         self._executor = executor
+        self._metrics = metrics
 
     def add_node(self, node: GraphNode) -> None:
         """Add a node to the graph. Raises ValueError on duplicate name."""
@@ -237,9 +249,14 @@ class AgentGraph:
 
             node.latency_ms = (time.perf_counter() - node_t0) * 1000
 
+            # Metrics: track per-node execution
+            if self._metrics is not None:
+                self._metrics.get_counter("graph_nodes_total").inc(node.agent_type)
+                self._metrics.get_counter(f"graph_node_{node.state.value}").inc(node.agent_type)
+                self._metrics.get_timer("graph_node_latency_ms").record(node.latency_ms)
+
         success = all(
-            n.state in (GraphNodeState.COMPLETED, GraphNodeState.SKIPPED)
-            for n in results.values()
+            n.state in (GraphNodeState.COMPLETED, GraphNodeState.SKIPPED) for n in results.values()
         )
         total_latency = (time.perf_counter() - t0) * 1000
 
@@ -263,7 +280,7 @@ class AgentGraph:
         lines = ["graph TD"]
         for name, node in self._nodes.items():
             safe = name.replace("-", "_").replace(" ", "_")
-            lines.append(f"    {safe}[\"{name}\\n({node.agent_type})\"]")
+            lines.append(f'    {safe}["{name}\\n({node.agent_type})"]')
         for name, node in self._nodes.items():
             safe = name.replace("-", "_").replace(" ", "_")
             for dep in node.depends_on:
@@ -290,24 +307,26 @@ class GraphRecipe:
     """List of node dicts with keys: name, agent_type, task_template, depends_on, timeout_seconds, on_failure."""
 
     @classmethod
-    def from_dict(cls, data: dict) -> "GraphRecipe":
+    def from_dict(cls, data: dict) -> GraphRecipe:
         return cls(
             name=data.get("name", "unnamed"),
             description=data.get("description", ""),
             nodes=data.get("nodes", []),
         )
 
-    def build(self, executor: Optional[Callable] = None) -> AgentGraph:
+    def build(self, executor: Callable | None = None) -> AgentGraph:
         """Build an AgentGraph from this recipe."""
         graph = AgentGraph(executor=executor)
         for spec in self.nodes:
-            graph.add_node(GraphNode(
-                name=spec["name"],
-                agent_type=spec.get("agent_type", "default"),
-                task_template=spec["task_template"],
-                depends_on=spec.get("depends_on", []),
-                timeout_seconds=spec.get("timeout_seconds", 120.0),
-                retry_count=spec.get("retry_count", 0),
-                on_failure=spec.get("on_failure", "abort"),
-            ))
+            graph.add_node(
+                GraphNode(
+                    name=spec["name"],
+                    agent_type=spec.get("agent_type", "default"),
+                    task_template=spec["task_template"],
+                    depends_on=spec.get("depends_on", []),
+                    timeout_seconds=spec.get("timeout_seconds", 120.0),
+                    retry_count=spec.get("retry_count", 0),
+                    on_failure=spec.get("on_failure", "abort"),
+                )
+            )
         return graph
