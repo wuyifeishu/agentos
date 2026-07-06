@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # ── Types ────────────────────────────────────
 
 
-class TestStatus(str, Enum):
+class ComplianceStatus(str, Enum):
     PASS = "pass"
     FAIL = "fail"
     SKIP = "skip"
@@ -39,7 +39,7 @@ class ProtocolTestResult:
     test_id: str
     protocol: str                    # "mcp" / "a2a" / "cross"
     name: str
-    status: TestStatus = TestStatus.SKIP
+    status: ComplianceStatus = ComplianceStatus.SKIP
     duration_ms: float = 0.0
     details: str = ""
     error: str = ""
@@ -119,7 +119,7 @@ class MCPComplianceSuite:
 
     # ── Individual Tests ─────────────────────
 
-    async def _test_mcp_01(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_01(self) -> Tuple[ComplianceStatus, str]:
         """验证 Stdio transport 可正常初始化。"""
         try:
             from agentos.protocols.mcp import StdioTransport, MCPServerConfig
@@ -127,31 +127,31 @@ class MCPComplianceSuite:
             config = MCPServerConfig(name="test-stdio", transport="stdio", command="echo", args=["test"])
             await transport.connect(config)
             await transport.close()
-            return TestStatus.PASS, "Stdio transport initialized and closed successfully."
+            return ComplianceStatus.PASS, "Stdio transport initialized and closed successfully."
         except Exception as e:
-            return TestStatus.FAIL, str(e)
+            return ComplianceStatus.FAIL, str(e)
 
-    async def _test_mcp_02(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_02(self) -> Tuple[ComplianceStatus, str]:
         """验证 SSE transport 可正常构造。"""
         try:
             from agentos.protocols.mcp import SSETransport, MCPServerConfig
             transport = SSETransport()
             config = MCPServerConfig(name="test-sse", transport="sse", url="http://localhost:8080")
             assert config.transport == "sse"
-            return TestStatus.PASS, "SSE transport configuration valid."
+            return ComplianceStatus.PASS, "SSE transport configuration valid."
         except Exception as e:
-            return TestStatus.FAIL, str(e)
+            return ComplianceStatus.FAIL, str(e)
 
-    async def _test_mcp_03(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_03(self) -> Tuple[ComplianceStatus, str]:
         """验证 JSON-RPC 2.0 消息格式正确。"""
         msg = json.dumps({"jsonrpc": "2.0", "method": "tools/list", "params": {}, "id": 1})
         parsed = json.loads(msg)
         assert parsed["jsonrpc"] == "2.0"
         assert "method" in parsed
         assert "id" in parsed
-        return TestStatus.PASS, "JSON-RPC 2.0 message format valid."
+        return ComplianceStatus.PASS, "JSON-RPC 2.0 message format valid."
 
-    async def _test_mcp_04(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_04(self) -> Tuple[ComplianceStatus, str]:
         """tools/list 方法应返回工具数组。"""
         from agentos.protocols.mcp import MCPClient
 
@@ -159,16 +159,16 @@ class MCPComplianceSuite:
         # 连接一个简单的 echo server 来验证 /list 逻辑
         assert hasattr(client, "call_tool"), "MCPClient has call_tool method"
         assert hasattr(client, "get_mcp_tool_schemas"), "MCPClient has get_mcp_tool_schemas"
-        return TestStatus.PASS, "MCPClient API surface supports tools/list."
+        return ComplianceStatus.PASS, "MCPClient API surface supports tools/list."
 
-    async def _test_mcp_05(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_05(self) -> Tuple[ComplianceStatus, str]:
         """验证工具 schema 包含 description 字段。"""
         from agentos.protocols.mcp import MCPToolSchema
         tool = MCPToolSchema(name="echo", description="Echo input back", input_schema={"type": "object"})
         assert tool.description != ""
-        return TestStatus.PASS, "MCPToolSchema includes description."
+        return ComplianceStatus.PASS, "MCPToolSchema includes description."
 
-    async def _test_mcp_06(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_06(self) -> Tuple[ComplianceStatus, str]:
         """验证工具 schema 包含 inputSchema 字段。"""
         from agentos.protocols.mcp import MCPToolSchema
         tool = MCPToolSchema(name="search", description="Search", input_schema={
@@ -177,63 +177,63 @@ class MCPComplianceSuite:
             "required": ["query"],
         })
         assert "query" in tool.input_schema.get("properties", {})
-        return TestStatus.PASS, "MCPToolSchema includes valid inputSchema."
+        return ComplianceStatus.PASS, "MCPToolSchema includes valid inputSchema."
 
-    async def _test_mcp_07(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_07(self) -> Tuple[ComplianceStatus, str]:
         """tools/call 应支持正确参数调用。"""
         from agentos.protocols.mcp import MCPClient
 
         client = MCPClient()
         assert hasattr(client, "call_tool"), "MCPClient.call_tool exists"
-        return TestStatus.PASS, "MCPClient.call_tool API surface valid."
+        return ComplianceStatus.PASS, "MCPClient.call_tool API surface valid."
 
-    async def _test_mcp_08(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_08(self) -> Tuple[ComplianceStatus, str]:
         """tools/call 缺参数应返回错误。"""
         # MCPClient.call_tool raises ValueError for unknown tools
         from agentos.protocols.mcp import MCPClient
         client = MCPClient()
         try:
             await client.call_tool("mcp_invalid_tool", {})
-            return TestStatus.FAIL, "Should have raised ValueError"
+            return ComplianceStatus.FAIL, "Should have raised ValueError"
         except ValueError:
-            return TestStatus.PASS, "Correctly raises ValueError for unknown tool"
+            return ComplianceStatus.PASS, "Correctly raises ValueError for unknown tool"
 
-    async def _test_mcp_09(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_09(self) -> Tuple[ComplianceStatus, str]:
         """无效工具名应返回错误。"""
         from agentos.protocols.mcp import MCPClient
         client = MCPClient()
         try:
             await client.call_tool("nonexistent_tool", {})
-            return TestStatus.FAIL, "Should have raised ValueError"
+            return ComplianceStatus.FAIL, "Should have raised ValueError"
         except ValueError:
-            return TestStatus.PASS, "Correctly rejects unknown tool"
+            return ComplianceStatus.PASS, "Correctly rejects unknown tool"
 
-    async def _test_mcp_10(self) -> Tuple[TestStatus, str]:
-        return TestStatus.PASS, "resources/list concept verified (structurally supported)."
+    async def _test_mcp_10(self) -> Tuple[ComplianceStatus, str]:
+        return ComplianceStatus.PASS, "resources/list concept verified (structurally supported)."
 
-    async def _test_mcp_11(self) -> Tuple[TestStatus, str]:
-        return TestStatus.PASS, "resources/read concept verified (structurally supported)."
+    async def _test_mcp_11(self) -> Tuple[ComplianceStatus, str]:
+        return ComplianceStatus.PASS, "resources/read concept verified (structurally supported)."
 
-    async def _test_mcp_12(self) -> Tuple[TestStatus, str]:
-        return TestStatus.PASS, "prompts/list concept verified (structurally supported)."
+    async def _test_mcp_12(self) -> Tuple[ComplianceStatus, str]:
+        return ComplianceStatus.PASS, "prompts/list concept verified (structurally supported)."
 
-    async def _test_mcp_13(self) -> Tuple[TestStatus, str]:
-        return TestStatus.PASS, "prompts/get concept verified (structurally supported)."
+    async def _test_mcp_13(self) -> Tuple[ComplianceStatus, str]:
+        return ComplianceStatus.PASS, "prompts/get concept verified (structurally supported)."
 
-    async def _test_mcp_14(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_14(self) -> Tuple[ComplianceStatus, str]:
         """验证无效 JSON 不会导致客户端崩溃。"""
         try:
             json.loads("{invalid}")
-            return TestStatus.FAIL, "Invalid JSON should have raised error"
+            return ComplianceStatus.FAIL, "Invalid JSON should have raised error"
         except json.JSONDecodeError:
-            return TestStatus.PASS, "Invalid JSON correctly raises json.JSONDecodeError"
+            return ComplianceStatus.PASS, "Invalid JSON correctly raises json.JSONDecodeError"
 
-    async def _test_mcp_15(self) -> Tuple[TestStatus, str]:
+    async def _test_mcp_15(self) -> Tuple[ComplianceStatus, str]:
         """验证多客户端并发连接（同一 MCPClient 可管理多个 server 配置）。"""
         from agentos.protocols.mcp import MCPClient
         client = MCPClient()
         assert isinstance(client, MCPClient)
-        return TestStatus.PASS, "MCPClient supports multiple server connections (managed via _servers dict)."
+        return ComplianceStatus.PASS, "MCPClient supports multiple server connections (managed via _servers dict)."
 
     # ── Helpers ──────────────────────────────
 
@@ -242,7 +242,7 @@ class MCPComplianceSuite:
         try:
             status, details = await func()
         except Exception as e:
-            status, details = TestStatus.FAIL, str(e)
+            status, details = ComplianceStatus.FAIL, str(e)
 
         result = ProtocolTestResult(
             test_id=test_id,
@@ -258,9 +258,9 @@ class MCPComplianceSuite:
         report = ComplianceReport(
             protocol=protocol,
             total_tests=len(self._results),
-            passed=sum(1 for r in self._results if r.status == TestStatus.PASS),
-            failed=sum(1 for r in self._results if r.status == TestStatus.FAIL),
-            skipped=sum(1 for r in self._results if r.status == TestStatus.SKIP),
+            passed=sum(1 for r in self._results if r.status == ComplianceStatus.PASS),
+            failed=sum(1 for r in self._results if r.status == ComplianceStatus.FAIL),
+            skipped=sum(1 for r in self._results if r.status == ComplianceStatus.SKIP),
             results=self._results,
             generated_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         )
@@ -292,7 +292,7 @@ class A2AComplianceSuite:
 
         return self._build_report("a2a")
 
-    async def _test_a2a_01(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_01(self) -> Tuple[ComplianceStatus, str]:
         """验证 AgentCard schema。"""
         try:
             from agentos.protocols.a2a import AgentCard
@@ -307,55 +307,55 @@ class A2AComplianceSuite:
             d = card.model_dump()
             assert d["name"] == "TestAgent"
             assert "capabilities" in d
-            return TestStatus.PASS, "AgentCard schema valid."
+            return ComplianceStatus.PASS, "AgentCard schema valid."
         except Exception as e:
-            return TestStatus.FAIL, str(e)
+            return ComplianceStatus.FAIL, str(e)
 
-    async def _test_a2a_02(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_02(self) -> Tuple[ComplianceStatus, str]:
         """验证 task lifecycle: submit → status → result。"""
         try:
             from agentos.protocols.a2a import TaskStatus
             valid_states = {"submitted", "working", "completed", "failed", "canceled"}
             for state in TaskStatus:
                 assert state.value in valid_states, f"Unknown state: {state.value}"
-            return TestStatus.PASS, f"TaskStatus enum covers {len(valid_states)} lifecycle states."
+            return ComplianceStatus.PASS, f"TaskStatus enum covers {len(valid_states)} lifecycle states."
         except Exception as e:
-            return TestStatus.FAIL, str(e)
+            return ComplianceStatus.FAIL, str(e)
 
-    async def _test_a2a_03(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_03(self) -> Tuple[ComplianceStatus, str]:
         """验证消息总线路由。"""
         try:
             from agentos.protocols.a2a import A2AMessageBus
             # 检查 MessageBus 具有必要的方法
             assert hasattr(A2AMessageBus, "register_agent")
             assert hasattr(A2AMessageBus, "send")
-            return TestStatus.PASS, "A2AMessageBus supports register_agent and send."
+            return ComplianceStatus.PASS, "A2AMessageBus supports register_agent and send."
         except Exception as e:
-            return TestStatus.FAIL, str(e)
+            return ComplianceStatus.FAIL, str(e)
 
-    async def _test_a2a_04(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_04(self) -> Tuple[ComplianceStatus, str]:
         """验证 gRPC streaming 支持。"""
         try:
             from agentos.protocols.grpc import A2AGrpcServer
             assert hasattr(A2AGrpcServer, "serve")
-            return TestStatus.PASS, "gRPC server supports serve() method."
+            return ComplianceStatus.PASS, "gRPC server supports serve() method."
         except ImportError:
-            return TestStatus.SKIP, "gRPC module not installed."
+            return ComplianceStatus.SKIP, "gRPC module not installed."
         except Exception as e:
-            return TestStatus.FAIL, str(e)
+            return ComplianceStatus.FAIL, str(e)
 
-    async def _test_a2a_05(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_05(self) -> Tuple[ComplianceStatus, str]:
         """验证多 agent 握手协议。"""
-        return TestStatus.PASS, "Multi-agent handshake: A2AMessageBus.send supports routing to agent ID."
+        return ComplianceStatus.PASS, "Multi-agent handshake: A2AMessageBus.send supports routing to agent ID."
 
-    async def _test_a2a_06(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_06(self) -> Tuple[ComplianceStatus, str]:
         """验证任务取消传播。"""
         from agentos.protocols.a2a import TaskStatus
         assert hasattr(TaskStatus, "canceled") or any(t.value == "canceled" for t in TaskStatus), \
             "TaskStatus should include 'canceled' state"
-        return TestStatus.PASS, "Task cancellation state exists in protocol."
+        return ComplianceStatus.PASS, "Task cancellation state exists in protocol."
 
-    async def _test_a2a_07(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_07(self) -> Tuple[ComplianceStatus, str]:
         """验证 agent 能力协商。"""
         from agentos.protocols.a2a import AgentCard
         card = AgentCard(
@@ -367,40 +367,40 @@ class A2AComplianceSuite:
             provider={"name": "AgentOS"},
         )
         assert "python" in card.capabilities
-        return TestStatus.PASS, "AgentCard supports capabilities negotiation."
+        return ComplianceStatus.PASS, "AgentCard supports capabilities negotiation."
 
-    async def _test_a2a_08(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_08(self) -> Tuple[ComplianceStatus, str]:
         """验证跨 agent 边界错误处理。"""
         from agentos.protocols.a2a import TaskStatus
         assert "failed" in [t.value for t in TaskStatus], "TaskStatus must include 'failed'"
-        return TestStatus.PASS, "Error propagation via 'failed' task status."
+        return ComplianceStatus.PASS, "Error propagation via 'failed' task status."
 
-    async def _test_a2a_09(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_09(self) -> Tuple[ComplianceStatus, str]:
         """验证流式结果聚合。"""
         try:
             from agentos.protocols.a2a_streaming import StreamingAggregator
             assert hasattr(StreamingAggregator, "collect")
-            return TestStatus.PASS, "StreamingAggregator.collect exists."
+            return ComplianceStatus.PASS, "StreamingAggregator.collect exists."
         except ImportError:
-            return TestStatus.SKIP, "Streaming module not yet imported."
+            return ComplianceStatus.SKIP, "Streaming module not yet imported."
         except Exception as e:
-            return TestStatus.FAIL, str(e)
+            return ComplianceStatus.FAIL, str(e)
 
-    async def _test_a2a_10(self) -> Tuple[TestStatus, str]:
+    async def _test_a2a_10(self) -> Tuple[ComplianceStatus, str]:
         """验证编排拓扑验证。"""
         try:
             from agentos.orchestration.a2a_router import A2ARouter
             assert hasattr(A2ARouter, "register"), "A2ARouter has register method"
-            return TestStatus.PASS, "A2ARouter supports topology registration."
+            return ComplianceStatus.PASS, "A2ARouter supports topology registration."
         except Exception as e:
-            return TestStatus.FAIL, str(e)
+            return ComplianceStatus.FAIL, str(e)
 
     async def _test(self, test_id: str, name: str, func: Callable):
         start = time.time()
         try:
             status, details = await func()
         except Exception as e:
-            status, details = TestStatus.FAIL, str(e)
+            status, details = ComplianceStatus.FAIL, str(e)
         self._results.append(ProtocolTestResult(
             test_id=test_id, protocol="a2a", name=name,
             status=status, duration_ms=(time.time() - start) * 1000,
@@ -411,9 +411,9 @@ class A2AComplianceSuite:
         return ComplianceReport(
             protocol=protocol,
             total_tests=len(self._results),
-            passed=sum(1 for r in self._results if r.status == TestStatus.PASS),
-            failed=sum(1 for r in self._results if r.status == TestStatus.FAIL),
-            skipped=sum(1 for r in self._results if r.status == TestStatus.SKIP),
+            passed=sum(1 for r in self._results if r.status == ComplianceStatus.PASS),
+            failed=sum(1 for r in self._results if r.status == ComplianceStatus.FAIL),
+            skipped=sum(1 for r in self._results if r.status == ComplianceStatus.SKIP),
             results=self._results,
             generated_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         )

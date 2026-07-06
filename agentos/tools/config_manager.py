@@ -205,14 +205,14 @@ class ConfigManager:
             result = self._deep_merge(result, self._runtime_layer)
             return result
 
-    def reload(self) -> None:
-        """Reload file layer from disk (check mtime)."""
+    def reload(self, force: bool = False) -> None:
+        """Reload file layer from disk (check mtime unless force=True)."""
         with self._lock:
             for path_str, mtime in list(self._watchers.items()):
                 p = Path(path_str)
                 if p.exists():
                     new_mtime = p.stat().st_mtime
-                    if new_mtime > mtime:
+                    if force or new_mtime > mtime:
                         self._file_layer = {}
                         self.load_file(path_str)
                         self._watchers[path_str] = new_mtime

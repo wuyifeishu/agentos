@@ -8,7 +8,7 @@ from agentos.protocols.compliance import (
     MCPComplianceSuite,
     A2AComplianceSuite,
     CrossFrameworkInterop,
-    TestStatus,
+    ComplianceStatus,
     ComplianceReport,
     run_all_compliance_tests,
 )
@@ -30,25 +30,25 @@ class TestMCPCompliance:
         suite = MCPComplianceSuite()
 
         status, _ = await suite._test_mcp_01()
-        assert status == TestStatus.PASS
+        assert status == ComplianceStatus.PASS
 
         status, _ = await suite._test_mcp_03()
-        assert status == TestStatus.PASS
+        assert status == ComplianceStatus.PASS
 
         status, _ = await suite._test_mcp_05()
-        assert status == TestStatus.PASS
+        assert status == ComplianceStatus.PASS
 
         status, _ = await suite._test_mcp_06()
-        assert status == TestStatus.PASS
+        assert status == ComplianceStatus.PASS
 
         status, _ = await suite._test_mcp_08()
-        assert status == TestStatus.PASS
+        assert status == ComplianceStatus.PASS
 
         status, _ = await suite._test_mcp_09()
-        assert status == TestStatus.PASS
+        assert status == ComplianceStatus.PASS
 
         status, _ = await suite._test_mcp_14()
-        assert status == TestStatus.PASS
+        assert status == ComplianceStatus.PASS
 
     @pytest.mark.asyncio
     async def test_report_format(self):
@@ -66,7 +66,7 @@ class TestMCPCompliance:
         suite = MCPComplianceSuite()
         report = await suite.run_full_suite()
         for result in report.results:
-            assert result.status in (TestStatus.PASS, TestStatus.FAIL, TestStatus.SKIP)
+            assert result.status in (ComplianceStatus.PASS, ComplianceStatus.FAIL, ComplianceStatus.SKIP)
             assert result.test_id.startswith("mcp-")
             assert result.name != ""
 
@@ -96,38 +96,38 @@ class TestA2ACompliance:
     async def test_agent_card_valid(self):
         suite = A2AComplianceSuite()
         status, msg = await suite._test_a2a_01()
-        assert status == TestStatus.PASS, msg
+        assert status == ComplianceStatus.PASS, msg
 
     @pytest.mark.asyncio
     async def test_task_lifecycle(self):
         suite = A2AComplianceSuite()
         status, msg = await suite._test_a2a_02()
-        assert status == TestStatus.PASS, msg
+        assert status == ComplianceStatus.PASS, msg
 
     @pytest.mark.asyncio
     async def test_message_bus(self):
         suite = A2AComplianceSuite()
         status, msg = await suite._test_a2a_03()
-        assert status == TestStatus.PASS, msg
+        assert status == ComplianceStatus.PASS, msg
 
     @pytest.mark.asyncio
     async def test_capability_negotiation(self):
         suite = A2AComplianceSuite()
         status, msg = await suite._test_a2a_07()
-        assert status == TestStatus.PASS, msg
+        assert status == ComplianceStatus.PASS, msg
 
     @pytest.mark.asyncio
     async def test_error_handling(self):
         suite = A2AComplianceSuite()
         status, msg = await suite._test_a2a_08()
-        assert status == TestStatus.PASS, msg
+        assert status == ComplianceStatus.PASS, msg
 
     @pytest.mark.asyncio
     async def test_all_tests_either_pass_or_fail_or_skip(self):
         suite = A2AComplianceSuite()
         report = await suite.run_full_suite()
         for result in report.results:
-            assert result.status in (TestStatus.PASS, TestStatus.FAIL, TestStatus.SKIP)
+            assert result.status in (ComplianceStatus.PASS, ComplianceStatus.FAIL, ComplianceStatus.SKIP)
             assert result.test_id.startswith("a2a-")
 
 

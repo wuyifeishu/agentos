@@ -136,7 +136,7 @@ class TestConfigManager:
             # Write new value
             with open(path, "w") as fw:
                 json.dump({"v": 2}, fw)
-            cm.reload()
+            cm.reload(force=True)
             assert cm.get("v") == 2
         finally:
             os.unlink(path)

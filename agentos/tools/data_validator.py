@@ -76,7 +76,7 @@ class DataValidator:
         schema = {
             "name": Field(str, min_length=1, max_length=100),
             "age": Field(int, min_value=0, max_value=150),
-            "email": Field(str, pattern=r"^[^@]+@[^@]+\.[^@]+$"),
+            "email": Field(str, pattern=r"^[^@]+@[^@]+\\.[^@]+$"),
             "tags": Field(list, items=Field(str)),
         }
 
