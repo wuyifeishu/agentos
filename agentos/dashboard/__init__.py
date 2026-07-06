@@ -1,10 +1,1 @@
-"""
-AgentOS Dashboard v1.5 — 可视化追踪与运行监控面板。
-
-启动: agentos dashboard
-访问: http://localhost:18500
-"""
-
-from agentos.dashboard.server import DashboardServer
-
-__all__ = ["DashboardServer"]
+IiIiCkFnZW50T1MgRGFzaGJvYXJkIHYxLjUg4oCUIOWPr+inhuWMlui/vei4quS4jui/kOihjOebkeaOp+mdouadv+OAggoK5ZCv5YqoOiBhZ2VudG9zIGRhc2hib2FyZArorr/pl646IGh0dHA6Ly9sb2NhbGhvc3Q6MTg1MDAKIiIiCgpmcm9tIGFnZW50b3MuZGFzaGJvYXJkLnNlcnZlciBpbXBvcnQgRGFzaGJvYXJkU2VydmVyCgpfX2FsbF9fID0gWyJEYXNoYm9hcmRTZXJ2ZXIiXQo=

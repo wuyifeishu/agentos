@@ -1,16 +1,1 @@
-name: pdf
-version: 0.1.0
-format: agentos
-description: 'PDF manipulation toolkit: merge, split, extract, annotate'
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/pdf
-category: utility
-tags:
-- document
-- pdf
-requirements: []
-entrypoint: pdf.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogcGRmCnZlcnNpb246IDAuMS4wCmZvcm1hdDogYWdlbnRvcwpkZXNjcmlwdGlvbjogJ1BERiBtYW5pcHVsYXRpb24gdG9vbGtpdDogbWVyZ2UsIHNwbGl0LCBleHRyYWN0LCBhbm5vdGF0ZScKYXV0aG9yOiBOZXh1c0FnZW50T1MgU2VlZCBUZWFtCmxpY2Vuc2U6IE1JVApob21lcGFnZTogaHR0cHM6Ly9naXRodWIuY29tL29wZW5jbGF3L3NraWxscy90cmVlL21haW4vc2tpbGxzL3BkZgpjYXRlZ29yeTogdXRpbGl0eQp0YWdzOgotIGRvY3VtZW50Ci0gcGRmCnJlcXVpcmVtZW50czogW10KZW50cnlwb2ludDogcGRmLnB5CmFnZW50b3M6CiAgbWluX3ZlcnNpb246IDEuMTYuMAogIHR5cGU6IHRvb2wK

@@ -1,15 +1,1 @@
-"""AgentOS v0.80 — 自动 API 文档生成器。"""
-
-from agentos.docs.generator import (
-    DocConfig,
-    DocGenerator,
-    generate_api_docs,
-    generate_quickstart,
-)
-
-__all__ = [
-    "DocGenerator",
-    "DocConfig",
-    "generate_api_docs",
-    "generate_quickstart",
-]
+IiIiQWdlbnRPUyB2MC44MCDigJQg6Ieq5YqoIEFQSSDmlofmoaPnlJ/miJDlmajjgIIiIiIKCmZyb20gYWdlbnRvcy5kb2NzLmdlbmVyYXRvciBpbXBvcnQgKAogICAgRG9jQ29uZmlnLAogICAgRG9jR2VuZXJhdG9yLAogICAgZ2VuZXJhdGVfYXBpX2RvY3MsCiAgICBnZW5lcmF0ZV9xdWlja3N0YXJ0LAopCgpfX2FsbF9fID0gWwogICAgIkRvY0dlbmVyYXRvciIsCiAgICAiRG9jQ29uZmlnIiwKICAgICJnZW5lcmF0ZV9hcGlfZG9jcyIsCiAgICAiZ2VuZXJhdGVfcXVpY2tzdGFydCIsCl0K

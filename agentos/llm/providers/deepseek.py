@@ -1,15 +1,1 @@
-"""DeepSeek V3 API Provider."""
-
-from agentos.llm.providers.base_http import BaseHttpProvider
-
-
-class DeepSeekProvider(BaseHttpProvider):
-    """DeepSeek API provider (deepseek-chat / deepseek-reasoner).
-
-    Requires: DEEPSEEK_API_KEY env var.
-    """
-
-    provider_name = "deepseek"
-    API_URL = "https://api.deepseek.com/chat/completions"
-    _api_key_env = "DEEPSEEK_API_KEY"
-    _default_model = "deepseek-chat"
+IiIiRGVlcFNlZWsgVjMgQVBJIFByb3ZpZGVyLiIiIgoKZnJvbSBhZ2VudG9zLmxsbS5wcm92aWRlcnMuYmFzZV9odHRwIGltcG9ydCBCYXNlSHR0cFByb3ZpZGVyCgoKY2xhc3MgRGVlcFNlZWtQcm92aWRlcihCYXNlSHR0cFByb3ZpZGVyKToKICAgICIiIkRlZXBTZWVrIEFQSSBwcm92aWRlciAoZGVlcHNlZWstY2hhdCAvIGRlZXBzZWVrLXJlYXNvbmVyKS4KCiAgICBSZXF1aXJlczogREVFUFNFRUtfQVBJX0tFWSBlbnYgdmFyLgogICAgIiIiCgogICAgcHJvdmlkZXJfbmFtZSA9ICJkZWVwc2VlayIKICAgIEFQSV9VUkwgPSAiaHR0cHM6Ly9hcGkuZGVlcHNlZWsuY29tL2NoYXQvY29tcGxldGlvbnMiCiAgICBfYXBpX2tleV9lbnYgPSAiREVFUFNFRUtfQVBJX0tFWSIKICAgIF9kZWZhdWx0X21vZGVsID0gImRlZXBzZWVrLWNoYXQiCg==

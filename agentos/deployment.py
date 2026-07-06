@@ -1,16 +1,1 @@
-from dataclasses import dataclass
-
-
-@dataclass
-class DockerConfig:
-    image: str = ""
-
-
-@dataclass
-class ComposeService:
-    name: str = ""
-
-
-@dataclass
-class ComposeConfig:
-    version: str = "3.8"
+ZnJvbSBkYXRhY2xhc3NlcyBpbXBvcnQgZGF0YWNsYXNzCgoKQGRhdGFjbGFzcwpjbGFzcyBEb2NrZXJDb25maWc6CiAgICBpbWFnZTogc3RyID0gIiIKCgpAZGF0YWNsYXNzCmNsYXNzIENvbXBvc2VTZXJ2aWNlOgogICAgbmFtZTogc3RyID0gIiIKCgpAZGF0YWNsYXNzCmNsYXNzIENvbXBvc2VDb25maWc6CiAgICB2ZXJzaW9uOiBzdHIgPSAiMy44Igo=

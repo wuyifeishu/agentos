@@ -1,16 +1,1 @@
-name: web-search
-version: 0.1.0
-format: agentos
-description: Web search with multiple engines and result parsing
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/web-search
-category: web
-tags:
-- web
-- search
-requirements: []
-entrypoint: web-search.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogd2ViLXNlYXJjaAp2ZXJzaW9uOiAwLjEuMApmb3JtYXQ6IGFnZW50b3MKZGVzY3JpcHRpb246IFdlYiBzZWFyY2ggd2l0aCBtdWx0aXBsZSBlbmdpbmVzIGFuZCByZXN1bHQgcGFyc2luZwphdXRob3I6IE5leHVzQWdlbnRPUyBTZWVkIFRlYW0KbGljZW5zZTogTUlUCmhvbWVwYWdlOiBodHRwczovL2dpdGh1Yi5jb20vb3BlbmNsYXcvc2tpbGxzL3RyZWUvbWFpbi9za2lsbHMvd2ViLXNlYXJjaApjYXRlZ29yeTogd2ViCnRhZ3M6Ci0gd2ViCi0gc2VhcmNoCnJlcXVpcmVtZW50czogW10KZW50cnlwb2ludDogd2ViLXNlYXJjaC5weQphZ2VudG9zOgogIG1pbl92ZXJzaW9uOiAxLjE2LjAKICB0eXBlOiB0b29sCg==

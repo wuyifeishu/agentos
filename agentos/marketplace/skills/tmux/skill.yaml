@@ -1,16 +1,1 @@
-name: tmux
-version: 0.1.0
-format: agentos
-description: Tmux session management and automation
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/tmux
-category: development
-tags:
-- dev
-- terminal
-requirements: []
-entrypoint: tmux.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogdG11eAp2ZXJzaW9uOiAwLjEuMApmb3JtYXQ6IGFnZW50b3MKZGVzY3JpcHRpb246IFRtdXggc2Vzc2lvbiBtYW5hZ2VtZW50IGFuZCBhdXRvbWF0aW9uCmF1dGhvcjogTmV4dXNBZ2VudE9TIFNlZWQgVGVhbQpsaWNlbnNlOiBNSVQKaG9tZXBhZ2U6IGh0dHBzOi8vZ2l0aHViLmNvbS9vcGVuY2xhdy9za2lsbHMvdHJlZS9tYWluL3NraWxscy90bXV4CmNhdGVnb3J5OiBkZXZlbG9wbWVudAp0YWdzOgotIGRldgotIHRlcm1pbmFsCnJlcXVpcmVtZW50czogW10KZW50cnlwb2ludDogdG11eC5weQphZ2VudG9zOgogIG1pbl92ZXJzaW9uOiAxLjE2LjAKICB0eXBlOiB0b29sCg==

@@ -1,10 +1,1 @@
-class AgentMarket:
-    pass
-
-
-class AgentSkill:
-    pass
-
-
-class AgentCategory:
-    pass
+Y2xhc3MgQWdlbnRNYXJrZXQ6CiAgICBwYXNzCgoKY2xhc3MgQWdlbnRTa2lsbDoKICAgIHBhc3MKCgpjbGFzcyBBZ2VudENhdGVnb3J5OgogICAgcGFzcwo=

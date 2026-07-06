@@ -1,16 +1,1 @@
-name: encryption
-version: 0.1.0
-format: agentos
-description: File encryption/decryption with multiple algorithms
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/encryption
-category: security
-tags:
-- security
-- crypto
-requirements: []
-entrypoint: encryption.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogZW5jcnlwdGlvbgp2ZXJzaW9uOiAwLjEuMApmb3JtYXQ6IGFnZW50b3MKZGVzY3JpcHRpb246IEZpbGUgZW5jcnlwdGlvbi9kZWNyeXB0aW9uIHdpdGggbXVsdGlwbGUgYWxnb3JpdGhtcwphdXRob3I6IE5leHVzQWdlbnRPUyBTZWVkIFRlYW0KbGljZW5zZTogTUlUCmhvbWVwYWdlOiBodHRwczovL2dpdGh1Yi5jb20vb3BlbmNsYXcvc2tpbGxzL3RyZWUvbWFpbi9za2lsbHMvZW5jcnlwdGlvbgpjYXRlZ29yeTogc2VjdXJpdHkKdGFnczoKLSBzZWN1cml0eQotIGNyeXB0bwpyZXF1aXJlbWVudHM6IFtdCmVudHJ5cG9pbnQ6IGVuY3J5cHRpb24ucHkKYWdlbnRvczoKICBtaW5fdmVyc2lvbjogMS4xNi4wCiAgdHlwZTogdG9vbAo=

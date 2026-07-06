@@ -1,16 +1,1 @@
-name: healthcheck
-version: 0.1.0
-format: agentos
-description: System health monitoring and diagnostics
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/healthcheck
-category: system
-tags:
-- system
-- monitoring
-requirements: []
-entrypoint: healthcheck.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogaGVhbHRoY2hlY2sKdmVyc2lvbjogMC4xLjAKZm9ybWF0OiBhZ2VudG9zCmRlc2NyaXB0aW9uOiBTeXN0ZW0gaGVhbHRoIG1vbml0b3JpbmcgYW5kIGRpYWdub3N0aWNzCmF1dGhvcjogTmV4dXNBZ2VudE9TIFNlZWQgVGVhbQpsaWNlbnNlOiBNSVQKaG9tZXBhZ2U6IGh0dHBzOi8vZ2l0aHViLmNvbS9vcGVuY2xhdy9za2lsbHMvdHJlZS9tYWluL3NraWxscy9oZWFsdGhjaGVjawpjYXRlZ29yeTogc3lzdGVtCnRhZ3M6Ci0gc3lzdGVtCi0gbW9uaXRvcmluZwpyZXF1aXJlbWVudHM6IFtdCmVudHJ5cG9pbnQ6IGhlYWx0aGNoZWNrLnB5CmFnZW50b3M6CiAgbWluX3ZlcnNpb246IDEuMTYuMAogIHR5cGU6IHRvb2wK

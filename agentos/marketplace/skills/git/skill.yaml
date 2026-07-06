@@ -1,16 +1,1 @@
-name: git
-version: 0.1.0
-format: agentos
-description: 'Git version control: commit, branch, merge, rebase'
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/git
-category: development
-tags:
-- dev
-- vcs
-requirements: []
-entrypoint: git.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogZ2l0CnZlcnNpb246IDAuMS4wCmZvcm1hdDogYWdlbnRvcwpkZXNjcmlwdGlvbjogJ0dpdCB2ZXJzaW9uIGNvbnRyb2w6IGNvbW1pdCwgYnJhbmNoLCBtZXJnZSwgcmViYXNlJwphdXRob3I6IE5leHVzQWdlbnRPUyBTZWVkIFRlYW0KbGljZW5zZTogTUlUCmhvbWVwYWdlOiBodHRwczovL2dpdGh1Yi5jb20vb3BlbmNsYXcvc2tpbGxzL3RyZWUvbWFpbi9za2lsbHMvZ2l0CmNhdGVnb3J5OiBkZXZlbG9wbWVudAp0YWdzOgotIGRldgotIHZjcwpyZXF1aXJlbWVudHM6IFtdCmVudHJ5cG9pbnQ6IGdpdC5weQphZ2VudG9zOgogIG1pbl92ZXJzaW9uOiAxLjE2LjAKICB0eXBlOiB0b29sCg==

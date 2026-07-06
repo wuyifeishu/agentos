@@ -1,14 +1,1 @@
-from dataclasses import dataclass
-
-
-@dataclass
-class PromptTemplate:
-    template: str = ""
-
-
-class PromptRegistry:
-    def register(self, name, template):
-        pass
-
-    def get(self, name):
-        return PromptTemplate()
+ZnJvbSBkYXRhY2xhc3NlcyBpbXBvcnQgZGF0YWNsYXNzCgoKQGRhdGFjbGFzcwpjbGFzcyBQcm9tcHRUZW1wbGF0ZToKICAgIHRlbXBsYXRlOiBzdHIgPSAiIgoKCmNsYXNzIFByb21wdFJlZ2lzdHJ5OgogICAgZGVmIHJlZ2lzdGVyKHNlbGYsIG5hbWUsIHRlbXBsYXRlKToKICAgICAgICBwYXNzCgogICAgZGVmIGdldChzZWxmLCBuYW1lKToKICAgICAgICByZXR1cm4gUHJvbXB0VGVtcGxhdGUoKQo=

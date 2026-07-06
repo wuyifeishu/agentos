@@ -1,16 +1,1 @@
-name: telegram
-version: 0.1.0
-format: agentos
-description: 'Telegram bot API: messages, channels, inline queries'
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/telegram
-category: communication
-tags:
-- communication
-- telegram
-requirements: []
-entrypoint: telegram.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogdGVsZWdyYW0KdmVyc2lvbjogMC4xLjAKZm9ybWF0OiBhZ2VudG9zCmRlc2NyaXB0aW9uOiAnVGVsZWdyYW0gYm90IEFQSTogbWVzc2FnZXMsIGNoYW5uZWxzLCBpbmxpbmUgcXVlcmllcycKYXV0aG9yOiBOZXh1c0FnZW50T1MgU2VlZCBUZWFtCmxpY2Vuc2U6IE1JVApob21lcGFnZTogaHR0cHM6Ly9naXRodWIuY29tL29wZW5jbGF3L3NraWxscy90cmVlL21haW4vc2tpbGxzL3RlbGVncmFtCmNhdGVnb3J5OiBjb21tdW5pY2F0aW9uCnRhZ3M6Ci0gY29tbXVuaWNhdGlvbgotIHRlbGVncmFtCnJlcXVpcmVtZW50czogW10KZW50cnlwb2ludDogdGVsZWdyYW0ucHkKYWdlbnRvczoKICBtaW5fdmVyc2lvbjogMS4xNi4wCiAgdHlwZTogdG9vbAo=

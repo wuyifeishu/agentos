@@ -1,15 +1,1 @@
-"""OpenAI API Provider (GPT-4o, GPT-4o-mini, etc.)."""
-
-from agentos.llm.providers.base_http import BaseHttpProvider
-
-
-class OpenAIProvider(BaseHttpProvider):
-    """OpenAI API provider.
-
-    Requires: OPENAI_API_KEY env var.
-    """
-
-    provider_name = "openai"
-    API_URL = "https://api.openai.com/v1/chat/completions"
-    _api_key_env = "OPENAI_API_KEY"
-    _default_model = "gpt-4o-mini"
+IiIiT3BlbkFJIEFQSSBQcm92aWRlciAoR1BULTRvLCBHUFQtNG8tbWluaSwgZXRjLikuIiIiCgpmcm9tIGFnZW50b3MubGxtLnByb3ZpZGVycy5iYXNlX2h0dHAgaW1wb3J0IEJhc2VIdHRwUHJvdmlkZXIKCgpjbGFzcyBPcGVuQUlQcm92aWRlcihCYXNlSHR0cFByb3ZpZGVyKToKICAgICIiIk9wZW5BSSBBUEkgcHJvdmlkZXIuCgogICAgUmVxdWlyZXM6IE9QRU5BSV9BUElfS0VZIGVudiB2YXIuCiAgICAiIiIKCiAgICBwcm92aWRlcl9uYW1lID0gIm9wZW5haSIKICAgIEFQSV9VUkwgPSAiaHR0cHM6Ly9hcGkub3BlbmFpLmNvbS92MS9jaGF0L2NvbXBsZXRpb25zIgogICAgX2FwaV9rZXlfZW52ID0gIk9QRU5BSV9BUElfS0VZIgogICAgX2RlZmF1bHRfbW9kZWwgPSAiZ3B0LTRvLW1pbmkiCg==

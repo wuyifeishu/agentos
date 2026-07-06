@@ -1,5 +1,1 @@
-"""Feedback learning: preference collection and learning from signals."""
-
-from .learner import FeedbackCollector, FeedbackRecord, FeedbackType, PreferenceLearner
-
-__all__ = ["FeedbackCollector", "FeedbackRecord", "FeedbackType", "PreferenceLearner"]
+IiIiRmVlZGJhY2sgbGVhcm5pbmc6IHByZWZlcmVuY2UgY29sbGVjdGlvbiBhbmQgbGVhcm5pbmcgZnJvbSBzaWduYWxzLiIiIgoKZnJvbSAubGVhcm5lciBpbXBvcnQgRmVlZGJhY2tDb2xsZWN0b3IsIEZlZWRiYWNrUmVjb3JkLCBGZWVkYmFja1R5cGUsIFByZWZlcmVuY2VMZWFybmVyCgpfX2FsbF9fID0gWyJGZWVkYmFja0NvbGxlY3RvciIsICJGZWVkYmFja1JlY29yZCIsICJGZWVkYmFja1R5cGUiLCAiUHJlZmVyZW5jZUxlYXJuZXIiXQo=

@@ -1,5 +1,1 @@
-"""Structured logging with JSON formatter and trace context."""
-
-from .formatter import JSONFormatter, TraceContext, _ExtraAdapter
-
-__all__ = ["JSONFormatter", "TraceContext", "_ExtraAdapter"]
+IiIiU3RydWN0dXJlZCBsb2dnaW5nIHdpdGggSlNPTiBmb3JtYXR0ZXIgYW5kIHRyYWNlIGNvbnRleHQuIiIiCgpmcm9tIC5mb3JtYXR0ZXIgaW1wb3J0IEpTT05Gb3JtYXR0ZXIsIFRyYWNlQ29udGV4dCwgX0V4dHJhQWRhcHRlcgoKX19hbGxfXyA9IFsiSlNPTkZvcm1hdHRlciIsICJUcmFjZUNvbnRleHQiLCAiX0V4dHJhQWRhcHRlciJdCg==

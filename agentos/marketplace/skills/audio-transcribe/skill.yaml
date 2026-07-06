@@ -1,16 +1,1 @@
-name: audio-transcribe
-version: 0.1.0
-format: agentos
-description: Speech-to-text transcription with Whisper API
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/audio-transcribe
-category: media
-tags:
-- media
-- audio
-requirements: []
-entrypoint: audio-transcribe.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogYXVkaW8tdHJhbnNjcmliZQp2ZXJzaW9uOiAwLjEuMApmb3JtYXQ6IGFnZW50b3MKZGVzY3JpcHRpb246IFNwZWVjaC10by10ZXh0IHRyYW5zY3JpcHRpb24gd2l0aCBXaGlzcGVyIEFQSQphdXRob3I6IE5leHVzQWdlbnRPUyBTZWVkIFRlYW0KbGljZW5zZTogTUlUCmhvbWVwYWdlOiBodHRwczovL2dpdGh1Yi5jb20vb3BlbmNsYXcvc2tpbGxzL3RyZWUvbWFpbi9za2lsbHMvYXVkaW8tdHJhbnNjcmliZQpjYXRlZ29yeTogbWVkaWEKdGFnczoKLSBtZWRpYQotIGF1ZGlvCnJlcXVpcmVtZW50czogW10KZW50cnlwb2ludDogYXVkaW8tdHJhbnNjcmliZS5weQphZ2VudG9zOgogIG1pbl92ZXJzaW9uOiAxLjE2LjAKICB0eXBlOiB0b29sCg==

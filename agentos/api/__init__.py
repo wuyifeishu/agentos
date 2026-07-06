@@ -1,7 +1,1 @@
-"""
-AgentOS API Server — FastAPI-based REST + WebSocket server for agent endpoints.
-"""
-
-from agentos.api.server import AgentManager, app, serve
-
-__all__ = ["app", "serve", "AgentManager"]
+IiIiCkFnZW50T1MgQVBJIFNlcnZlciDigJQgRmFzdEFQSS1iYXNlZCBSRVNUICsgV2ViU29ja2V0IHNlcnZlciBmb3IgYWdlbnQgZW5kcG9pbnRzLgoiIiIKCmZyb20gYWdlbnRvcy5hcGkuc2VydmVyIGltcG9ydCBBZ2VudE1hbmFnZXIsIGFwcCwgc2VydmUKCl9fYWxsX18gPSBbImFwcCIsICJzZXJ2ZSIsICJBZ2VudE1hbmFnZXIiXQo=

@@ -1,16 +1,1 @@
-name: sherpa-onnx-tts
-version: 0.1.0
-format: agentos
-description: Text-to-speech with Sherpa-ONNX engine
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/sherpa-onnx-tts
-category: media
-tags:
-- media
-- tts
-requirements: []
-entrypoint: sherpa-onnx-tts.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogc2hlcnBhLW9ubngtdHRzCnZlcnNpb246IDAuMS4wCmZvcm1hdDogYWdlbnRvcwpkZXNjcmlwdGlvbjogVGV4dC10by1zcGVlY2ggd2l0aCBTaGVycGEtT05OWCBlbmdpbmUKYXV0aG9yOiBOZXh1c0FnZW50T1MgU2VlZCBUZWFtCmxpY2Vuc2U6IE1JVApob21lcGFnZTogaHR0cHM6Ly9naXRodWIuY29tL29wZW5jbGF3L3NraWxscy90cmVlL21haW4vc2tpbGxzL3NoZXJwYS1vbm54LXR0cwpjYXRlZ29yeTogbWVkaWEKdGFnczoKLSBtZWRpYQotIHR0cwpyZXF1aXJlbWVudHM6IFtdCmVudHJ5cG9pbnQ6IHNoZXJwYS1vbm54LXR0cy5weQphZ2VudG9zOgogIG1pbl92ZXJzaW9uOiAxLjE2LjAKICB0eXBlOiB0b29sCg==

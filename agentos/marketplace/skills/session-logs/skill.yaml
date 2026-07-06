@@ -1,16 +1,1 @@
-name: session-logs
-version: 0.1.0
-format: agentos
-description: Audit and analyze agent session logs
-author: NexusAgentOS Seed Team
-license: MIT
-homepage: https://github.com/openclaw/skills/tree/main/skills/session-logs
-category: security
-tags:
-- security
-- audit
-requirements: []
-entrypoint: session-logs.py
-agentos:
-  min_version: 1.16.0
-  type: tool
+bmFtZTogc2Vzc2lvbi1sb2dzCnZlcnNpb246IDAuMS4wCmZvcm1hdDogYWdlbnRvcwpkZXNjcmlwdGlvbjogQXVkaXQgYW5kIGFuYWx5emUgYWdlbnQgc2Vzc2lvbiBsb2dzCmF1dGhvcjogTmV4dXNBZ2VudE9TIFNlZWQgVGVhbQpsaWNlbnNlOiBNSVQKaG9tZXBhZ2U6IGh0dHBzOi8vZ2l0aHViLmNvbS9vcGVuY2xhdy9za2lsbHMvdHJlZS9tYWluL3NraWxscy9zZXNzaW9uLWxvZ3MKY2F0ZWdvcnk6IHNlY3VyaXR5CnRhZ3M6Ci0gc2VjdXJpdHkKLSBhdWRpdApyZXF1aXJlbWVudHM6IFtdCmVudHJ5cG9pbnQ6IHNlc3Npb24tbG9ncy5weQphZ2VudG9zOgogIG1pbl92ZXJzaW9uOiAxLjE2LjAKICB0eXBlOiB0b29sCg==

@@ -1,12 +1,1 @@
-import json
-import logging
-
-
-class JSONFormatter(logging.Formatter):
-    def format(self, record):
-        return json.dumps({"msg": record.getMessage()})
-
-
-class TraceContext:
-    trace_id: str = ""
-    span_id: str = ""
+aW1wb3J0IGpzb24KaW1wb3J0IGxvZ2dpbmcKCgpjbGFzcyBKU09ORm9ybWF0dGVyKGxvZ2dpbmcuRm9ybWF0dGVyKToKICAgIGRlZiBmb3JtYXQoc2VsZiwgcmVjb3JkKToKICAgICAgICByZXR1cm4ganNvbi5kdW1wcyh7Im1zZyI6IHJlY29yZC5nZXRNZXNzYWdlKCl9KQoKCmNsYXNzIFRyYWNlQ29udGV4dDoKICAgIHRyYWNlX2lkOiBzdHIgPSAiIgogICAgc3Bhbl9pZDogc3RyID0gIiIK

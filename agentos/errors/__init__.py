@@ -1,5 +1,1 @@
-"""Error handling: classification, formatting, and human-readable diagnosis."""
-
-from .handler import ErrorCategory, ErrorContext, ErrorFormatter, HumanError
-
-__all__ = ["ErrorCategory", "ErrorContext", "ErrorFormatter", "HumanError"]
+IiIiRXJyb3IgaGFuZGxpbmc6IGNsYXNzaWZpY2F0aW9uLCBmb3JtYXR0aW5nLCBhbmQgaHVtYW4tcmVhZGFibGUgZGlhZ25vc2lzLiIiIgoKZnJvbSAuaGFuZGxlciBpbXBvcnQgRXJyb3JDYXRlZ29yeSwgRXJyb3JDb250ZXh0LCBFcnJvckZvcm1hdHRlciwgSHVtYW5FcnJvcgoKX19hbGxfXyA9IFsiRXJyb3JDYXRlZ29yeSIsICJFcnJvckNvbnRleHQiLCAiRXJyb3JGb3JtYXR0ZXIiLCAiSHVtYW5FcnJvciJdCg==
