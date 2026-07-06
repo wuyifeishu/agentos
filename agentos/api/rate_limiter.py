@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import time
 import threading
-from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint

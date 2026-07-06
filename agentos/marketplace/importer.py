@@ -14,15 +14,12 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
-import tempfile
-import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Callable, Any
+from typing import Optional, Callable
 
-from agentos.marketplace.manifest import SkillManifest, SkillFormat, ToolDef
-from agentos.marketplace.registry import SkillRegistry, SearchResult, InstallResult
+from agentos.marketplace.manifest import SkillManifest
+from agentos.marketplace.registry import SkillRegistry, InstallResult
 
 
 # ── OpenClaw Importer ──

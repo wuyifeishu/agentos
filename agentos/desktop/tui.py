@@ -24,10 +24,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 try:
     from textual.app import App, ComposeResult
@@ -265,7 +264,7 @@ if TEXTUAL_AVAILABLE:
             if not src.get("installable"):
                 log.write(f"[bold blue]{src['name']}[/bold blue]")
                 log.write(f"[dim]{src.get('description', 'External marketplace')}[/dim]\n")
-                log.write(f"[bold]Open in browser:[/bold]")
+                log.write("[bold]Open in browser:[/bold]")
                 log.write(f"  [link={src['web_url']}]{src['web_url']}[/link]")
                 log.write(f"  [link={src.get('url', src['web_url'])}]{src.get('url', '')}[/link]\n")
                 log.write("[dim]External marketplace — open the URL above in your browser to browse and install.[/dim]")
@@ -289,7 +288,7 @@ if TEXTUAL_AVAILABLE:
                 log.write(f"  {installed} [bold]{name}[/bold]  {tags}")
                 log.write(f"    [dim]{desc}[/dim]")
             log.write("")
-            log.write(f"[dim]Use 'agentos skill-store' to start the web UI for one-click install.[/dim]")
+            log.write("[dim]Use 'agentos skill-store' to start the web UI for one-click install.[/dim]")
 
         def _fallback_skills(self) -> list[dict]:
             """Load real seed skills from the registry index."""

@@ -15,7 +15,6 @@ import shutil
 import mimetypes
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 
 from agentos.system.permissions import (
     SystemPermissionManager,

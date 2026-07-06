@@ -15,10 +15,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-import weakref
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import (
     Any,
@@ -27,9 +26,7 @@ from typing import (
     Dict,
     List,
     Optional,
-    Set,
     Tuple,
-    Type,
     TypeVar,
 )
 

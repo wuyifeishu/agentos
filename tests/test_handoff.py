@@ -137,52 +137,71 @@ class TestCanHandle:
 # ============================================================================
 
 class TestExecuteWithHandoffBasic:
-    def test_returns_raw_output_when_no_handoff(self):
-        """execute_with_handoff is a stub — returns None by default."""
+    @pytest.mark.asyncio
+    async def test_returns_raw_output_when_no_handoff(self):
+        """No handoff — returns the agent's raw output."""
         agent = StubAgent(name="simple", response="direct output")
-        result = execute_with_handoff(agent, "task")
-        assert result is None  # stub returns None
+        result = await execute_with_handoff(agent, "task")
+        assert result == "direct output"
 
-    def test_returns_handoff_result_for_single_hop(self):
+    @pytest.mark.asyncio
+    async def test_returns_handoff_result_for_single_hop(self):
+        """Single handoff → HandoffResult with chain and final output."""
         target = StubAgent(name="target", response="final answer")
         source = ChainAgent(name="source", handoff_target=target)
-        result = execute_with_handoff(source, "task")
-        assert result is None  # stub
+        result = await execute_with_handoff(source, "task")
+        assert isinstance(result, HandoffResult)
+        assert result.output == "final answer"
+        assert result.handoff_chain == ["source", "target"]
+        assert result.source_agent == "source"
+        assert result.target_agent == "target"
 
-    def test_multi_hop(self):
+    @pytest.mark.asyncio
+    async def test_multi_hop(self):
+        """Multi-hop handoff → full chain reflected in HandoffResult."""
         c = StubAgent(name="c", response="deep result")
         b = ChainAgent(name="b", handoff_target=c)
         a = ChainAgent(name="a", handoff_target=b)
-        result = execute_with_handoff(a, "task")
-        assert result is None  # stub
+        result = await execute_with_handoff(a, "task")
+        assert isinstance(result, HandoffResult)
+        assert result.output == "deep result"
+        assert result.handoff_chain == ["a", "b", "c"]
 
-    def test_max_hops_exceeded(self):
+    @pytest.mark.asyncio
+    async def test_max_hops_exceeded(self):
+        """Exceeding max_hops raises RuntimeError."""
         d = StubAgent(name="d", response="end")
         c = ChainAgent(name="c", handoff_target=d)
         b = ChainAgent(name="b", handoff_target=c)
         a = ChainAgent(name="a", handoff_target=b)
-        result = execute_with_handoff(a, "task", max_hops=2)
-        assert result is None  # stub — no enforcement yet
+        with pytest.raises(RuntimeError, match="Max handoff"):
+            await execute_with_handoff(a, "task", max_hops=2)
 
-    def test_metadata_merges_across_hops(self):
+    @pytest.mark.asyncio
+    async def test_metadata_merges_across_hops(self):
+        """Metadata from handoffs should be merged into the final result."""
+
+        class InnerMeta:
+            name = "inner"
+
+            async def invoke(self, input_data, **metadata):
+                return "done"
+
         class MetaAgent:
             name = "meta"
+
             async def invoke(self, input_data, **metadata):
                 return transfer_to(
-                    MetaAgent.InnerMeta(),
+                    InnerMeta(),
                     input_data,
                     extra_key="extra_val",
                 )
 
-        class InnerMeta:
-            name = "inner"
-            async def invoke(self, input_data, **metadata):
-                return "done"
-
-        MetaAgent.InnerMeta = InnerMeta  # type: ignore
-
-        result = execute_with_handoff(MetaAgent(), "task", initial_meta="init")
-        assert result is None  # stub
+        result = await execute_with_handoff(MetaAgent(), "task", initial_meta="init")
+        assert isinstance(result, HandoffResult)
+        assert result.output == "done"
+        assert result.metadata.get("extra_key") == "extra_val"
+        assert result.metadata.get("initial_meta") == "init"
 
 
 # ============================================================================

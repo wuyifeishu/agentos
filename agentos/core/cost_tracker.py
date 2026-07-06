@@ -23,7 +23,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +232,6 @@ class CostTracker:
     @classmethod
     def noop(cls) -> "CostTracker":
         """Return a minimal no-op tracker that does not record anything."""
-        import builtins
         # Monkey-patch record to be a no-op returning True (budget allows)
         inst = cls.__new__(cls)
         inst._pricing = PricingRegistry

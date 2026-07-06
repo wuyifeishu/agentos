@@ -43,7 +43,7 @@ def run(action: str, directory: str = "", pattern: str = "*",
 
         if action == "organize":
             if organize_by not in ("type", "date", "size"):
-                return f"[file-organizer] organize_by 只支持: type/date/size"
+                return "[file-organizer] organize_by 只支持: type/date/size"
             moved = 0
             for fp in _walk():
                 fname = os.path.basename(fp)

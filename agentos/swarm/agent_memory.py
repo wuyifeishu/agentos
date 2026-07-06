@@ -11,13 +11,12 @@ ContextWindowManager: auto-trim/compress context to fit token budgets.
 
 from __future__ import annotations
 
-import heapq
 import json
 import time
 import uuid
 from collections import OrderedDict, deque
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 
 @dataclass

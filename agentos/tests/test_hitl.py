@@ -2,7 +2,6 @@
 Tests for HITL (Human-in-the-Loop) approval module.
 """
 
-import pytest
 from agentos.hitl.approver import (
     HumanInTheLoop,
     ApprovalRequest,

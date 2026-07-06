@@ -17,7 +17,7 @@ import json
 import threading
 import time
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional
 
 
 # ============================================================================

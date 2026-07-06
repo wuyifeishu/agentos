@@ -10,7 +10,7 @@ from agentos.mcp import (
     MCPError,
 )
 from agentos.mcp.adapter import MCPToolAdapter, MCPToolRegistry
-from agentos.tools.base import PermissionLevel, ToolResult
+from agentos.tools.base import PermissionLevel
 
 
 class TestMCPServerConfig:

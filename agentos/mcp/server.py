@@ -15,7 +15,6 @@ import json
 import logging
 import os
 import sys
-import uuid
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -464,7 +463,7 @@ def start_mcp_server(port: int = 0):
         server = create_default_server()
         server.run_stdio()
     else:
-        print(f"MCP HTTP SSE 模式暂未实现。请使用 stdio 模式（port=0）。")
+        print("MCP HTTP SSE 模式暂未实现。请使用 stdio 模式（port=0）。")
         sys.exit(1)
 
 # ── ServerInfo & Tool (test compatibility) ──

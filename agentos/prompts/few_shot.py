@@ -7,7 +7,7 @@ custom selection algorithms for constructing optimal few-shot prompts.
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Iterable, Optional, Sequence
 import hashlib
 import random
 import re

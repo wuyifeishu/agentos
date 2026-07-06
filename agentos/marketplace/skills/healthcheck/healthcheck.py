@@ -6,7 +6,6 @@ Actions: disk, memory, cpu, uptime, processes, all
 
 import subprocess
 import shutil
-import os
 from typing import Any
 
 

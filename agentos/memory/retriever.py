@@ -8,7 +8,6 @@ ConversationMemory window strategies and LongTermMemory persistence.
 
 from __future__ import annotations
 
-import json
 import math
 from collections import Counter
 from dataclasses import dataclass, field

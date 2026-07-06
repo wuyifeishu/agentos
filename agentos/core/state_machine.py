@@ -7,10 +7,9 @@ AgentOS v0.60 State Machine — Agent 生命周期状态管理。
 from __future__ import annotations
 
 import time
-import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Callable, Awaitable
+from typing import Callable
 
 
 class AgentState(str, Enum):

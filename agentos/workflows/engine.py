@@ -111,7 +111,6 @@ class WorkflowEngine:
 
     async def execute(self, input_text: str, context: dict | None = None) -> str:
         """执行工作流。"""
-        from agentos.models.router import ModelRouter
 
         last_output = input_text
         for round_idx in range(self.workflow.max_rounds):

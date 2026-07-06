@@ -11,7 +11,6 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import json as _json
-import math
 
 
 _JUDGE_PROMPT = """You are an expert quality judge. Given a task and multiple candidate results,

@@ -16,7 +16,7 @@ Supports:
 from __future__ import annotations
 
 import secrets
-from typing import List, Optional, Set, Union
+from typing import List, Optional
 
 
 # ============================================================================

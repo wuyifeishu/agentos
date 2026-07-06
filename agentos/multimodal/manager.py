@@ -6,11 +6,9 @@ AgentOS v0.40 Multimodal — 多模态输入支持。
 from __future__ import annotations
 
 import base64
-import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Any
 
 
 logger = logging.getLogger(__name__)

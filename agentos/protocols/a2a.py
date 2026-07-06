@@ -540,7 +540,6 @@ class A2AClient:
 
     async def get_task(self, task_id: str) -> Optional[A2ATask]:
         """GET /tasks/{id} — 查询任务状态和结果。"""
-        import httpx
         client = await self._get_client()
         try:
             resp = await client.get(f"{self.base_url}/tasks/{task_id}")
@@ -551,7 +550,6 @@ class A2AClient:
 
     async def cancel_task(self, task_id: str) -> bool:
         """DELETE /tasks/{id} — 取消任务。"""
-        import httpx
         client = await self._get_client()
         try:
             resp = await client.delete(f"{self.base_url}/tasks/{task_id}")
@@ -610,7 +608,6 @@ class A2AClient:
         on_event: Callable[[dict], Any] | None = None,
     ) -> None:
         """SSE streaming subscribe: 连接到服务端 SSE 端点监听任务事件。"""
-        import httpx
         client = await self._get_client()
         async with client.stream("GET", f"{self.base_url}/tasks/{task_id}/stream") as resp:
             resp.raise_for_status()
@@ -790,7 +787,7 @@ class A2AServer:
                 stream = server._stream_manager
                 session = stream.get_session(task_id)
                 if session is None:
-                    yield f"event: error\ndata: {{\"error\": \"Session not found\"}}\n\n"
+                    yield "event: error\ndata: {\"error\": \"Session not found\"}\n\n"
                     return
                 sub = session.subscribe()
                 try:
@@ -849,7 +846,6 @@ def new_handoff(
 # Compat: lightweight AgentRegistry for test_core.py
 # ==========================================================================
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict
 import time
 
 @dataclass

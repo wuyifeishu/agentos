@@ -7,8 +7,6 @@ Meta Developer App → Phone Number ID + Access Token → webhook → ChannelMes
 from __future__ import annotations
 
 import json
-import hmac
-import hashlib
 from typing import Optional
 
 from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult

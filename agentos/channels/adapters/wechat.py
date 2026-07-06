@@ -13,7 +13,6 @@ Webhook 规范: https://developers.weixin.qq.com/doc/offiaccount/Message_Managem
 
 from __future__ import annotations
 
-import json
 import time
 import xml.etree.ElementTree as ET
 from typing import Optional

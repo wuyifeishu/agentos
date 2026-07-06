@@ -11,16 +11,16 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator, Optional
+from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from agentos.agent.production import ProductionAgent, ProductionConfig
-from agentos.agent.tool_agent import ToolExecutor, AgentResult
-from agentos.llm.base import LLMProvider, Message, MessageRole
-from agentos.llm.smart_cache import SmartCache, CacheConfig
+from agentos.agent.tool_agent import ToolExecutor
+from agentos.llm.base import LLMProvider
+from agentos.llm.smart_cache import SmartCache
 from agentos.agent.model_router import ModelRouter
 
 __all__ = [

@@ -19,13 +19,12 @@ Features:
 from __future__ import annotations
 
 import json
-import os
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from agentos.evaluation import GoldenCase, GoldenDataset
 
@@ -524,7 +523,7 @@ class EvalSuiteRunner:
             else:
                 xml += f'  <testcase name="{case_name}" time="{r.latency_ms / 1000:.3f}">\n'
                 xml += f'    <failure message="Score: {r.overall:.2f}">Accuracy: {r.accuracy:.2f}, Tool: {r.tool_selection:.2f}, Hallucination: {r.hallucination_free:.2f}</failure>\n'
-                xml += f'  </testcase>\n'
+                xml += '  </testcase>\n'
         xml += '</testsuite>\n'
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -540,8 +539,8 @@ class EvalSuiteRunner:
         md += f"**Total Cases:** {summary['total_cases']}\n\n"
 
         md += "## Summary\n\n"
-        md += f"| Metric | Value |\n"
-        md += f"|--------|-------|\n"
+        md += "| Metric | Value |\n"
+        md += "|--------|-------|\n"
         md += f"| Average Score | {summary['average_score']:.2%} |\n"
         md += f"| Median Score | {summary['median_score']:.2%} |\n"
         md += f"| Min Score | {summary['min_score']:.2%} |\n"

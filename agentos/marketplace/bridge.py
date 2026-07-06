@@ -7,16 +7,12 @@ into AgentOS SkillManifest format for unified skill registry and discovery.
 from __future__ import annotations
 
 import enum
-import json
 import logging
 import os
-import re
 import tempfile
-import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
+from typing import Dict, List, Optional
 
 from agentos.marketplace.manifest import SkillManifest, SkillFormat, ToolDef
 

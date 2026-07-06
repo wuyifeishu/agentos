@@ -7,10 +7,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class RateLimitStrategy(str, Enum):

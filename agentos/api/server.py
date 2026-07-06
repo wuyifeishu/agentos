@@ -8,15 +8,13 @@ v1.18.0: Production-ready with graceful shutdown, Prometheus metrics,
 import asyncio
 import json
 import logging
-import os
 import signal
 import time
 import uuid
 from collections import defaultdict
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -288,7 +286,7 @@ if HAS_API_DEPS:
             "# HELP agentos_active_requests Currently in-flight requests",
             "# TYPE agentos_active_requests gauge",
             f"agentos_active_requests {_active_connections}",
-            f"",
+            "",
         ]
         return PlainTextResponse("\n".join(lines), media_type="text/plain; version=0.0.4")
 

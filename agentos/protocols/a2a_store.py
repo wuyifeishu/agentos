@@ -12,9 +12,9 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Iterator, Optional
 
-from agentos.protocols.a2a import A2ATask, A2ASession, TaskState
+from agentos.protocols.a2a import A2ATask, TaskState
 
 
 class A2ATaskStore(ABC):

@@ -7,7 +7,7 @@ BotFather token → long-polling / webhook → ChannelMessage.
 from __future__ import annotations
 
 import json
-from typing import Optional, Any
+from typing import Optional
 
 from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
 from agentos.channels.message import ChannelMessage, ChannelType, MessageType

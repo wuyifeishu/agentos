@@ -4,10 +4,8 @@ AgentOS v0.30 向量数据库集成 — Chroma + FAISS。
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
 import os
 import pickle
-import json
 import uuid
 
 

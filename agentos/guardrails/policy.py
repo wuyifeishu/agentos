@@ -4,8 +4,8 @@ and session-scoped policy decisions.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional
+from enum import Enum
+from typing import Any, Callable, Dict, Optional
 
 from agentos.guardrails.engine import GuardrailAction, GuardrailCategory, GuardrailResult
 

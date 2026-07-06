@@ -22,12 +22,10 @@ import re
 import hashlib
 import shutil
 import subprocess
-import tempfile
 import time
 import urllib.parse
 import urllib.request
 import urllib.error
-from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional

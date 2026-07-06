@@ -51,12 +51,11 @@ from agentos.agent.model_router import (
 )
 from agentos.security.audit_logger import (
     AuditLogger,
-    AuditEvent,
     AuditSeverity,
     AuditActionCategory,
 )
-from agentos.llm.base import LLMProvider, Message, MessageRole
-from agentos.llm.smart_cache import SmartCache, CacheConfig
+from agentos.llm.base import LLMProvider
+from agentos.llm.smart_cache import SmartCache
 
 
 __all__ = [

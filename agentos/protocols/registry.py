@@ -11,12 +11,10 @@ Agent 注册中心实现:
 from __future__ import annotations
 
 import asyncio
-import json
 import time
-import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Coroutine, Dict, List, Optional, Set, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Union
 
 
 # ── Agent Info ───────────────────────────────
@@ -696,7 +694,6 @@ default_registry = AgentRegistry()
 
 # ── AgentRecord (test compatibility) ──
 from dataclasses import dataclass, field
-from typing import Optional
 import time
 
 @dataclass

@@ -51,7 +51,7 @@ from typing import Any, Callable, Awaitable
 import websockets
 from websockets.server import WebSocketServerProtocol
 
-from agentos.subagent.manager import SubAgentManager, SubAgentSpec, SubAgentResult
+from agentos.subagent.manager import SubAgentManager, SubAgentSpec
 from agentos.subagent.parent_child import ChildContext, ChildHandle, ChildStatus
 
 

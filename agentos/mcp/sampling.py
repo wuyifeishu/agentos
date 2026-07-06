@@ -12,8 +12,6 @@ MCP Sampling 允许 MCP Server 向 Client 发起 LLM 请求。
 
 from __future__ import annotations
 
-import asyncio
-import json
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Coroutine, Dict, List, Optional, Union

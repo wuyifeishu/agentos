@@ -8,13 +8,11 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
-import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Optional, Callable, Awaitable
 
-from agentos.channels.message import ChannelMessage, ChannelType, ConversationContext
+from agentos.channels.message import ChannelMessage, ChannelType
 
 
 @dataclass

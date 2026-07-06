@@ -11,7 +11,6 @@ Supports failure/success thresholds, recovery timeout, and callbacks.
 
 import threading
 import time
-from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Any, Callable, Dict, Optional, TypeVar
 
@@ -108,7 +107,7 @@ class CircuitBreaker:
             result = fn(*args, **kwargs)
             self._on_success()
             return result
-        except Exception as e:
+        except Exception:
             self._on_failure()
             raise
 

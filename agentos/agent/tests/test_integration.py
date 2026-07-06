@@ -8,8 +8,6 @@ import pytest
 
 from agentos.agent.tool_agent import (
     AgentConfig,
-    AgentResult,
-    AgentStep,
     MockLLMProvider,
     ToolAgent,
     ToolExecutor,

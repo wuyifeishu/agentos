@@ -3,8 +3,8 @@ Guardrail engine — rule registry, evaluation, and result aggregation.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from enum import Enum
+from typing import Any, Callable, Dict, Optional
 
 
 class GuardrailAction(str, Enum):

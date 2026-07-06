@@ -4,7 +4,6 @@ AgentOS v1.7.1 CLI — System layer + Desktop client: file ops, shell, browser, 
 
 from __future__ import annotations
 
-import asyncio
 import os
 import sys
 
@@ -13,7 +12,6 @@ from agentos.llm.base import Tool, ToolParameter
 from agentos.agent.tool_agent import ToolAgent, ToolExecutor, AgentConfig, MockLLMProvider
 from agentos.cli.errors import (
     no_provider_configured,
-    single_provider_failed,
     no_task_provided,
     welcome,
 )
@@ -175,7 +173,7 @@ def _run_hello():
     import time
 
     print(f"  \033[36mNexus AgentOS\033[0m v{__version__}")
-    print(f"  \033[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m")
+    print("  \033[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m")
     print()
 
     # Step 1: check provider
@@ -208,17 +206,17 @@ def _run_hello():
 
     time.sleep(0.3)
     print()
-    print(f"  \033[1m一切就绪。\033[0m")
+    print("  \033[1m一切就绪。\033[0m")
     print()
 
     if os.environ.get("OPENAI_API_KEY") or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"):
-        print(f"  快速开始：")
-        print(f"    \033[32magentos\033[0m \"用一句话解释什么是递归\"")
-        print(f"    \033[32magentos demo\033[0m")
+        print("  快速开始：")
+        print("    \033[32magentos\033[0m \"用一句话解释什么是递归\"")
+        print("    \033[32magentos demo\033[0m")
     else:
-        print(f"  下一步（30 秒配置）：")
-        print(f"    \033[32magentos init\033[0m        终端交互式配置")
-        print(f"    \033[32magentos config-panel\033[0m 浏览器图形界面")
+        print("  下一步（30 秒配置）：")
+        print("    \033[32magentos init\033[0m        终端交互式配置")
+        print("    \033[32magentos config-panel\033[0m 浏览器图形界面")
     print()
 
 
@@ -346,7 +344,7 @@ def _run_production_agent(cli_args: list[str], verbose: bool = False) -> None:
 
     import uvicorn
     print(f"AgentOS Production API → http://{host}:{port}")
-    print(f"  POST /agent/run    GET /agent/health    GET /agent/stats")
+    print("  POST /agent/run    GET /agent/health    GET /agent/stats")
     uvicorn.run(app, host=host, port=port, log_level="info" if verbose else "warning")
 
 
@@ -516,7 +514,7 @@ def main():
             elif a == "--port" and i + 2 < len(args):
                 port = int(args[i + 2])
         from agentos.api.server import AgentAPI
-        from agentos.core.loop import AgentLoop, LoopConfig
+        from agentos.core.loop import AgentLoop
         from agentos.core.context import ContextManager
         from agentos.tools.registry import ToolRegistry
         from agentos.models.router import ModelRouter, RECOMMENDED_CONFIG
@@ -618,7 +616,7 @@ def _run_marketplace(args: list[str]):
         print("\n兼容格式: agentos / openclaw / mcp / generic")
         return
 
-    from agentos.marketplace import SkillRegistry, InstallResult
+    from agentos.marketplace import SkillRegistry
 
     registry = SkillRegistry()
     sub = args[0]
@@ -730,11 +728,11 @@ def _run_marketplace(args: list[str]):
 
     elif sub == "stats":
         stats = registry.stats()
-        print(f"Marketplace Stats:")
+        print("Marketplace Stats:")
         print(f"  Total installed: {stats['total']}")
         print(f"  Market dir:      {stats['market_dir']}")
         if stats.get("by_format"):
-            print(f"  By format:")
+            print("  By format:")
             for fmt, count in stats["by_format"].items():
                 print(f"    {fmt}: {count}")
 
@@ -757,7 +755,6 @@ def _run_enterprise(args: list[str]):
     sub = args[0]
     from agentos.enterprise import (
         APIKeyManager, TenantManager, AuditLogger,
-        KeyCreateRequest, KeyScope, TenantTier,
     )
 
     if sub == "api-key":
@@ -925,7 +922,7 @@ def _run_demo(verbose: bool):
     )
 
     result = agent.run("北京天气怎么样？")
-    print(f"\nTask: 北京天气怎么样？")
+    print("\nTask: 北京天气怎么样？")
     print(f"Steps: {result.total_steps} | Time: {(result.total_duration_ms/1000):.1f}s")
     print(f"Tokens: {result.total_tokens} | Cost: ${result.total_cost_usd:.4f}")
     print(f"Answer: {result.final_answer}")

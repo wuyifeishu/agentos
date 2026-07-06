@@ -18,7 +18,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable
 
 
 # ── Core Types ──────────────────────────────────
@@ -444,7 +444,7 @@ class ToolOrchestrator:
         last_checkpoint_time = 0.0
         try:
             await self.execute(dag)
-        except (asyncio.TimeoutError, Exception) as e:
+        except (asyncio.TimeoutError, Exception):
             # 异常时保存当前状态
             cp = self.checkpoint(dag)
             if checkpoint_callback:

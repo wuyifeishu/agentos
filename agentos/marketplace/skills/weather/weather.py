@@ -5,7 +5,6 @@ Category: utility
 Source: wttr.in
 """
 
-from typing import Any
 
 
 def run(city: str = "Beijing", format_str: str = "3") -> str:

@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import os
 import resource
-import signal
 import subprocess
 import sys
 import tempfile
@@ -29,7 +28,7 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 
 # ---------------------------------------------------------------------------

@@ -15,7 +15,6 @@ import uuid
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Optional
-from collections import defaultdict
 
 
 class MemoryType(str, Enum):

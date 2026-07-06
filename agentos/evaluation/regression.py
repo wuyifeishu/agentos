@@ -7,13 +7,12 @@ Builds on top of agentos.evaluation core (GoldenDataset, Evaluator, EvalReport).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 import json
 import math
-import time
 import xml.etree.ElementTree as ET
 
-from agentos.evaluation import GoldenDataset, Evaluator, EvalConfig, EvalReport, ScoreDetail
+from agentos.evaluation import Evaluator, EvalReport, ScoreDetail
 
 
 @dataclass

@@ -901,7 +901,7 @@ class WorkflowTemplates:
         step = WorkflowStep(
             id="retry_task",
             type=StepType.TASK,
-            name=f"Task with retry",
+            name="Task with retry",
             agent=agent_id,
             task=task,
             on_error=ErrorStrategy.RETRY,

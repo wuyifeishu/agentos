@@ -6,8 +6,8 @@ Generic connection pool, rate limiter, resource quota manager, and health-checke
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Generic, List, Optional, Set, TypeVar
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 T = TypeVar("T")
 

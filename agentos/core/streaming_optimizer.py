@@ -21,10 +21,9 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, AsyncIterable, AsyncIterator, Callable, Dict, List, Optional, Set
+from typing import Any, AsyncIterable, AsyncIterator, Callable, Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@ Supports:
 from __future__ import annotations
 
 import re
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 
 # ============================================================================

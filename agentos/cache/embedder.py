@@ -5,11 +5,9 @@ v0.50: 新增模块。为语义缓存/向量数据库提供embedding实现。
 
 from __future__ import annotations
 
-import asyncio
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 
 import httpx
 

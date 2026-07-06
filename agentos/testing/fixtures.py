@@ -5,14 +5,12 @@ AgentOS v0.95 Testing Fixtures — 可复用测试基础设施。
 供单元测试和集成测试共用。
 """
 
-import json
-import os
 import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 
 # ─── Mock LLM ───────────────────────────────────────────────

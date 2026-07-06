@@ -14,7 +14,7 @@ import json
 import os
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Generator, Optional
+from typing import Callable, Generator, Optional
 
 from agentos.llm.base import (
     LLMProvider,
@@ -26,9 +26,9 @@ from agentos.llm.base import (
     Tool,
     ToolCall,
 )
-from agentos.tools.circuit_breaker import CircuitBreaker, CircuitState
+from agentos.tools.circuit_breaker import CircuitBreaker
 from agentos.tools.validation import ToolOutputValidator, ToolResult, ValidationResult
-from agentos.tools.metrics import MetricsCollector, Counter, Timer
+from agentos.tools.metrics import MetricsCollector
 
 __all__ = [
     "ToolAgent",

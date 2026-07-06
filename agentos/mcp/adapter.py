@@ -6,7 +6,7 @@ integration with the AgentOS tool system and permission model.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from agentos.mcp import MCPClient, MCPToolInfo
 from agentos.tools.base import BaseTool, PermissionLevel, ToolResult

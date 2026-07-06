@@ -6,7 +6,6 @@ AgentOS v0.30 反馈学习系统 — Human-in-the-loop + RLHF hooks。
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 import json
 import os
 

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import threading
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set
 
 
 class FeatureFlag:

@@ -23,13 +23,12 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from agentos.marketplace.manifest import SkillManifest, SkillFormat, ToolDef
+from agentos.marketplace.manifest import SkillManifest, SkillFormat
 
 MARKET_DIR = Path.home() / ".agentos" / "marketplace"
 INSTALLED_JSON = MARKET_DIR / "installed.json"

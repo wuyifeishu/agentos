@@ -5,7 +5,6 @@ v1.3.36: +Function Calling / Tool Use 支持。
 
 from __future__ import annotations
 
-import json
 from typing import Any, Iterator
 
 try:

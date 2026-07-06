@@ -7,10 +7,9 @@ v1.5.1: 支持条件路由(ConditionalPipeline)、并行扇出(ParallelPipeline)
 
 from __future__ import annotations
 
-import asyncio
 import concurrent.futures
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Callable
 
 from agentos.agent.tool_agent import ToolAgent, AgentConfig, AgentResult
 

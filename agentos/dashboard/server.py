@@ -9,12 +9,10 @@ from __future__ import annotations
 
 import json
 import http.server
-import os
 import queue
 import threading
 import webbrowser
-from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 from agentos.dashboard.tracker import Tracker
 

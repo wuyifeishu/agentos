@@ -4,7 +4,7 @@ Supports local LLM inference via Ollama.
 Models: llama3, mistral, codellama, phi3, gemma2, deepseek-r1, etc.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, AsyncIterator, Dict, List, Optional
 
 
@@ -82,7 +82,7 @@ class OllamaClient:
                     )
                     resp.raise_for_status()
                     return resp.json()
-            except (httpx.HTTPStatusError, httpx.ConnectError) as e:
+            except (httpx.HTTPStatusError, httpx.ConnectError):
                 if attempt == self.config.max_retries - 1:
                     raise
                 import asyncio

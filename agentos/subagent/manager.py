@@ -15,8 +15,6 @@ from typing import Any, Callable, Awaitable
 
 from .parent_child import (
     ChildStatus,
-    ChildHeartbeat,
-    ChildInfo,
     SharedState,
     ChildContext,
     ChildHandle,

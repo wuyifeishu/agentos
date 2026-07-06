@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from typing import Optional
 
-from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
+from agentos.channels.base import BaseChannelAdapter, ReplyResult
 from agentos.channels.message import ChannelMessage, ChannelType, ConversationContext
 
 

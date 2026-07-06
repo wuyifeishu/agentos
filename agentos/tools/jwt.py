@@ -17,7 +17,7 @@ import hashlib
 import hmac
 import json
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Union
 
 
 # ============================================================================
@@ -198,7 +198,7 @@ class JWT:
             if isinstance(aud, str):
                 aud = [aud]
             if not set(expected) & set(aud):
-                raise InvalidTokenError(f"Audience mismatch")
+                raise InvalidTokenError("Audience mismatch")
 
         # Check issuer
         if issuer is not None:

@@ -13,7 +13,6 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
@@ -154,7 +153,7 @@ class MCPComplianceSuite:
 
     async def _test_mcp_04(self) -> Tuple[TestStatus, str]:
         """tools/list 方法应返回工具数组。"""
-        from agentos.protocols.mcp import MCPClient, MCPServerConfig
+        from agentos.protocols.mcp import MCPClient
 
         client = MCPClient()
         # 连接一个简单的 echo server 来验证 /list 逻辑
@@ -182,7 +181,7 @@ class MCPComplianceSuite:
 
     async def _test_mcp_07(self) -> Tuple[TestStatus, str]:
         """tools/call 应支持正确参数调用。"""
-        from agentos.protocols.mcp import MCPClient, MCPServerConfig
+        from agentos.protocols.mcp import MCPClient
 
         client = MCPClient()
         assert hasattr(client, "call_tool"), "MCPClient.call_tool exists"
@@ -231,7 +230,7 @@ class MCPComplianceSuite:
 
     async def _test_mcp_15(self) -> Tuple[TestStatus, str]:
         """验证多客户端并发连接（同一 MCPClient 可管理多个 server 配置）。"""
-        from agentos.protocols.mcp import MCPClient, MCPServerConfig
+        from agentos.protocols.mcp import MCPClient
         client = MCPClient()
         assert isinstance(client, MCPClient)
         return TestStatus.PASS, "MCPClient supports multiple server connections (managed via _servers dict)."

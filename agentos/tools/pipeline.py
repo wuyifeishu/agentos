@@ -12,10 +12,9 @@ Features:
 import threading
 import time
 from abc import ABC, abstractmethod
-from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Generic, Iterator, List, Optional, TypeVar
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 T = TypeVar("T")
 U = TypeVar("U")

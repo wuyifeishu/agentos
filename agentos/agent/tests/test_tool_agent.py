@@ -1,7 +1,6 @@
 """agentos/agent/tool_agent.py 单元测试。"""
 
 import json
-import pytest
 
 from agentos.agent.tool_agent import (
     ToolExecutor,
@@ -9,7 +8,7 @@ from agentos.agent.tool_agent import (
     AgentStep,
     AgentResult,
 )
-from agentos.llm.base import Tool, ToolFunction, ToolParameter, ToolCall
+from agentos.llm.base import Tool, ToolParameter, ToolCall
 
 
 # ── 工具定义 ──────────────────────────────────────────────────────

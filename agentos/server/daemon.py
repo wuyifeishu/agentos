@@ -32,7 +32,6 @@ from __future__ import annotations
 
 import asyncio
 import atexit
-import json
 import logging
 import os
 import signal
@@ -41,7 +40,7 @@ import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Callable, Any
+from typing import Callable, Any
 
 import uvicorn
 from fastapi import FastAPI, APIRouter

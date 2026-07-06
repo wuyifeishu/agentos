@@ -16,7 +16,6 @@ import subprocess
 import tempfile
 import shlex
 from dataclasses import dataclass, field
-from typing import Optional
 
 from agentos.system.permissions import (
     SystemPermissionManager,

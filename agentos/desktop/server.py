@@ -11,22 +11,18 @@ Desktop Server — AgentOS 桌面客户端后端 v1.7.1。
 from __future__ import annotations
 
 import os
-import json
 import uuid
 from dataclasses import dataclass
-from typing import Optional
 
 from agentos.system.permissions import (
     SystemPermissionManager,
     PermissionTier,
-    SAFE_PERMISSIONS,
-    DEV_PERMISSIONS,
 )
 from agentos.system.file_ops import FileOperator, FileOpResult
 from agentos.system.shell_exec import ShellExecutor
 from agentos.system.approval import ApprovalEngine
 from agentos.enterprise.api_keys import (
-    APIKeyManager, KeyScope, KeyCreateRequest, APIKey,
+    APIKeyManager, KeyScope, KeyCreateRequest,
 )
 from agentos.cli.config_panel import CONFIG_DIR, CONFIG_FILE, ENV_FILE
 
@@ -374,14 +370,14 @@ class DesktopServer:
         import uvicorn
         app = self.build_app()
         print(f"\n  AgentOS Desktop v{APP_VERSION}")
-        print(f"  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         print(f"  地址:     http://{self._config.host}:{self._config.port}")
         print(f"  模式:     {self._config.permission_mode}")
         print(f"  工作区:   {os.getcwd()}")
         print(f"  会话:     {self._sid}")
-        print(f"  授权引擎: 可视化审批（Agent主动申请 → 用户点击允许/拒绝）")
-        print(f"  桌面壳:   agentos desktop-shell（原生窗口包裹）")
-        print(f"  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+        print("  授权引擎: 可视化审批（Agent主动申请 → 用户点击允许/拒绝）")
+        print("  桌面壳:   agentos desktop-shell（原生窗口包裹）")
+        print("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
         uvicorn.run(app, host=self._config.host, port=self._config.port, log_level="warning")
 
 

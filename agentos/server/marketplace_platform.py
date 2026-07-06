@@ -20,9 +20,7 @@ import json
 import os
 import re
 import secrets
-import shutil
 import sqlite3
-import tempfile
 import time
 import zipfile
 from datetime import datetime, timedelta
@@ -736,9 +734,9 @@ def start_marketplace_platform(host: str = "0.0.0.0", port: int = 8911) -> None:
     """Start the marketplace platform server (blocking)."""
     import uvicorn
     app = create_marketplace_app()
-    print(f"\n  AgentOS Skill Marketplace Platform v1.8.1")
+    print("\n  AgentOS Skill Marketplace Platform v1.8.1")
     print(f"  Local:  http://{host}:{port}")
-    print(f"  Admin:  admin / admin123")
-    print(f"  Upload: POST /api/skills/upload  |  Browse: GET /api/skills")
+    print("  Admin:  admin / admin123")
+    print("  Upload: POST /api/skills/upload  |  Browse: GET /api/skills")
     print()
     uvicorn.run(app, host=host, port=port, log_level="info")

@@ -13,10 +13,7 @@ Also serves built-in MCP info: /api/mcp/servers, /api/mcp/tools
 
 from __future__ import annotations
 
-import json
-import sys
 from pathlib import Path
-from typing import Optional
 
 # ── FastAPI app ──
 try:
@@ -217,7 +214,7 @@ def start_marketplace_server(host: str = "0.0.0.0", port: int = 8910) -> None:
     """Start the marketplace server (blocking)."""
     import uvicorn
     app = create_marketplace_app()
-    print(f"\n  AgentOS Skill Marketplace")
+    print("\n  AgentOS Skill Marketplace")
     print(f"  Local:  http://{host}:{port}")
     print(f"  Skills: {len(SkillRegistry().list_installed())} installed")
     print()

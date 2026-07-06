@@ -16,10 +16,9 @@ import hashlib
 import json
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 
 # ── Models ──
@@ -158,7 +157,7 @@ class RollbackManager:
         print(f"  Size: {target.wheel_size / 1024:.0f} KB")
 
         if dry_run:
-            print(f"  [DRY RUN — no changes made]")
+            print("  [DRY RUN — no changes made]")
             return True
 
         # pip install
@@ -235,7 +234,7 @@ class RollbackManager:
             else:
                 actual_sha = hashlib.sha256(wheel.read_bytes()).hexdigest()
                 if actual_sha != entry.sha256:
-                    issues.append(f"SHA256 mismatch")
+                    issues.append("SHA256 mismatch")
 
             if entry.version not in pyapi_versions:
                 issues.append("not on PyPI")

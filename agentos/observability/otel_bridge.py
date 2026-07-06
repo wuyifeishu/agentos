@@ -156,7 +156,6 @@ class OtelTracer:
 
     @classmethod
     def _init_sdk(cls, config: OtelConfig):
-        from opentelemetry import trace as otel_trace
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
         from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION

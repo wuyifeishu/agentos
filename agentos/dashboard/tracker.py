@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import json
 import time
-import os
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Any
 
 
 TRACKER_DIR = Path.home() / ".agentos" / "tracker"

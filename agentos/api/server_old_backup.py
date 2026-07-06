@@ -2,14 +2,12 @@
 AgentOS v0.30 FastAPI REST服务 — 暴露Agent能力。
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import Optional
-import asyncio
+from pydantic import BaseModel
 import uuid
 
-from agentos.core.loop import AgentLoop, AgentResult, LoopState
+from agentos.core.loop import AgentLoop
 
 
 class RunRequest(BaseModel):

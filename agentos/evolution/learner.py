@@ -16,7 +16,6 @@ Learning strategies:
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
@@ -25,7 +24,6 @@ from agentos.evolution.signals import (
     BehaviorSignal,
     SignalCollector,
     SignalSummary,
-    FeedbackPolarity,
 )
 
 

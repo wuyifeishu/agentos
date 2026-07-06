@@ -18,12 +18,11 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
-import os
 import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 # ---------------------------------------------------------------------------

@@ -44,11 +44,11 @@ def generate_dockerfile(config: Optional[DockerConfig] = None) -> str:
         "",
         "# Install Python dependencies",
         "COPY requirements.txt .",
-        f"RUN pip install --no-cache-dir -r requirements.txt",
+        "RUN pip install --no-cache-dir -r requirements.txt",
         "",
         "# Copy application",
         "COPY . .",
-        f"RUN pip install --no-cache-dir -e .",
+        "RUN pip install --no-cache-dir -e .",
         "",
     ]
 
@@ -102,23 +102,23 @@ class ComposeConfig:
 
 def generate_docker_compose(config: ComposeConfig) -> str:
     """Generate a docker-compose.yml for an AgentOS project."""
-    lines = [f'version: "3.9"', "", "services:"]
+    lines = ['version: "3.9"', "", "services:"]
 
     for svc in config.services:
         lines.append(f"  {svc.name}:")
-        lines.append(f"    build:")
+        lines.append("    build:")
         lines.append(f"      context: {svc.build_context}")
-        lines.append(f"    ports:")
+        lines.append("    ports:")
         lines.append(f'      - "{svc.port}:{svc.port}"')
         if svc.env_file:
-            lines.append(f"    env_file:")
+            lines.append("    env_file:")
             lines.append(f"      - {svc.env_file}")
         if svc.volumes:
-            lines.append(f"    volumes:")
+            lines.append("    volumes:")
             for v in svc.volumes:
                 lines.append(f"      - {v}")
         if svc.depends_on:
-            lines.append(f"    depends_on:")
+            lines.append("    depends_on:")
             for d in svc.depends_on:
                 lines.append(f"      - {d}")
         if svc.command:
@@ -127,7 +127,7 @@ def generate_docker_compose(config: ComposeConfig) -> str:
 
     lines += [
         "networks:",
-        f"  default:",
+        "  default:",
         f"    name: {config.network_name}",
     ]
 

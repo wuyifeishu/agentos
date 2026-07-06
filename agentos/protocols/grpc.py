@@ -14,10 +14,7 @@ Key features:
 """
 
 import asyncio
-import hashlib
-import io
 import logging
-import os
 import socket
 import ssl
 import struct
@@ -25,8 +22,8 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Set, Tuple, Union
+from enum import Enum
+from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Tuple
 
 from agentos.protocols.registry import AgentRegistry, AgentInfo
 

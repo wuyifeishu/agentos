@@ -26,21 +26,16 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import re
-import subprocess
-import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Callable, Any
-from urllib.parse import urlparse, quote_plus
+from typing import Optional, Any
 
 from agentos.marketplace.importer import (
-    OpenClawImporter, RemoteSkill, OPENCLAW_RAW_BASE, OPENCLAW_API,
+    OpenClawImporter,
 )
-from agentos.marketplace.manifest import SkillManifest
 
 
 # ── Ecosystem Registry ──────────────────────────────────────────────

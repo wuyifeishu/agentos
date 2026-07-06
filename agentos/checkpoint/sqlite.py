@@ -7,12 +7,9 @@ SQLite Checkpointer — 零依赖本地持久化。
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
-from typing import Any
 
 from agentos.checkpoint.base import (
     Checkpoint,

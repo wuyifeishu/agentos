@@ -4,7 +4,6 @@ toxicity heuristics, and code injection detection.
 """
 
 import re
-from typing import Dict, List
 
 from agentos.guardrails.engine import GuardrailRule, GuardrailAction, GuardrailCategory
 

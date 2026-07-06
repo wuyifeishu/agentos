@@ -8,9 +8,9 @@ client heartbeat, backpressure control, and typed event dispatching.
 import asyncio
 import json
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, AsyncIterator, Callable, Dict, Optional
+from typing import Any, AsyncIterator, Optional
 
 DEFAULT_RETRY_MS = 3000
 DEFAULT_HEARTBEAT_S = 30

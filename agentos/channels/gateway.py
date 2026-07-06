@@ -20,14 +20,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import json
 import logging
 import time
-from pathlib import Path
 from typing import Any, Callable, Optional
 
-from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
-from agentos.channels.message import ChannelMessage, ChannelType, MessageType, ConversationContext
+from agentos.channels.base import BaseChannelAdapter
+from agentos.channels.message import ChannelMessage, ChannelType, ConversationContext
 from agentos.channels.router import ChannelRouter
 
 logger = logging.getLogger("agentos.channels.gateway")

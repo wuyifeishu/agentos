@@ -18,9 +18,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 
-from agentos.llm import create_provider, Message, MessageRole, Tool, ToolParameter, ToolCall
+from agentos.llm import create_provider, Message, MessageRole, Tool, ToolParameter
 
 
 def run_chat(provider_name: str, model: str, prompt: str) -> None:

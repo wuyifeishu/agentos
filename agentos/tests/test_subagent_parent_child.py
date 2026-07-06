@@ -1,18 +1,14 @@
 """测试 SubAgent 父子通信 — 状态共享、心跳、生命周期管理。"""
 
 import asyncio
-import time
 import pytest
 
 pytestmark = pytest.mark.asyncio
 from agentos.subagent import (
     SubAgentManager,
-    SubAgentMode,
     SubAgentSpec,
-    SubAgentResult,
     ChildStatus,
     ChildHeartbeat,
-    ChildInfo,
     SharedState,
     ChildContext,
     ChildHandle,

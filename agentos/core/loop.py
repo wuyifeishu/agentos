@@ -10,7 +10,7 @@ import asyncio
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, AsyncIterator, Callable
+from typing import Callable
 
 from agentos.core.context import ContextManager
 from agentos.tools.registry import ToolRegistry
@@ -19,14 +19,12 @@ from agentos.security.sandbox import SandboxManager
 from agentos.observability.tracer import Tracer
 from agentos.observability.metrics import MetricsCollector
 from agentos.observability.cost_analytics import CostAnalytics
-from agentos.core.streaming import StreamChunk, StreamEvent
+from agentos.core.streaming import StreamChunk
 from agentos.storage.base import CheckpointStore
 from agentos.checkpoint.base import Checkpoint, CheckpointMetadata, CheckpointBackend
 from agentos.cost.tracker import CostTracker
-from agentos.swarm.coordinator import SwarmCoordinator, SwarmTopology, AgentRole, SwarmResult, MessageBus
+from agentos.swarm.coordinator import SwarmCoordinator, SwarmTopology, AgentRole, SwarmResult
 from agentos.comm.layer import CommunicationLayer
-from agentos.cache.llm_cache import LLMCache
-from agentos.multimodal.manager import MultimodalManager
 from agentos.tools.audit_logger import AuditLogger, AuditEvent, Severity
 from agentos.tools.rate_limiter import TokenBucket
 
@@ -419,7 +417,6 @@ class AgentLoop:
         # Full checkpoint via CheckpointBackend
         try:
             from datetime import datetime, timezone
-            import uuid
 
             checkpoint_id = f"ckpt-{session_id}-{iteration:06d}"
             parent_id = getattr(self, '_last_checkpoint_id', None)
@@ -449,7 +446,7 @@ class AgentLoop:
             await backend.put(cp)
             self._last_checkpoint_id = checkpoint_id
 
-        except Exception as e:
+        except Exception:
             pass  # Checkpoint failure must not crash the loop
 
     async def _try_restore(self, session_id: str) -> int:

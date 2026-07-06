@@ -16,13 +16,12 @@ from __future__ import annotations
 
 import json
 import os
-from copy import deepcopy
-from dataclasses import dataclass, field, fields, is_dataclass, MISSING
+from dataclasses import dataclass, fields, is_dataclass, MISSING
 from enum import Enum
 from pathlib import Path
 from typing import (
-    Any, Callable, Dict, Generic, List, Optional, Set, Tuple, Type, TypeVar, Union,
-    get_args, get_origin, get_type_hints, ClassVar,
+    Any, Callable, Dict, List, Optional, Set, Tuple, Type, TypeVar, Union,
+    get_args, get_origin, get_type_hints,
 )
 import logging
 
@@ -396,7 +395,7 @@ def _coerce(value: Any, target_type: Type) -> Any:
     if origin is dict:
         if isinstance(value, dict):
             return value
-        raise ConfigValidationError("", value, f"cannot coerce to dict")
+        raise ConfigValidationError("", value, "cannot coerce to dict")
     if is_dataclass(target_type) and isinstance(value, dict):
         return target_type(**value)
     return value

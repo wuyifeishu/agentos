@@ -6,8 +6,8 @@ Tool Bridge — 连接 ToolRegistry (BaseTool) 和 ToolExecutor (Tool + callable
 """
 from __future__ import annotations
 import json, asyncio
-from typing import Any, Callable
-from agentos.tools.base import BaseTool, ToolCall, ToolResult
+from typing import Callable
+from agentos.tools.base import BaseTool
 from agentos.tools.registry import ToolRegistry
 from agentos.llm.base import Tool as LLMTool, ToolFunction, ToolParameter
 

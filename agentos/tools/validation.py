@@ -13,11 +13,11 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from typing import Any, Optional, Union, List, Dict
 
 from .base import ToolResult
-from ..errors.handler import ErrorCategory, ErrorFormatter
+from ..errors.handler import ErrorCategory
 
 
 class ValidationSeverity(str, Enum):

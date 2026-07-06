@@ -11,7 +11,7 @@ import json
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, AsyncIterator, Callable, Dict, Optional
+from typing import Any, AsyncIterator, Callable, Optional
 
 from agentos.protocols.a2a import A2ATask, TaskState
 

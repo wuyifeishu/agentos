@@ -10,11 +10,10 @@ Supports:
 from __future__ import annotations
 
 import base64
-import io
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 # ── Enums & Data Classes ──────────────────────────────────────────

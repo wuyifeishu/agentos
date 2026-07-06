@@ -5,7 +5,6 @@ AgentOS v0.30 Agent技能市场 — 可复用的Agent技能模板。
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class AgentCategory(str, Enum):

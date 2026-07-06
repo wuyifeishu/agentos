@@ -6,7 +6,6 @@ import pytest
 from agentos.conversation.conversation import (
     ConversationManager,
     ConversationConfig,
-    Message,
     MessageRole,
     TrimStrategy,
 )

@@ -16,8 +16,7 @@ import os
 import time
 import threading
 from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 from agentos.cost.tracker import CostTracker, PRICING
 
@@ -163,7 +162,7 @@ class CostAnalytics:
 
     def daily_breakdown(self, days: int = 7) -> list[DailySummary]:
         """最近N天的每日成本明细。"""
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         today = datetime.now().date()
         summaries: dict[tuple[str, str], DailySummary] = {}

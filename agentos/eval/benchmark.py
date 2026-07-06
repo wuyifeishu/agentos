@@ -16,7 +16,7 @@ import statistics
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 
 # ── Enums & Data Classes ──────────────────────────────────────────
@@ -419,7 +419,7 @@ class EvalRunner:
     def print_report(self, report: EvalReport) -> str:
         """Generate a human-readable report string."""
         lines = [
-            f"╔══ Evaluation Report ══╗",
+            "╔══ Evaluation Report ══╗",
             f"║ Suite:    {report.suite.value:<20} ║",
             f"║ Metric:   {report.metric.value:<20} ║",
             f"║ Cases:    {report.total_cases:<20} ║",
@@ -428,7 +428,7 @@ class EvalRunner:
             f"║ Median:   {report.median_score:.4f} ║",
             f"║ Std Dev:  {report.std_dev:.4f}   ║",
             f"║ Time:     {report.duration_s:.1f}s",
-            f"╚════════════════════════╝",
+            "╚════════════════════════╝",
         ]
         if report.results and len(report.results) <= 20:
             lines.append("\nPer-case scores:")

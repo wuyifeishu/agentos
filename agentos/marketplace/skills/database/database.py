@@ -62,7 +62,7 @@ def run(action: str = "tables", db_path: str = ":memory:", query: str = "", **kw
                 return "[database] CREATE TABLE statement required."
             conn.execute(query)
             conn.commit()
-            return f"[database] Table created."
+            return "[database] Table created."
 
         if action == "insert":
             if not query:

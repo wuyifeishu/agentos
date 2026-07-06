@@ -20,14 +20,9 @@ Requirements: pip install fastapi uvicorn aiohttp
 
 from __future__ import annotations
 
-import asyncio
-import json
-import os
 import sys
 import webbrowser
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -196,9 +191,8 @@ def create_app() -> FastAPI:
             if agentos_root not in sys.path:
                 sys.path.insert(0, agentos_root)
 
-            from agentos.marketplace.importer import UnifiedImporter, OpenClawImporter
+            from agentos.marketplace.importer import OpenClawImporter
             from agentos.marketplace.registry import SkillRegistry
-            from agentos.marketplace.manifest import SkillManifest
 
             install_dir = Path.home() / ".agentos" / "skills"
             registry = SkillRegistry(install_dir=str(install_dir))

@@ -7,10 +7,7 @@ test case validation, and structured error extraction for feedback loops.
 
 from __future__ import annotations
 
-import asyncio
 import os
-import resource
-import signal
 import subprocess
 import tempfile
 import traceback

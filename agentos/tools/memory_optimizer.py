@@ -5,9 +5,8 @@ Object pooling, LRU caching, memory monitoring, and smart caching with TTL.
 
 import threading
 import time
-import weakref
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
 
 T = TypeVar("T")

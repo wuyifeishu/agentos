@@ -85,16 +85,20 @@ class TestTaskManager:
 
     def test_done(self):
         mod = _load_skill("task-manager")
+        mod.run(action="add", title="Task to complete")
         r = mod.run(action="done", title="1")
         assert "Done" in r
 
     def test_search(self):
         mod = _load_skill("task-manager")
-        r = mod.run(action="search", title="Test")
-        assert "Test" in r
+        mod.run(action="add", title="Searchable task")
+        r = mod.run(action="search", title="Searchable")
+        assert "Searchable" in r
 
     def test_clear_done(self):
         mod = _load_skill("task-manager")
+        mod.run(action="add", title="Task to complete")
+        mod.run(action="done", title="1")
         r = mod.run(action="clear_done")
         assert "Cleared" in r or "remaining" in r
 

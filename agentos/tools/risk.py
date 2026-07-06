@@ -7,7 +7,7 @@ AgentOS v1.1.4 Tool Risk Rating — 工具风险分级。
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 

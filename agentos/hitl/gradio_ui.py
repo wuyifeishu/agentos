@@ -21,7 +21,6 @@ Core features:
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 import uuid
 import threading
@@ -29,9 +28,8 @@ import queue
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
 from typing import (
-    Any, Callable, Dict, List, Optional, Set, Tuple, Union,
+    Any, Callable, Dict, List, Optional, Tuple,
 )
 
 

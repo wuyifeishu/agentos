@@ -21,22 +21,19 @@ v2 New Features:
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import os
 import subprocess
-import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Callable, Any
+from typing import Optional, Any
 
 from agentos.evolution.engine import EvolutionEngine, EvolutionProposal, EvolutionStatus
-from agentos.evolution.learner import Learner, LearningInsight
-from agentos.evolution.signals import SignalCollector, BehaviorSignal
+from agentos.evolution.learner import Learner
 
 
 # ── Types ───────────────────────────────────────────────────────────

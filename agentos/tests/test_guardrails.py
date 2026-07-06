@@ -2,12 +2,9 @@
 Tests for guardrails module — engine, rules, and policy enforcement.
 """
 
-import pytest
 from agentos.guardrails.engine import (
     GuardrailEngine,
-    GuardrailRule,
     GuardrailAction,
-    GuardrailCategory,
     GuardrailResult,
     InputGuardrail,
     OutputGuardrail,

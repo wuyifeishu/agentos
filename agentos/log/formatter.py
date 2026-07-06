@@ -8,7 +8,6 @@ import json
 _stdlib_logging = importlib.import_module("logging")
 import os
 import sys
-import time
 import uuid
 from typing import IO, Optional
 

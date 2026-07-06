@@ -7,11 +7,9 @@ AgentOS Channels — 统一消息模型与渠道协议。
 
 from __future__ import annotations
 
-import json
 import time
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional
 
 
 class ChannelType(str, Enum):

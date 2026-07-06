@@ -5,7 +5,6 @@ from __future__ import annotations
 import fnmatch
 import os
 import re
-from typing import Any, Dict
 
 from agentos.tools.base import BaseTool, ToolResult
 

@@ -7,7 +7,7 @@ Category: knowledge
 
 def run(action: str, query: str = "", lang: str = "zh") -> str:
     """Wikipedia 查询工具。action: search/summary/page。lang: zh/en/ja 等。"""
-    import urllib.request, urllib.parse, json, re
+    import urllib.request, urllib.parse, json
 
     if not query:
         return "[wikipedia] 需要 query 参数"

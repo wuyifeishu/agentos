@@ -6,7 +6,7 @@ AgentOS v0.20 评测框架。
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass

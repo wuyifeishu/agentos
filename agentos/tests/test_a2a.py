@@ -3,14 +3,13 @@
 import time
 import pytest
 from agentos.protocols.a2a import (
-    TaskState, PartType, MessageRole,
+    TaskState, MessageRole,
     TextPart, FilePart, DataPart, part_from_dict,
     A2AArtifact,
     A2AMessage,
     A2ATask,
     A2AHandoff,
     A2ASession,
-    A2AClient,
     A2AServer,
     new_task, new_handoff,
 )

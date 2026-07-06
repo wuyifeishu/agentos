@@ -10,7 +10,6 @@ Reduces API costs by caching LLM responses. Supports:
 from __future__ import annotations
 
 import hashlib
-import json
 import time
 from collections import OrderedDict
 from dataclasses import dataclass, field

@@ -11,7 +11,7 @@ import inspect
 import json
 import os
 import sys
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from agentos.tools.base import BaseTool, ToolResult
 
@@ -124,7 +124,7 @@ def discover_skills(skills_dir: str = None) -> list[SkillTool]:
                 parameters=params,
             )
             tools.append(tool)
-        except Exception as e:
+        except Exception:
             # Skip skills that fail to load
             continue
 

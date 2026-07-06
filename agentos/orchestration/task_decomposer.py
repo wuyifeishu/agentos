@@ -481,7 +481,7 @@ Only respond with the JSON array, no other text."""
         # 模式 1：提取/收集 → 分析 → 生成
         if any(kw in desc for kw in ("extract", "collect", "fetch", "retrieve", "提取", "收集")):
             subtasks.append(self._create_node(f"Phase 1: Collect data for: {node.description[:60]}"))
-            subtasks.append(self._create_node(f"Phase 2: Analyze/process collected data"))
+            subtasks.append(self._create_node("Phase 2: Analyze/process collected data"))
             subtasks.append(self._create_node(f"Phase 3: Generate output/report for: {node.description[:60]}"))
 
         # 模式 2：对比/比较
@@ -492,13 +492,13 @@ Only respond with the JSON array, no other text."""
             if len(parts) >= 2:
                 subtasks.append(self._create_node(f"Analyze: {parts[0].strip()}"))
                 subtasks.append(self._create_node(f"Analyze: {parts[1].strip()}"))
-                subtasks.append(self._create_node(f"Synthesize comparison results"))
+                subtasks.append(self._create_node("Synthesize comparison results"))
 
         # 模式 3：transform/convert/migrate
         elif any(kw in desc for kw in ("transform", "convert", "migrate", "转换", "迁移")):
-            subtasks.append(self._create_node(f"Validate source data integrity"))
+            subtasks.append(self._create_node("Validate source data integrity"))
             subtasks.append(self._create_node(f"Execute transformation: {node.description[:60]}"))
-            subtasks.append(self._create_node(f"Verify output correctness"))
+            subtasks.append(self._create_node("Verify output correctness"))
 
         # 模式 4：default — 按步骤拆
         else:

@@ -7,9 +7,8 @@ Features: per-request tracking, budget management, usage reporting.
 
 from __future__ import annotations
 
-import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
@@ -294,11 +293,11 @@ class CostTracker:
         total_calls = len(self.usage_log)
 
         lines = [
-            f"╔══ Cost Report ══╗",
+            "╔══ Cost Report ══╗",
             f"║ Total calls:  {total_calls}",
             f"║ Total tokens: {total_tokens:,}",
             f"║ Total cost:   ${total_cost:.4f}",
-            f"╚════════════════╝",
+            "╚════════════════╝",
             "",
             "By model:",
         ]

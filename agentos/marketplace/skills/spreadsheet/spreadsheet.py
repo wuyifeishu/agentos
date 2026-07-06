@@ -8,7 +8,6 @@ Lightweight CSV manipulation without pandas.
 import csv
 import os
 from typing import Any
-from io import StringIO
 
 
 def run(action: str = "read", file_path: str = "", column: str = "", condition: str = "",

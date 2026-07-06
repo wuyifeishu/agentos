@@ -16,7 +16,6 @@ warnings.warn(
 
 from agentos.swarm.coordinator import (
     # Core coordinator
-    SmartSwarmCoordinator,
     SwarmCoordinator,
     # Topology
     SwarmTopology,
@@ -24,7 +23,6 @@ from agentos.swarm.coordinator import (
     SwarmMessage,
     MessageBus,
     # Enums
-    ExecutionMode,
     SwarmAgentRole as AgentRole,
     TaskPriority,
     TaskStatus,

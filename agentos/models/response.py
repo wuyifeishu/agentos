@@ -7,7 +7,7 @@ All responses are wrapped in APIResponse[T] for consistency.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Generic, List, Optional, TypeVar
+from typing import Generic, List, Optional, TypeVar
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 

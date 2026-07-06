@@ -7,7 +7,7 @@ enabling answer provenance and fact-checking.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 import re
 import hashlib
 

@@ -10,7 +10,7 @@ import json
 import hmac
 import hashlib
 import time
-from typing import Optional, Callable, Any
+from typing import Optional
 
 from agentos.channels.base import BaseChannelAdapter, ChannelConfig, ReplyResult
 from agentos.channels.message import ChannelMessage, ChannelType, MessageType

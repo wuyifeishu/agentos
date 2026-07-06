@@ -5,8 +5,8 @@ iterative refinement, few-shot bootstrapping, and multi-strategy optimization.
 
 import random
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional
+from enum import Enum
+from typing import Any, Callable, Optional
 
 
 class OptimizationStrategy(str, Enum):

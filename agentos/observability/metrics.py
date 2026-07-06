@@ -16,7 +16,6 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass

@@ -22,10 +22,8 @@ Desktop Shell — AgentOS 原生桌面壳。
 from __future__ import annotations
 
 import argparse
-import sys
 import os
 import json
-import threading
 import time
 import webbrowser
 

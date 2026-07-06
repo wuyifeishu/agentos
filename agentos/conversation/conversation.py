@@ -10,7 +10,7 @@ import hashlib
 import time
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Callable
+from typing import Callable
 
 
 class MessageRole(str, Enum):

@@ -13,11 +13,10 @@ from __future__ import annotations
 import asyncio
 import time
 from dataclasses import dataclass, field
-from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
-from concurrent.futures import TimeoutError as FutureTimeoutError
+from enum import Enum
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from .base import BaseTool, ToolResult, ToolCall
+from .base import BaseTool, ToolResult
 from .validation import ToolErrorClassifier, ErrorCategory
 
 

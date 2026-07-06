@@ -6,9 +6,7 @@ v1.3.36: 首个实现，支持 Function Calling。
 
 from __future__ import annotations
 
-from typing import Any
 
-from agentos.llm.base import CompletionResult
 from agentos.llm.openai_provider import OpenAIProvider
 
 __all__ = ["DeepSeekProvider"]

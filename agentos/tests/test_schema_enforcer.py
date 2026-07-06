@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field
 from agentos.validation.schema_enforcer import (
     SchemaEnforcer,
     EnforcerConfig,
-    EnforcerResult,
     FixStrategy,
 )
 

@@ -16,7 +16,6 @@ Agent 协作模式 — Debate/Vote/Review/Pipeline/Ensemble。
 
 from __future__ import annotations
 
-import asyncio
 import re
 import time
 import uuid
@@ -25,7 +24,7 @@ from enum import Enum
 from typing import Any, Callable, Awaitable
 
 from .manager import SubAgentManager, SubAgentSpec, SubAgentResult
-from .parent_child import ChildStatus, ChildContext, SharedState, ChildHandle
+from .parent_child import ChildContext, SharedState
 
 
 # ──────────────────────────────────────────────

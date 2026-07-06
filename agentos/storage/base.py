@@ -10,7 +10,6 @@ import sqlite3
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
 
 
 # ── 抽象基类 ────────────────────────────────────

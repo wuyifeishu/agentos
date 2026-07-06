@@ -5,7 +5,6 @@ AgentOS v0.30 Prompt模板管理 — 版本化Prompt仓库。
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
 import json
 import os
 

@@ -12,11 +12,10 @@ Guardrail types:
 from __future__ import annotations
 
 import re
-import json
 import hashlib
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Callable, Optional
+from typing import Any
 
 
 # ── Enums & Data Classes ──────────────────────────────────────────

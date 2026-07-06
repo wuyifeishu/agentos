@@ -8,7 +8,7 @@ assigning each sub-task to appropriate agent roles.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any
 
 import json as _json
 

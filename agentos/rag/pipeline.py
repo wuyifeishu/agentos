@@ -7,8 +7,8 @@ RAG Pipeline — 检索增强生成管道。
 from __future__ import annotations
 
 from agentos.rag.store import VectorStore, ChromaStore
-from agentos.rag.loader import DocumentLoader, Document
-from agentos.agent.tool_agent import ToolAgent, AgentConfig
+from agentos.rag.loader import DocumentLoader
+from agentos.agent.tool_agent import ToolAgent
 
 
 class RAGPipeline:
